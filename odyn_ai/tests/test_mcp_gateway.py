@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from odyn_ai.core.mcp_gateway import MCPGateway
+from odyn_ai.core.secret_manager import NativeSecretManager
 
 
 class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
@@ -11,12 +12,20 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = __import__("unittest").mock.patch.dict(os.environ, {"ODYN_DATA_DIR": self.tmp.name}, clear=False)
         self.env.start()
+        class TestKeyring:
+            def get_password(self, service, name):
+                return os.getenv("ODYN_SECRET_" + name)
+            def set_password(self, service, name, value):
+                return None
+            def delete_password(self, service, name):
+                return None
+        self.keyring = NativeSecretManager(backend=TestKeyring())
 
     def tearDown(self):
         self.env.stop()
         self.tmp.cleanup()
     def test_register_and_list_server(self):
-        gateway = MCPGateway(allowed_hosts={"localhost"})
+        gateway = MCPGateway(allowed_hosts={"localhost"}, secret_manager=self.keyring, ssrf_allow_private=True)
         server = gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
         self.assertEqual(server.name, "narzedzia")
         self.assertEqual(gateway.list_servers(), [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp", "protocol_version": None, "tool_count": 0, "session": False, "auth": "none"}])
@@ -132,7 +141,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             gateway._headers(gateway.get_server("secure"))
 
     def test_non_allowlisted_host_is_rejected(self):
-        gateway = MCPGateway(allowed_hosts={"example.com"})
+        gateway = MCPGateway(allowed_hosts={"example.com"}, secret_manager=self.keyring)
         with self.assertRaises(PermissionError):
             gateway.register_mcp_server("local", "http://localhost:9000/mcp")
 
@@ -163,7 +172,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             await gateway._rate_limiter.acquire("narzedzia")
 
     async def test_unknown_server_is_rejected(self):
-        gateway = MCPGateway()
+        gateway = MCPGateway(allowed_hosts={"localhost"}, secret_manager=self.keyring, ssrf_allow_private=True)
         with self.assertRaises(ValueError):
             await gateway.execute_tool("brak", "search", {})
 
