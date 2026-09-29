@@ -7,6 +7,47 @@
   <meta name="description" content="ODYN AI — lokalna inteligencja, agenci AI oraz tworzenie aplikacji Web i Android.">
   <title>ODYN AI</title>
   <link rel="stylesheet" href="/static/nord.css">
+  <style>
+    #voice-btn {
+      min-width: 48px;
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--nord11);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--nord6);
+      cursor: pointer;
+      font-weight: 700;
+      touch-action: manipulation;
+    }
+    #voice-btn:hover,
+    #voice-btn:focus-visible {
+      background: var(--nord11);
+      color: var(--nord0);
+    }
+    #voice-btn.recording {
+      background: var(--nord11);
+      color: var(--nord6);
+      animation: odyn-voice-pulse 1.5s infinite;
+    }
+    #voice-btn:disabled {
+      cursor: not-allowed;
+      opacity: .5;
+    }
+    #voice-status {
+      min-width: 0;
+      color: var(--nord4);
+      font-size: .78rem;
+      align-self: center;
+    }
+    @keyframes odyn-voice-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.04); opacity: .72; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #voice-btn.recording { animation: none; }
+    }
+  </style>
 </head>
 <body>
   <aside id="sidebar">
@@ -100,7 +141,9 @@
 
     <form id="chat-form">
       <label class="sr-only" for="user-input">Polecenie</label>
-      <textarea id="user-input" rows="1" maxlength="20000" placeholder="Napisz polecenie do ODYN AI…" aria-label="Polecenie do ODYN AI"></textarea>
+      <textarea id="user-input" rows="1" maxlength="20000" placeholder="Napisz polecenie lub użyj głosu…" aria-label="Polecenie do ODYN AI"></textarea>
+      <button id="voice-btn" type="button" aria-label="Włącz dyktowanie" title="Dyktowanie po polsku">🎤 Głos</button>
+      <span id="voice-status" role="status" aria-live="polite">Głos: gotowy</span>
       <button id="send-btn" type="submit">Wyślij</button>
     </form>
   </main>
