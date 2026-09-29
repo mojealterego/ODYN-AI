@@ -66,6 +66,13 @@ class AppCreate(BaseModel):
     description: str = ""
     agent_id: str = "odyn_glowny"
     language: str = "pl"
+    platform: str = "web"
+    mode: str = "no_code"
+
+
+class WorkspaceWrite(BaseModel):
+    path: str
+    content: str
 
 
 @app.get("/")
@@ -107,7 +114,31 @@ async def list_apps():
 @app.post("/api/apps", summary="Utwórz aplikację")
 async def create_app(payload: AppCreate):
     try:
-        return apps.create(payload.name, payload.description, payload.agent_id, payload.language)
+        return apps.create(payload.name, payload.description, payload.agent_id, payload.language, payload.platform, payload.mode)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/apps/{app_id}/workspace", summary="Pobierz projekt IDE")
+async def get_workspace(app_id: str):
+    try:
+        return apps.workspace(app_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/api/apps/{app_id}/files", summary="Pobierz pliki projektu")
+async def get_workspace_files(app_id: str):
+    try:
+        return apps.read_file(app_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.put("/api/apps/{app_id}/files", summary="Zapisz plik projektu")
+async def write_workspace_file(app_id: str, payload: WorkspaceWrite):
+    try:
+        return apps.write_file(app_id, payload.path, payload.content)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
