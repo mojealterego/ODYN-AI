@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import tempfile
 from odyn_ai.config import LLMConfig
 from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
@@ -125,10 +126,10 @@ class BuilderTests(unittest.TestCase):
         builder = AppBuilder()
         app = builder.create("Formularz", "Opis", "odyn_glowny", platform="web", mode="no_code")
         form = builder.create_form(app["app_id"], "Rejestracja")
-        builder.add_form_field(form["form_id"], "name", "Imię")
+        builder.add_form_field(form["form_id"], "text", "Imię")
         builder.add_form_field(form["form_id"], "select", "Rola", options=["Fotograf", "Autor"])
         fields = builder.get_form(form["form_id"])["fields"]
-        self.assertEqual([f["type"] for f in fields], ["name", "select"])
+        self.assertEqual([f["type"] for f in fields], ["text", "select"])
         self.assertEqual(fields[1]["options"], ["Fotograf", "Autor"])
 
     def test_workspace_has_ide_project_files(self):
@@ -145,6 +146,25 @@ class BuilderTests(unittest.TestCase):
         builder.write_file(app["app_id"], "src/App.tsx", "export default function App() { return null }")
         self.assertIn("src/App.tsx", builder.read_file(app["app_id"])["files"])
         self.assertIn("export default", builder.read_file(app["app_id"])["files"])
+
+    def test_agents_persist_and_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = AgentManager(data_dir=tmp)
+            first.create("trwaly_agent", "Trwały agent", "Działaj.", can_search=True)
+            second = AgentManager(data_dir=tmp)
+            loaded = second.get("trwaly_agent")
+            self.assertEqual(loaded.name, "Trwały agent")
+            self.assertTrue(loaded.can_search)
+
+    def test_apps_persist_and_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = AppBuilder(data_dir=tmp)
+            created = first.create("Trwała aplikacja", "Opis", "odyn_glowny")
+            first.write_file(created["app_id"], "src/App.tsx", "export default function App() { return null }")
+            second = AppBuilder(data_dir=tmp)
+            apps = second.list_apps()
+            self.assertEqual(apps[0]["name"], "Trwała aplikacja")
+            self.assertIn("src/App.tsx", second.workspace(created["app_id"])["files"])
 
 class EngineTests(unittest.TestCase):
     def test_auto_without_models_uses_python_fallback(self):
