@@ -23,6 +23,7 @@ from odyn_ai.core.speech_to_text import SpeechToText, SpeechToTextError
 from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.coding_agent import CodingAgent
 from odyn_ai.core.github_integration import GitHubIntegration
+from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
@@ -49,6 +50,7 @@ mcp_gateway = MCPGateway(secret_manager=mcp_secret_manager, timeout=float(os.get
 execution = ExecutionEngine()
 coding_agent = CodingAgent(engine)
 github = GitHubIntegration()
+orchestrator = AutonomousBuildOrchestrator(apps, execution, coding_agent, github)
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
@@ -117,6 +119,14 @@ class GitHubCommitRequest(BaseModel):
     branch: str = "main"
     message: str = Field(min_length=1, max_length=200)
     create_branch: bool = False
+
+
+class AutonomousBuildRequest(BaseModel):
+    instruction: str = Field(min_length=1, max_length=20000)
+    timeout: float = Field(default=300, gt=0, le=900)
+    github_repository: str | None = None
+    github_branch: str = "main"
+    github_message: str = "feat(odyn): autonomous project update"
 
 
 class FormCreate(BaseModel):
@@ -347,6 +357,18 @@ async def execute_project(app_id: str, payload: ExecutionRequestModel):
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
+
+@app.post("/api/apps/{app_id}/autonomous-build", summary="Autonomicznie edytuj, testuj, buduj i weryfikuj projekt")
+async def autonomous_build(app_id: str, payload: AutonomousBuildRequest):
+    try:
+        result = await orchestrator.run(app_id, payload.instruction, payload.timeout, payload.github_repository, payload.github_branch, payload.github_message)
+        return result.__dict__
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Pipeline ODYN: {exc}") from exc
 
 @app.post("/api/apps/{app_id}/github/commit", summary="Wyślij projekt do GitHub")
 async def commit_project_to_github(app_id: str, payload: GitHubCommitRequest):
