@@ -13,24 +13,28 @@ class AgentDefinition:
     name: str
     prompt: str
     can_search: bool = False
+    mode: str = "no_code"
+    code: str = ""
 
 
 class AgentManager:
     def __init__(self) -> None:
         self.internet = OdynInternetAccess()
         self._agents = {
-            "odyn_glowny": AgentDefinition("odyn_glowny", "ODYN AI — Ogólny", SYSTEM_PROMPTS["default"]),
-            "odyn_koder": AgentDefinition("odyn_koder", "ODYN AI — Koder", SYSTEM_PROMPTS["coder"]),
+            "odyn_glowny": AgentDefinition("odyn_glowny", "ODYN AI — Ogólny", SYSTEM_PROMPTS["default"], False, "no_code", ""),
+            "odyn_koder": AgentDefinition("odyn_koder", "ODYN AI — Koder", SYSTEM_PROMPTS["coder"], False, "no_code", ""),
             "odyn_czarny_kruk": AgentDefinition(
                 "odyn_czarny_kruk",
                 "ODYN AI — Czarny Kruk",
                 SYSTEM_PROMPTS["researcher"],
                 True,
+                "no_code",
+                "",
             ),
         }
 
     def list_agents(self) -> list[dict[str, object]]:
-        return [{"id": a.agent_id, "name": a.name, "can_search": a.can_search} for a in self._agents.values()]
+        return [{"id": a.agent_id, "name": a.name, "can_search": a.can_search, "mode": a.mode} for a in self._agents.values()]
 
     def get(self, agent_id: str) -> AgentDefinition:
         return self._agents.get(agent_id, self._agents["odyn_glowny"])
@@ -40,7 +44,16 @@ class AgentManager:
             raise ValueError("Identyfikator agenta może zawierać wyłącznie małe litery, cyfry, myślniki i podkreślenia.")
         if not name.strip() or not prompt.strip():
             raise ValueError("Nazwa agenta i instrukcja agenta są wymagane.")
-        value = AgentDefinition(agent_id, name.strip(), prompt.strip(), can_search)
+        value = AgentDefinition(agent_id, name.strip(), prompt.strip(), can_search, "no_code", "")
+        self._agents[agent_id] = value
+        return value
+
+    def create_code(self, agent_id: str, name: str, source: str) -> AgentDefinition:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,63}", agent_id):
+            raise ValueError("Identyfikator agenta może zawierać wyłącznie małe litery, cyfry, myślniki i podkreślenia.")
+        if not name.strip() or not source.strip():
+            raise ValueError("Nazwa agenta i kod agenta są wymagane.")
+        value = AgentDefinition(agent_id, name.strip(), name.strip(), False, "code", source)
         self._agents[agent_id] = value
         return value
 
