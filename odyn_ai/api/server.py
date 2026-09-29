@@ -75,6 +75,21 @@ class WorkspaceWrite(BaseModel):
     content: str
 
 
+class FormCreate(BaseModel):
+    name: str
+
+
+class FormFieldCreate(BaseModel):
+    field_type: str
+    label: str
+    required: bool = False
+    validation: str = ""
+    default: str = ""
+    options: list[str] = []
+
+
+
+
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse(
@@ -117,6 +132,39 @@ async def create_app(payload: AppCreate):
         return apps.create(payload.name, payload.description, payload.agent_id, payload.language, payload.platform, payload.mode)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+
+@app.post("/api/apps/{app_id}/forms", summary="Utwórz formularz No Code")
+async def create_form(app_id: str, payload: FormCreate):
+    try:
+        return apps.create_form(app_id, payload.name)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/api/forms/{form_id}/fields", summary="Dodaj pole formularza No Code")
+async def add_form_field(form_id: str, payload: FormFieldCreate):
+    try:
+        return apps.add_form_field(form_id, payload.field_type, payload.label, required=payload.required, validation=payload.validation, default=payload.default, options=payload.options)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/forms/{form_id}", summary="Pobierz formularz No Code")
+async def get_form(form_id: str):
+    try:
+        return apps.get_form(form_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/api/forms/{form_id}/preview", summary="Podgląd formularza No Code")
+async def form_preview(form_id: str):
+    try:
+        return apps.form_preview(form_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @app.get("/api/apps/{app_id}/workspace", summary="Pobierz projekt IDE")
