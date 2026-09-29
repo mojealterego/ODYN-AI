@@ -123,6 +123,8 @@ async def register_mcp_server(payload: MCPServerRequest):
         return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix)).__dict__
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
 
 
 @app.delete("/api/mcp/servers/{server_name}", summary="Wyrejestruj serwer MCP")
@@ -154,6 +156,8 @@ async def execute_mcp_tool(payload: MCPToolRequest):
         return await mcp_gateway.execute_tool(payload.server_name, payload.tool_name, payload.payload)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
     except (RuntimeError, TimeoutError) as exc:
         raise HTTPException(502, str(exc)) from exc
 
