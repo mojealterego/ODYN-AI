@@ -3,6 +3,8 @@
   const history = [];
   let project = null;
   let file = null;
+  let form = null;
+  let formAppId = null;
 
   async function loadAgents() {
     const r = await fetch("/api/agents");
@@ -66,6 +68,78 @@
       }
       history.push({role:"user",content:text},{role:"assistant",content:reply});
     } catch (e) { out.textContent = "[Błąd ODYN AI] " + e.message; }
+  }
+
+  async function openNoCodeForm() {
+    const id = $("project-select").value;
+    if (!id) { $("status").textContent = "Wybierz najpierw aplikację Web w trybie No Code."; return; }
+    const project = (await (await fetch("/api/apps")).json()).apps.find(x => x.app_id === id);
+    if (!project || project.platform !== "web" || project.mode !== "no_code") { $("status").textContent = "Builder formularzy wymaga projektu Web + No Code."; return; }
+    formAppId = id;
+    $("form-project-name").textContent = project.name;
+    $("no-code-builder").hidden = false;
+    $("chat-history").hidden = true; $("chat-form").hidden = true;
+  }
+
+  function renderFormCanvas() {
+    const canvas = $("form-canvas-fields"); canvas.replaceChildren();
+    if (!form) return;
+    form.fields.forEach((field, index) => {
+      const card = document.createElement("button");
+      card.type = "button"; card.className = "form-field-card";
+      card.innerHTML = `<strong>${field.label}</strong><span>${field.type}${field.required ? " · wymagane" : ""}</span>`;
+      card.onclick = () => inspectField(index);
+      canvas.appendChild(card);
+    });
+    $("form-preview").innerHTML = form ? formPreviewHtml() : "";
+  }
+
+  function inspectField(index) {
+    const field = form.fields[index];
+    const box = $("form-inspector-content"); box.replaceChildren();
+    const label = document.createElement("label"); label.textContent = "Etykieta";
+    const input = document.createElement("input"); input.value = field.label;
+    input.onchange = () => { field.label = input.value; renderFormCanvas(); };
+    label.appendChild(input); box.appendChild(label);
+    const req = document.createElement("label"); req.textContent = "Wymagane";
+    const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = field.required;
+    checkbox.onchange = () => { field.required = checkbox.checked; renderFormCanvas(); };
+    req.appendChild(checkbox); box.appendChild(req);
+    const validation = document.createElement("input"); validation.placeholder = "Walidacja, np. email"; validation.value = field.validation || "";
+    validation.onchange = () => { field.validation = validation.value; renderFormCanvas(); }; box.appendChild(validation);
+    if (["select","radio"].includes(field.type)) {
+      const options = document.createElement("textarea"); options.value = field.options.join("\n"); options.placeholder = "Jedna opcja w wierszu";
+      options.onchange = () => { field.options = options.value.split("\n").map(x => x.trim()).filter(Boolean); renderFormCanvas(); }; box.appendChild(options);
+    }
+  }
+
+  function formPreviewHtml() {
+    return `<form class="live-form"><h3>${form.name}</h3>${form.fields.map(f => {
+      const req = f.required ? " required" : "";
+      if (f.type === "textarea") return `<label>${f.label}<textarea${req}></textarea></label>`;
+      if (f.type === "select") return `<label>${f.label}<select${req}>${f.options.map(o=>`<option>${o}</option>`).join("")}</select></label>`;
+      if (f.type === "checkbox") return `<label><input type="checkbox"${req}> ${f.label}</label>`;
+      return `<label>${f.label}<input type="${f.type}"${req}></label>`;
+    }).join("")}</form>`;
+  }
+
+  async function createForm() {
+    if (!formAppId) return;
+    const name = prompt("Nazwa formularza:", "Nowy formularz");
+    if (!name) return;
+    const r = await fetch("/api/apps/"+encodeURIComponent(formAppId)+"/forms", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})});
+    if (!r.ok) throw new Error("Nie udało się utworzyć formularza.");
+    form = await r.json(); renderFormCanvas();
+  }
+
+  async function addField(type) {
+    if (!form) { $("status").textContent = "Najpierw kliknij „Utwórz formularz”."; return; }
+    const label = prompt("Etykieta pola:", type === "email" ? "Adres e-mail" : "Nowe pole");
+    if (!label) return;
+    const options = ["select","radio"].includes(type) ? ["Opcja 1","Opcja 2"] : [];
+    const r = await fetch("/api/forms/"+encodeURIComponent(form.form_id)+"/fields",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({field_type:type,label,options})});
+    if (!r.ok) throw new Error("Nie udało się dodać pola.");
+    form = await (await fetch("/api/forms/"+encodeURIComponent(form.form_id))).json(); renderFormCanvas();
   }
 
   function openBuilder(kind) {
@@ -135,6 +209,10 @@
   $("status-btn").onclick=status;
   $("new-agent").onclick=()=>openBuilder("agent");
   $("new-app").onclick=()=>openBuilder("app");
+  $("new-form").onclick=()=>openNoCodeForm().catch(e=>$("status").textContent=e.message);
+  $("form-create").onclick=()=>createForm().catch(e=>$("status").textContent=e.message);
+  $("form-close").onclick=()=>{$("no-code-builder").hidden=true;$("chat-history").hidden=false;$("chat-form").hidden=false;};
+  document.querySelectorAll("[data-field-type]").forEach(b=>b.onclick=()=>addField(b.dataset.fieldType).catch(e=>$("status").textContent=e.message));
   $("open-ide").onclick=()=>openIde().catch(e=>$("status").textContent=e.message);
   $("project-select").onchange=()=>openIde().catch(e=>$("status").textContent=e.message);
   $("project-open").onclick=()=>openIde().catch(e=>$("status").textContent=e.message);
