@@ -316,3 +316,37 @@ Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktual
 **Dodatkowo:** test HTTP przez ASGI potwierdza rzeczywisty przepływ POST → FileResponse → artefakt PDF z poprawnym MIME i nagłówkiem attachment.
 
 **Status modułu eksportu:** implementacja backend + API + IDE UI + szablony jest zweryfikowana automatycznie. Pozostaje opcjonalna weryfikacja E2E w uruchomionej przeglądarce.
+
+
+### 2026-09-29 — Audyt #4 / MCP Gateway
+
+**Stan przed zmianą:**
+- `MCPGateway` potrafił rejestrować endpoint HTTP i wysyłać pojedyncze `tools/call`,
+- brakowało trwałego rejestru serwerów,
+- brakowało handshake `initialize`,
+- brakowało `tools/list` i cache odkrytych narzędzi,
+- brakowało publicznego API FastAPI do zarządzania serwerami MCP,
+- brakowało jednoznacznej obsługi timeoutów, błędów HTTP i błędów JSON-RPC.
+
+**Wykonane:**
+- [x] trwały rejestr `mcp_servers.json` przez istniejący `JsonStore`,
+- [x] rejestracja / wyrejestrowanie serwerów,
+- [x] walidacja HTTP/HTTPS i odrzucenie danych uwierzytelniających w URL,
+- [x] unikalne identyfikatory żądań JSON-RPC,
+- [x] handshake `initialize` z identyfikacją ODYN AI,
+- [x] `tools/list` i cache metadanych narzędzi,
+- [x] `tools/call` z automatyczną inicjalizacją,
+- [x] timeouty i mapowanie błędów transportowych,
+- [x] walidacja odpowiedzi JSON-RPC,
+- [x] API FastAPI: lista/rejestracja/usunięcie serwera,
+- [x] API FastAPI: initialize,
+- [x] API FastAPI: discovery narzędzi,
+- [x] API FastAPI: execute tool,
+- [x] testy lifecycle Gateway i testy HTTP API.
+
+**Bezpieczeństwo / dalsze utwardzenie:**
+- endpointy są walidowane jako HTTP/HTTPS,
+- dane uwierzytelniające nie mogą być przekazywane w URL,
+- pełna polityka allowlist hostów, TLS pinning, OAuth/API-key vault i kontrola uprawnień narzędzi pozostają osobnym etapem hardeningu.
+
+**Weryfikacja:** oczekiwany jest pełny CI po zmianach.
