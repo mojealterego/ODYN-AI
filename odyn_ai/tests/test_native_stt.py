@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = ROOT / "api" / "server.py"
 APP = ROOT / "ui" / "app.js"
-REQUIREMENTS = ROOT / "requirements.txt"
+REQUIREMENTS = ROOT / "requirements_extra.txt"
 
 class NativeSttContractTests(unittest.TestCase):
     def test_frontend_contains_media_recorder_upload_flow(self):
