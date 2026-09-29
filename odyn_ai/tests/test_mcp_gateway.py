@@ -25,10 +25,10 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             "json": lambda self: {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}},
             "raise_for_status": lambda self: None,
         })()
-        client = type("Client", (), {})()
-        client.post = AsyncMock(return_value=response)
-        client.__aenter__ = AsyncMock(return_value=client)
-        client.__aexit__ = AsyncMock(return_value=None)
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = None
         client_cls.return_value = client
 
         gateway = MCPGateway()
