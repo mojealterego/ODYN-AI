@@ -24,6 +24,8 @@ from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.coding_agent import CodingAgent
 from odyn_ai.core.github_integration import GitHubIntegration
 from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
+from odyn_ai.core.experience_memory import AgentExperienceMemory
+from odyn_ai.core.rag_memory import RAGMemoryEngine
 from odyn_ai.core.voice_commands import parse_voice_command
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
@@ -51,7 +53,20 @@ mcp_gateway = MCPGateway(secret_manager=mcp_secret_manager, timeout=float(os.get
 execution = ExecutionEngine()
 coding_agent = CodingAgent(engine)
 github = GitHubIntegration()
-orchestrator = AutonomousBuildOrchestrator(apps, execution, coding_agent, github)
+
+# Durable experience memory is always available. RAG is enabled only when
+# an embedding GGUF is explicitly present/configured.
+rag = None
+rag_model = os.getenv("ODYN_RAG_EMBEDDING_MODEL", "")
+if rag_model and os.path.isfile(rag_model):
+    rag = RAGMemoryEngine(
+        rag_model,
+        data_path=os.getenv("ODYN_RAG_MEMORY_PATH", "odyn_rag_memory.json"),
+    )
+experience_memory = AgentExperienceMemory(rag=rag)
+orchestrator = AutonomousBuildOrchestrator(
+    apps, execution, coding_agent, github, experience_memory
+)
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
