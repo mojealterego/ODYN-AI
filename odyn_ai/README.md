@@ -1,22 +1,28 @@
 # ODYN AI
 
-ODYN AI is the local-first agent layer inside hermes-agent.
+ODYN AI to lokalna warstwa agentowa w repozytorium **hermes-agent**.
 
-## True dual-GGUF mode
+## Tryb dwóch modeli GGUF
 
-Build/install llama-server from llama.cpp and put both files in odyn_ai/models:
+Zbuduj lub zainstaluj **llama-server** z projektu llama.cpp i umieść oba pliki w katalogu `odyn_ai/models`:
 
-- model_glowny_normany.gguf
-- model_pomocniczy_maly.gguf
+- `model_glowny_normany.gguf`
+- `model_pomocniczy_maly.gguf`
 
-Run with ODYN_BACKEND=server. The engine starts llama-server with --model-draft and --spec-type draft-simple, which is the actual two-GGUF speculative path.
+Uruchom aplikację z `ODYN_BACKEND=server`. Silnik uruchomi `llama-server` z parametrami `--model-draft` i `--spec-type draft-simple`. Jest to właściwa ścieżka dekodowania spekulatywnego z dwoma modelami GGUF.
 
-## Python fallback
+## Tryb awaryjny Python
 
-Without llama-server or the draft GGUF, ODYN uses llama-cpp-python and LlamaPromptLookupDecoding. This is local speculative decoding, but it is not a neural two-GGUF draft model.
+Jeżeli `llama-server` lub pomocniczy model GGUF nie są dostępne, ODYN AI użyje `llama-cpp-python` i `LlamaPromptLookupDecoding`. Jest to lokalne dekodowanie spekulatywne, ale **nie jest to neuronowy model pomocniczy GGUF**.
 
-## Run
+## Uruchomienie
 
+```bash
 python -m odyn_ai.run
+```
 
-Open http://127.0.0.1:8000.
+Następnie otwórz w przeglądarce:
+
+`http://127.0.0.1:8000`
+
+Interfejs użytkownika i komunikaty aplikacji są prowadzone po polsku.
