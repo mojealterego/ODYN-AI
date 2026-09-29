@@ -7,6 +7,7 @@ from uuid import uuid4
 
 SUPPORTED_PLATFORMS = {"web", "android"}
 SUPPORTED_MODES = {"no_code", "code"}
+FORM_FIELD_TYPES = {"text", "email", "number", "tel", "date", "textarea", "select", "checkbox", "radio", "file"}
 
 
 @dataclass
@@ -45,6 +46,7 @@ def _android_files(name: str) -> dict[str, str]:
 class AppBuilder:
     def __init__(self) -> None:
         self._apps: dict[str, AppDefinition] = {}
+        self._forms: dict[str, dict[str, object]] = {}
 
     def list_apps(self) -> list[dict[str, object]]:
         return [asdict(a) | {"files": sorted(a.files)} for a in self._apps.values()]
@@ -79,6 +81,53 @@ class AppBuilder:
         self._apps[app.app_id] = app
         return asdict(app) | {"files": sorted(app.files)}
 
+    def create_form(self, app_id: str, name: str) -> dict[str, object]:
+        app = self._get(app_id)
+        if app.mode != "no_code":
+            raise ValueError("Formularze No Code są dostępne w trybie no_code.")
+        if not name.strip():
+            raise ValueError("Nazwa formularza jest wymagana.")
+        form = {"form_id": f"form_{uuid4().hex[:12]}", "app_id": app_id, "name": name.strip(), "fields": []}
+        self._forms[form["form_id"]] = form
+        return form
+
+    def get_form(self, form_id: str) -> dict[str, object]:
+        try:
+            return self._forms[form_id]
+        except KeyError as exc:
+            raise ValueError("Nie znaleziono formularza.") from exc
+
+    def add_form_field(self, form_id: str, field_type: str, label: str, *, required: bool = False, validation: str = "", default: str = "", options: list[str] | None = None) -> dict[str, object]:
+        form = self.get_form(form_id)
+        if field_type not in FORM_FIELD_TYPES:
+            raise ValueError("Nieobsługiwany typ pola formularza.")
+        if not label.strip():
+            raise ValueError("Etykieta pola jest wymagana.")
+        if field_type in {"select", "radio"} and not options:
+            raise ValueError("To pole wymaga listy opcji.")
+        field = {"field_id": f"field_{uuid4().hex[:10]}", "type": field_type, "label": label.strip(), "required": bool(required), "validation": validation.strip(), "default": default, "options": list(options or [])}
+        form["fields"].append(field)
+        return field
+
+    def form_preview(self, form_id: str) -> dict[str, object]:
+        form = self.get_form(form_id)
+        html = [f'<form data-form-id="{form["form_id"]}"><h2>{form["name"]}</h2>']
+        for field in form["fields"]:
+            required = " required" if field["required"] else ""
+            if field["type"] == "select":
+                options = "".join(f'<option>{option}</option>' for option in field["options"])
+                html.append(f'<label>{field["label"]}<select{required}>{options}</select></label>')
+            elif field["type"] == "radio":
+                controls = "".join(f'<label><input type="radio" name="{field["field_id"]}">{option}</label>' for option in field["options"])
+                html.append(f'<fieldset><legend>{field["label"]}</legend>{controls}</fieldset>')
+            elif field["type"] == "textarea":
+                html.append(f'<label>{field["label"]}<textarea{required}>{field["default"]}</textarea></label>')
+            elif field["type"] == "checkbox":
+                html.append(f'<label><input type="checkbox"{required}>{field["label"]}</label>')
+            else:
+                html.append(f'<label>{field["label"]}<input type="{field["type"]}" value="{field["default"]}"{required}></label>')
+        html.append("</form>")
+        return {"form_id": form_id, "html": "\n".join(html)}
     def _get(self, app_id: str) -> AppDefinition:
         try:
             return self._apps[app_id]
