@@ -228,7 +228,7 @@ class SecurityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(PermissionError):
                 policy.validate_addresses([ipaddress.ip_address(address)])
 
-    def test_ssrf_transport_pins_ip_and_preserves_hostname(self):
+    async def test_ssrf_transport_pins_ip_and_preserves_hostname(self):
         from odyn_ai.core.ssrf import PinnedAsyncHTTPTransport, SSRFPolicy
         import ipaddress
         policy = SSRFPolicy()
