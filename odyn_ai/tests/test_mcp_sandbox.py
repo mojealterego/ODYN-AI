@@ -17,6 +17,14 @@ class MCPWorkerTests(unittest.TestCase):
                 "arguments": {},
                 "token": "secret",
             })
+        with self.assertRaises(WorkerProtocolError):
+            validate_request({
+                "version": 1,
+                "operation": "tools/call",
+                "server": "safe",
+                "tool": "run",
+                "arguments": {"api_key": "secret"},
+            })
 
     def test_worker_rejects_unknown_operation(self):
         with self.assertRaises(WorkerProtocolError):
