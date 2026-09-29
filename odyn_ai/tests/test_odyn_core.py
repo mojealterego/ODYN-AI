@@ -30,6 +30,15 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertNotIn("APP BUILDER", html)
         self.assertNotIn("LOCAL-FIRST INTELLIGENCE", html)
 
+    def test_viking_nord_theme_uses_cold_north_palette(self):
+        css = (BASE_DIR / "ui" / "nord.css").read_text(encoding="utf-8")
+        self.assertIn("--obsydian:", css)
+        self.assertIn("--stal:", css)
+        self.assertIn("--stare-zloto:", css)
+        self.assertIn("--runiczny-blekit:", css)
+        self.assertIn("background: radial-gradient", css)
+        self.assertIn("text-transform: uppercase", css)
+
     def test_frontend_status_and_errors_are_polish(self):
         html = (BASE_DIR / "ui" / "index.html").read_text(encoding="utf-8")
         js = (BASE_DIR / "ui" / "app.js").read_text(encoding="utf-8")
