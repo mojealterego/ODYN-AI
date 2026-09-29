@@ -200,9 +200,12 @@ Nie uznajemy funkcji za zakończoną wyłącznie dlatego, że kod się kompiluje
 **Weryfikacja:**
 - przed zmianami: `compileall` PASS,
 - przed zmianami: unittest FAIL — 4 moduły testowe nie importowały się przez brak zależności,
-- po zmianach: oczekiwany kolejny etap to nowy run CI.
+- pierwszy run po dodaniu zależności: 30 testów uruchomiło się; ujawniono 4 regresje testowe i 1 błąd mocka,
+- skorygowano: mock async MCP, asercję workspace, asercję CSS oraz polskie etykiety UI.
 
-**Następny krok:** audyt i naprawa rzeczywistego Android/Web build pipeline oraz integracji MCP/API.
+**Dalsza weryfikacja:** pierwszy run po stabilizacji zależności ujawnił 5 latentnych regresji testowych; zostały skorygowane w testach/mocks oraz w widocznych etykietach UI.
+
+**Następny krok:** kolejny run CI, a następnie audyt rzeczywistego Android/Web build pipeline oraz integracji MCP/API.
 
 ---
 
