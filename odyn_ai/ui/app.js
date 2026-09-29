@@ -122,27 +122,50 @@
     $("dialog-title").textContent = isAgent ? "Kreator agenta" : "Kreator aplikacji";
     $("dialog-fields").replaceChildren();
 
-    const fields = isAgent
-      ? [
-          ["agent-id", "Identyfikator agenta", "np. mój-agent"],
-          ["agent-name", "Nazwa agenta", "np. Analityk"],
-          ["agent-prompt", "Instrukcja agenta", "Opisz rolę i sposób działania agenta."]
-        ]
-      : [
-          ["app-name", "Nazwa aplikacji", "np. Mój Asystent"],
-          ["app-description", "Opis aplikacji", "Krótki opis przeznaczenia aplikacji."]
-        ];
+    if (!isAgent) {
+      const fields = [
+        ["app-name", "Nazwa aplikacji", "np. Mój Asystent"],
+        ["app-description", "Opis aplikacji", "Krótki opis przeznaczenia aplikacji."]
+      ];
+      for (const [id, label, placeholder] of fields) {
+        const wrapper = document.createElement("label");
+        wrapper.className = "dialog-field";
+        wrapper.htmlFor = id;
+        wrapper.textContent = label;
+        const control = id.endsWith("description") ? document.createElement("textarea") : document.createElement("input");
+        control.id = id;
+        control.name = id;
+        control.placeholder = placeholder;
+        control.required = true;
+        wrapper.appendChild(control);
+        $("dialog-fields").appendChild(wrapper);
+      }
+      $("dialog-submit").dataset.builder = kind;
+      dialog.showModal();
+      return;
+    }
 
+    const modeLabel = document.createElement("label");
+    modeLabel.className = "dialog-field";
+    modeLabel.htmlFor = "agent-mode";
+    modeLabel.textContent = "Tryb tworzenia";
+    const mode = document.createElement("select");
+    mode.id = "agent-mode";
+    mode.name = "agent-mode";
+    mode.innerHTML = '<option value="no_code">Tryb bez kodu</option><option value="code">Tryb kodowy</option>';
+    modeLabel.appendChild(mode);
+    $("dialog-fields").appendChild(modeLabel);
+
+    const fields = [
+      ["agent-id", "Identyfikator agenta", "np. moj-agent"],
+      ["agent-name", "Nazwa agenta", "np. Analityk"]
+    ];
     for (const [id, label, placeholder] of fields) {
       const wrapper = document.createElement("label");
       wrapper.className = "dialog-field";
       wrapper.htmlFor = id;
       wrapper.textContent = label;
-
-      const control = id.endsWith("prompt") || id.endsWith("description")
-        ? document.createElement("textarea")
-        : document.createElement("input");
-
+      const control = document.createElement("input");
       control.id = id;
       control.name = id;
       control.placeholder = placeholder;
@@ -150,6 +173,52 @@
       wrapper.appendChild(control);
       $("dialog-fields").appendChild(wrapper);
     }
+
+    const promptWrapper = document.createElement("label");
+    promptWrapper.className = "dialog-field";
+    promptWrapper.htmlFor = "agent-instructions";
+    promptWrapper.textContent = "Instrukcje agenta";
+    const prompt = document.createElement("textarea");
+    prompt.id = "agent-instructions";
+    prompt.name = "agent-instructions";
+    prompt.placeholder = "Opisz rolę, zasady i sposób działania agenta.";
+    prompt.required = true;
+    promptWrapper.appendChild(prompt);
+    $("dialog-fields").appendChild(promptWrapper);
+
+    const codeWrapper = document.createElement("label");
+    codeWrapper.className = "dialog-field";
+    codeWrapper.htmlFor = "agent-code";
+    codeWrapper.textContent = "Kod agenta";
+    const code = document.createElement("textarea");
+    code.id = "agent-code";
+    code.name = "agent-code";
+    code.placeholder = "W trybie kodowym zapisz tutaj źródło agenta. Kod nie jest wykonywany bezpośrednio przez serwer.";
+    code.rows = 14;
+    code.hidden = true;
+    code.required = false;
+    codeWrapper.appendChild(code);
+    $("dialog-fields").appendChild(codeWrapper);
+
+    const searchLabel = document.createElement("label");
+    searchLabel.className = "dialog-field";
+    const search = document.createElement("input");
+    search.type = "checkbox";
+    search.id = "agent-search";
+    search.name = "agent-search";
+    searchWrapper = searchLabel;
+    searchLabel.append(search, document.createTextNode(" Agent może korzystać z wyszukiwania internetowego"));
+    $("dialog-fields").appendChild(searchLabel);
+
+    mode.onchange = () => {
+      const codeMode = mode.value === "code";
+      promptWrapper.hidden = codeMode;
+      prompt.required = !codeMode;
+      code.hidden = !codeMode;
+      code.required = codeMode;
+      searchLabel.hidden = codeMode;
+      search.checked = false;
+    };
 
     $("dialog-submit").dataset.builder = kind;
     dialog.showModal();
@@ -188,8 +257,10 @@
         ? {
             agent_id: formData.get("agent-id"),
             name: formData.get("agent-name"),
-            prompt: formData.get("agent-prompt"),
-            can_search: false
+            mode: formData.get("agent-mode") || "no_code",
+            prompt: formData.get("agent-instructions") || "",
+            code: formData.get("agent-code") || "",
+            can_search: Boolean(formData.get("agent-search"))
           }
         : {
             name: formData.get("app-name"),
