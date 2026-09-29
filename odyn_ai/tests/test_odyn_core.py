@@ -42,7 +42,7 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertNotIn("Builder API", js)
         self.assertIn("Kreator agentów", js)
         self.assertIn("Kreator aplikacji", js)
-        self.assertIn("SILNIK", js)
+        self.assertIn("SILNIK", html)
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
