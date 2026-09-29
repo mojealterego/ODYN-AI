@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -9,9 +10,7 @@ from odyn_ai.api import server
 class MCPApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_register_list_and_remove_mcp_server(self):
         with patch.object(server, "mcp_gateway") as gateway:
-            gateway.register_mcp_server.return_value = type(
-                "Server", (), {"__dict__": {"name": "narzedzia", "endpoint": "http://localhost:9000/mcp"}}
-            )()
+            gateway.register_mcp_server.return_value = SimpleNamespace(name="narzedzia", endpoint="http://localhost:9000/mcp")
             gateway.list_servers.return_value = [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp"}]
             gateway.unregister_mcp_server.return_value = True
             transport = httpx.ASGITransport(app=server.app)
