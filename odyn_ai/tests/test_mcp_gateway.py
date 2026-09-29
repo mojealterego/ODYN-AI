@@ -114,6 +114,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
         gateway.tool_policy["search"] = "allow"
+        gateway.get_server("oauth").protocol_version = "2025-06-18"
         result = await gateway.execute_tool("oauth", "search", {})
         self.assertTrue(result["result"]["ok"])
         calls = client.post.await_args_list
