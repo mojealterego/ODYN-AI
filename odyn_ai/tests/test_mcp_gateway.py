@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -6,6 +7,14 @@ from odyn_ai.core.mcp_gateway import MCPGateway
 
 
 class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = __import__("unittest").mock.patch.dict(os.environ, {"ODYN_DATA_DIR": self.tmp.name}, clear=False)
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
     def test_register_and_list_server(self):
         gateway = MCPGateway(allowed_hosts={"localhost"})
         server = gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
@@ -51,7 +60,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         client.__aenter__.return_value = client
         client.__aexit__.return_value = None
         client_cls.return_value = client
-        gateway = MCPGateway()
+        gateway = MCPGateway(allowed_hosts={"localhost"})
         gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
         result = await gateway.execute_tool("narzedzia", "search", {"query": "ODYN"})
         self.assertTrue(result["result"]["ok"])
