@@ -51,6 +51,15 @@ class AutonomousBuildOrchestrator:
             # Persistence/RAG is advisory. It must never break a build.
             return
 
+    def _remember_episode(self, method: str, *args, **kwargs) -> int | None:
+        if not self.memory:
+            return None
+        try:
+            episode = getattr(self.memory, method)(*args, **kwargs)
+            return getattr(episode, "id", None)
+        except Exception:
+            return None
+
     async def _apply(
         self,
         platform: str,
@@ -91,6 +100,8 @@ class AutonomousBuildOrchestrator:
         files: dict[str, str],
         stage: str,
         result: dict[str, Any],
+        *,
+        failed_execution_id: int | None = None,
     ) -> tuple[dict[str, str], list[dict[str, str]], bool]:
         diagnostics = list(result.get("diagnostics", []))
         failure = (
@@ -111,6 +122,7 @@ class AutonomousBuildOrchestrator:
             stage,
             diagnostics,
             changes,
+            failed_execution_id=failed_execution_id,
         )
         self._remember(
             "record_decision",
@@ -136,22 +148,31 @@ class AutonomousBuildOrchestrator:
             ExecutionRequest(platform, stage, files, timeout)
         )
         result_dict = asdict(result)
-        self._remember("record_execution", app_id, stage, result_dict)
+        failed_execution_id = self._remember_episode(
+            "record_execution", app_id, stage, result_dict
+        )
 
         if result.ok or not allow_correction:
-            return files, [], result
+            return files, [], result, failed_execution_id
 
         files, changes, corrected = await self._correct(
-            app_id, platform, files, stage, result_dict
+            app_id,
+            platform,
+            files,
+            stage,
+            result_dict,
+            failed_execution_id=failed_execution_id,
         )
         if not corrected:
-            return files, [], result
+            return files, [], result, failed_execution_id
 
         retry = await self.execution.execute(
             ExecutionRequest(platform, stage, files, timeout)
         )
-        self._remember("record_execution", app_id, f"{stage}_retry", asdict(retry))
-        return files, changes, retry
+        retry_execution_id = self._remember_episode(
+            "record_execution", app_id, f"{stage}_retry", asdict(retry)
+        )
+        return files, changes, retry, retry_execution_id
 
     async def run(
         self,
@@ -194,11 +215,13 @@ class AutonomousBuildOrchestrator:
             except Exception:
                 pass
 
-        files, test_changes, test = await self._execute_stage(
+        files, test_changes, test, test_memory_id = await self._execute_stage(
             app_id, platform, files, "test", timeout,
             allow_correction=self.max_corrections > 0,
         )
         changes.extend(test_changes)
+        if test_memory_id is not None:
+            memory_events.append(test_memory_id)
 
         if not test.ok:
             return PipelineResult(
@@ -208,11 +231,13 @@ class AutonomousBuildOrchestrator:
                 memory_events,
             )
 
-        files, build_changes, build = await self._execute_stage(
+        files, build_changes, build, build_memory_id = await self._execute_stage(
             app_id, platform, files, "build", timeout,
             allow_correction=self.max_corrections > 0,
         )
         changes.extend(build_changes)
+        if build_memory_id is not None:
+            memory_events.append(build_memory_id)
 
         if not build.ok:
             return PipelineResult(
@@ -228,6 +253,7 @@ class AutonomousBuildOrchestrator:
             platform,
             "verified",
             build.artifact,
+            source_execution_id=build_memory_id,
         )
 
         github_result = None
