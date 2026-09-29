@@ -24,7 +24,7 @@ class _OdynPDF(FPDF):
 
     def footer(self) -> None:
         self.set_y(-13)
-        self.set_font("ODYN", "", 8)
+        self.set_font("Helvetica", "", 8)
         self.set_text_color(120, 130, 140)
         self.cell(0, 6, text=f"ODYN AI  |  {self.page_no()} / {{nb}}", align="C")
 
