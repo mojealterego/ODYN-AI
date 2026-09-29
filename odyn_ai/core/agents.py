@@ -74,6 +74,7 @@ class AgentManager:
             raise ValueError("Nazwa agenta i kod agenta są wymagane.")
         value = AgentDefinition(agent_id, name.strip(), name.strip(), False, "code", source)
         self._agents[agent_id] = value
+        self._persist()
         return value
 
     async def preprocess(self, messages: list[dict[str, str]], agent_id: str) -> list[dict[str, str]]:
