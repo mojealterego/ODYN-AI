@@ -20,6 +20,7 @@
       <div class="eyebrow">APP BUILDER</div>
       <button id="new-agent" type="button">+ Nowy agent</button>
       <button id="new-app" type="button">+ Nowa aplikacja</button>
+      <button id="new-form" type="button">+ Formularz No Code</button>
       <button id="open-ide" type="button">ODYN IDE</button>
       <button id="status-btn" type="button">Status silnika</button>
     </div>
@@ -48,6 +49,8 @@
         <p>System gotowy. Wybierz agenta i rozpocznij rozmowę.</p>
       </div>
     </section>
+
+    <section id="no-code-builder" hidden aria-label="Builder formularzy No Code"><div class="ide-toolbar"><strong>NO CODE FORM BUILDER</strong><span id="form-project-name">Brak projektu</span><button id="form-create" type="button">Utwórz formularz</button><button id="form-close" type="button">Zamknij</button></div><div class="form-builder-grid"><aside class="form-palette"><div class="eyebrow">POLA</div><button data-field-type="text">Tekst</button><button data-field-type="email">E-mail</button><button data-field-type="number">Liczba</button><button data-field-type="tel">Telefon</button><button data-field-type="date">Data</button><button data-field-type="textarea">Długi tekst</button><button data-field-type="select">Lista wyboru</button><button data-field-type="radio">Wybór</button><button data-field-type="checkbox">Checkbox</button><button data-field-type="file">Plik</button></aside><section class="form-canvas"><div class="eyebrow">FORMULARZ</div><div id="form-canvas-fields"></div></section><aside class="form-inspector"><div class="eyebrow">WŁAŚCIWOŚCI POLA</div><div id="form-inspector-content">Wybierz pole.</div><div class="eyebrow">PODGLĄD</div><div id="form-preview"></div></aside></div></section>
 
     <section id="ide" hidden aria-label="ODYN IDE">
       <div class="ide-toolbar">
