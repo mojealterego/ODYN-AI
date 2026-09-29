@@ -39,7 +39,8 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertIn("--runiczny-blekit:", css)
         self.assertIn("background:", css)
         self.assertIn("radial-gradient", css)
-        self.assertIn("text-transform: uppercase", css)
+        self.assertIn("text-transform:uppercase", css)
+
 
     def test_frontend_status_and_errors_are_polish(self):
         html = (BASE_DIR / "ui" / "index.html").read_text(encoding="utf-8")
@@ -58,8 +59,8 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertIn("Tryb kodowy", js)
         self.assertIn("Kod agenta", js)
         self.assertIn("SILNIK", html)
-        self.assertIn("WEB", html)
-        self.assertIn("ANDROID NATIVE", html)
+        self.assertIn("WEB", js)
+        self.assertIn("ANDROID NATIVE", js)
         self.assertIn("ODYN IDE", html)
         self.assertIn("Eksplorator", html)
         self.assertIn("Edytor kodu", html)
