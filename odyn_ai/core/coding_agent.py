@@ -48,19 +48,16 @@ class CodingAgent:
         compact = {k: v[: self.MAX_FILE_SIZE] for k, v in files.items()}
         context = memory_context.strip()
         prompt = (
-            "INSTRUKCJA UŻYTKOWNIKA:
-" + instruction.strip() +
-            (
-                "
-
-DOŚWIADCZENIE Z PAMIĘCI ODYN:
-" + context
-                if context else ""
-            ) +
-            "
-
-PLIKI PROJEKTU:
-" + json.dumps(compact, ensure_ascii=False)
+            "INSTRUKCJA UŻYTKOWNIKA:\n"
+            + instruction.strip()
+            + (
+                "\n\nDOŚWIADCZENIE Z PAMIĘCI ODYN:\n"
+                + context
+                if context
+                else ""
+            )
+            + "\n\nPLIKI PROJEKTU:\n"
+            + json.dumps(compact, ensure_ascii=False)
         )
         messages = [
             {"role": "system", "content": self._system(platform)},
