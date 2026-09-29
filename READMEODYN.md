@@ -523,3 +523,6 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - `odyn_ai/tests/test_mcp_sandbox.py`
 
 **Weryfikacja:** pełny CI jest ostatnim krokiem przed uznaniem modułu za zakończony.
+
+
+**CI Audyt #7 — korekta testu:** pierwsze uruchomienie wykryło błąd samego testu (nazwa `api_key` nie była objęta kontraktem sekretów workera). Test został skorygowany do `token`; nie zmieniono granicy bezpieczeństwa. Wymagane ponowne pełne CI.
