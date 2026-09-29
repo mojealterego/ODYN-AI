@@ -15,6 +15,7 @@ from odyn_ai.config import load_config
 from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
+from odyn_ai.core.mcp_gateway import MCPGateway
 from odyn_ai.core.document_generator import OdynDocumentBuilder
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 
@@ -24,6 +25,7 @@ engine = DualGGUFEngine(config)
 agents = AgentManager()
 apps = AppBuilder()
 documents = OdynDocumentBuilder(os.getenv("ODYN_EXPORT_DIR", "exports"))
+mcp_gateway = MCPGateway(timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")))
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
@@ -100,6 +102,53 @@ async def index(request: Request):
         name="index.html",
         context={"agents": agents.list_agents()},
     )
+
+
+
+@app.get("/api/mcp/servers", summary="Pobierz zarejestrowane serwery MCP")
+async def list_mcp_servers():
+    return {"servers": mcp_gateway.list_servers()}
+
+
+@app.post("/api/mcp/servers", summary="Zarejestruj serwer MCP")
+async def register_mcp_server(payload):
+    try:
+        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint).__dict__
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.delete("/api/mcp/servers/{server_name}", summary="Wyrejestruj serwer MCP")
+async def unregister_mcp_server(server_name: str):
+    if not mcp_gateway.unregister_mcp_server(server_name):
+        raise HTTPException(404, "Serwer MCP nie jest zarejestrowany.")
+    return {"removed": True, "name": server_name}
+
+
+@app.post("/api/mcp/servers/{server_name}/initialize", summary="Zainicjalizuj serwer MCP")
+async def initialize_mcp_server(server_name: str):
+    try:
+        return await mcp_gateway.initialize(server_name)
+    except (ValueError, RuntimeError, TimeoutError) as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+@app.get("/api/mcp/servers/{server_name}/tools", summary="Odkryj narzędzia serwera MCP")
+async def list_mcp_tools(server_name: str):
+    try:
+        return {"tools": await mcp_gateway.discover_tools(server_name)}
+    except (ValueError, RuntimeError, TimeoutError) as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+@app.post("/api/mcp/tools/execute", summary="Wywołaj narzędzie MCP")
+async def execute_mcp_tool(payload):
+    try:
+        return await mcp_gateway.execute_tool(payload.server_name, payload.tool_name, payload.payload)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except (RuntimeError, TimeoutError) as exc:
+        raise HTTPException(502, str(exc)) from exc
 
 
 @app.get("/api/status", summary="Pobierz status silnika")
