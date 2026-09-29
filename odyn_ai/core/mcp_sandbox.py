@@ -48,7 +48,7 @@ class DockerMCPWorker:
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=32m",
             "--user", "65532:65532",
             self.image,
-            "python", "-m", "odyn_ai.core.mcp_worker",
+            "python", "/app/mcp_worker.py",
         ]
 
     async def execute(
