@@ -113,6 +113,9 @@ Dodano regresje dla:
 - [x] persistent MCP registry
 - [x] RAG memory
 - [x] PDF/DOCX/XLSX generator
+- [x] API eksportu PDF/DOCX/XLSX
+- [x] zabezpieczenie nazw plików przed traversal
+- [x] ochrona eksportu XLSX przed formułami w danych użytkownika
 
 ### Nadal wymaga dalszej implementacji
 
@@ -217,3 +220,32 @@ Nie uznajemy funkcji za zakończoną wyłącznie dlatego, że kod się kompiluje
 - llama-cpp-python: Python fallback wykorzystuje `LlamaPromptLookupDecoding`.
 
 Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktualizowany przy każdej kolejnej zmianie.
+
+
+### 2026-09-29 — Audyt #2 / Moduł natywnego generowania dokumentów
+
+**Zakres:** `odyn_ai/core/document_generator.py`
+
+**Ustalenia:**
+- moduł był już częściowo ulepszony względem pierwotnej wersji: `pathlib`, Unicode PDF font discovery, formatowanie nagłówka XLSX, freeze panes i auto-filter,
+- modele API eksportu (`document_api_models.py`) istniały, ale nie były używane przez FastAPI,
+- brakowało kompletnego przepływu endpoint → generator → pobieralny artefakt.
+
+**Wykonane:**
+- dodano `POST /api/documents/pdf`,
+- dodano `POST /api/documents/docx`,
+- dodano `POST /api/documents/xlsx`,
+- endpointy zwracają właściwe typy MIME i bezpieczną nazwę pliku,
+- generator XLSX neutralizuje wartości tekstowe rozpoczynające się od `=`, `+`, `-` lub `@`, aby ograniczyć ryzyko formula injection,
+- zachowano rzeczywiste liczby jako wartości liczbowe,
+- zachowano Unicode PDF przez wykrywanie czcionki TrueType z możliwością wskazania `ODYN_PDF_FONT`,
+- dodano testy traversal/normalizacji rozszerzenia oraz zabezpieczenia XLSX.
+
+**Weryfikacja:**
+- testy regresyjne zostały dodane przed implementacją zmian generatora,
+- następny krok weryfikacyjny: pełny CI po zmianach oraz test HTTP endpointów eksportu.
+
+**Pozostało:**
+- UI export actions,
+- testy pobierania PDF/DOCX/XLSX przez FastAPI,
+- ewentualne szablony dokumentów premium (okładka, stopka, numeracja stron, style DOCX/XLSX).
