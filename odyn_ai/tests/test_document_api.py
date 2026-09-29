@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
+
 from odyn_ai.api.document_api_models import DocumentExportRequest, SpreadsheetExportRequest, ReportExportRequest
 from odyn_ai.api import server
 
@@ -70,6 +72,25 @@ class DocumentExportApiTests(unittest.IsolatedAsyncioTestCase):
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 )
                 self.assertEqual(Path(response.path).name, "raport-agenta.docx")
+
+    async def test_http_export_returns_downloadable_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(server, "documents", server.OdynDocumentBuilder(tmp)):
+                transport = httpx.ASGITransport(app=server.app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://odyn.test") as client:
+                    response = await client.post(
+                        "/api/reports/export",
+                        json={
+                            "format": "pdf",
+                            "title": "Raport HTTP",
+                            "content": "Treść raportu.",
+                            "filename": "raport-http",
+                        },
+                    )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["content-type"], "application/pdf")
+                self.assertIn("attachment", response.headers["content-disposition"])
+                self.assertGreater(len(response.content), 100)
 
 
 if __name__ == "__main__":
