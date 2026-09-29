@@ -49,20 +49,31 @@ class MCPServer:
 
 
 class SecretStore:
-    """Secrets are resolved from environment variables, never persisted to registry."""
+    """Native OS secret store; environment variables are not a production fallback."""
 
-    def __init__(self, prefix: str = "ODYN_SECRET_") -> None:
+    def __init__(self, prefix: str = "ODYN_SECRET_", native: NativeSecretManager | None = None, allow_env_fallback: bool = False) -> None:
         self.prefix = prefix
+        self.native = native
+        self.allow_env_fallback = allow_env_fallback
 
     def get(self, env_name: str | None) -> str | None:
         if not env_name:
             return None
         if not env_name.startswith(self.prefix):
-            raise ValueError("Sekret MCP musi wskazywać zmienną środowiskową z prefiksem ODYN_SECRET_.")
-        return os.getenv(env_name)
+            raise ValueError("Sekret MCP musi wskazywać nazwę ODYN_SECRET_*.")
+        key = env_name[len(self.prefix):]
+        if self.native is not None:
+            return self.native.get(key)
+        if self.allow_env_fallback:
+            return os.getenv(env_name)
+        raise RuntimeError("Brak natywnego Secret Managera; odmowa użycia sekretu ze środowiska.")
 
     def set_local(self, env_name: str, value: str) -> None:
-        raise RuntimeError("ODYN nie zapisuje sekretów do rejestru. Użyj menedżera sekretów lub środowiska procesu.")
+        if not env_name.startswith(self.prefix):
+            raise ValueError("Nazwa sekretu musi zaczynać się od ODYN_SECRET_.")
+        if self.native is None:
+            raise RuntimeError("Brak natywnego Secret Managera.")
+        self.native.set(env_name[len(self.prefix):], value)
 
 
 class RateLimiter:
