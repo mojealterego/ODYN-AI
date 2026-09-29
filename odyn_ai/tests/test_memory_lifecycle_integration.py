@@ -79,18 +79,19 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
             failure = events[2]
             correction = events[3]
             retry = events[4]
+            build = events[5]
             success = events[6]
 
             self.assertEqual(failure.payload["ok"], False)
             self.assertEqual(correction.payload["failed_execution_id"], failure.id)
-            self.assertEqual(success.payload["source_execution_id"], retry.id)
+            self.assertEqual(success.payload["source_execution_id"], build.id)
             self.assertEqual(
                 [item.payload for item in store.related(correction.id, "corrects")],
                 [failure.payload],
             )
             self.assertEqual(
                 [item.payload for item in store.related(success.id, "verified_by")],
-                [retry.payload],
+                [build.payload],
             )
 
 
