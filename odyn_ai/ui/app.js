@@ -82,9 +82,9 @@
   }
 
 
-  async function initNativeVoiceInput() {
+  function initNativeVoiceInput() {
     const voiceBtn = $("voice-btn"), voiceStatus = $("voice-status"), userInput = $("user-input");
-    if (!voiceBtn || !voiceStatus || !userInput || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return;
+    if (!voiceBtn || !voiceStatus || !userInput || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return false;
     const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
     let mediaRecorder = null, stream = null, chunks = [], baseText = "";
     const setUi = (recording, status) => { voiceBtn.classList.toggle("recording", recording); voiceBtn.setAttribute("aria-pressed", String(recording)); voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎙 STT"; voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj nagrywanie STT" : "Włącz natywne STT"); voiceStatus.textContent = status; };
@@ -110,6 +110,7 @@
         mediaRecorder.start(250); setUi(true, "STT: nagrywam…");
       } catch (error) { cleanup(); setUi(false, error.name === "NotAllowedError" ? "STT: brak zgody na mikrofon" : "STT: nie można uruchomić mikrofonu"); }
     });
+    return true;
   }
 
   function initVoiceInput() {
@@ -433,8 +434,7 @@
     $("terminal-output").textContent=`${action.toUpperCase()} · ${project.platform === "android" ? "ANDROID NATIVE" : "WEB"}\n\n${cmd[action]}\n\nPolecenie przygotowane dla projektu.`;
   }
 
-  initNativeVoiceInput();
-  initVoiceInput();
+  if (!initNativeVoiceInput()) initVoiceInput();
   $("chat-form").onsubmit=e=>{e.preventDefault();send();};
   $("user-input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
   $("status-btn").onclick=status;
