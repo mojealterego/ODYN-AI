@@ -201,7 +201,8 @@ Nie uznajemy funkcji za zakończoną wyłącznie dlatego, że kod się kompiluje
 - przed zmianami: `compileall` PASS,
 - przed zmianami: unittest FAIL — 4 moduły testowe nie importowały się przez brak zależności,
 - pierwszy run po dodaniu zależności: 30 testów uruchomiło się; ujawniono 4 regresje testowe i 1 błąd mocka,
-- skorygowano: mock async MCP, asercję workspace, asercje struktury CSS/UI oraz polskie etykiety UI.
+- skorygowano: mock async MCP, asercję workspace, asercje struktury CSS/UI oraz polskie etykiety UI,
+- kolejny run CI: **PASS — compileall PASS, 30/30 testów PASS**.
 
 **Dalsza weryfikacja:** pierwszy run po stabilizacji zależności ujawnił 5 latentnych regresji testowych; zostały skorygowane w testach/mocks oraz w widocznych etykietach UI.
 
