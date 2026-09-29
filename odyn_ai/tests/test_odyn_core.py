@@ -40,6 +40,9 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertNotIn("SPECULATIVE", js)
         self.assertNotIn("Fallback Python", js)
         self.assertNotIn("Builder API", js)
+        self.assertIn("Kreator agentów", js)
+        self.assertIn("Kreator aplikacji", js)
+        self.assertIn("SILNIK", js)
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
