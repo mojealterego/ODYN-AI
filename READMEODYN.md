@@ -548,3 +548,5 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 **Korekta CI Audytu #8:** centralny rejestr został ujednolicony — każdy profil zawiera teraz bezpośrednio `prompt`, dzięki czemu rejestr jest samowystarczalnym kontraktem. `AgentManager` konsumuje `profile["prompt"]`.
 
 **Korekta testu Audytu #8:** usunięto przestarzałą asercję `prompt_key`; test weryfikuje obecnie rzeczywisty kontrakt samowystarczalnego profilu (`prompt`).
+
+**Weryfikacja końcowa Audytu #8:** ODYN AI CI #292 — **PASS**; compileall **PASS**; unittest **PASS — 76 testów**. Profile specjalistyczne są dostępne przez `AgentManager` i pochodzą z centralnego `SPECIALIST_PROFILES`.
