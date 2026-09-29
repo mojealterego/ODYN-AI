@@ -90,6 +90,31 @@ class BuilderTests(unittest.TestCase):
         app = AppBuilder().create("Test", "Opis", "odyn_glowny")
         self.assertTrue(app["app_id"].startswith("app_"))
 
+    def test_app_builder_supports_web_and_native_android_modes(self):
+        builder = AppBuilder()
+        web = builder.create("Web", "Opis", "odyn_glowny", platform="web", mode="no_code")
+        android = builder.create("Android", "Opis", "odyn_glowny", platform="android", mode="code")
+        self.assertEqual(web["platform"], "web")
+        self.assertEqual(web["mode"], "no_code")
+        self.assertEqual(android["platform"], "android")
+        self.assertEqual(android["mode"], "code")
+        with self.assertRaises(ValueError):
+            builder.create("Desktop", "Opis", "odyn_glowny", platform="desktop")
+
+    def test_workspace_has_ide_project_files(self):
+        builder = AppBuilder()
+        app = builder.create("Projekt", "Opis", "odyn_glowny", platform="android", mode="code")
+        workspace = builder.workspace(app["app_id"])
+        self.assertEqual(workspace["platform"], "android")
+        self.assertIn("settings.gradle.kts", workspace["files"])
+        self.assertIn("app/src/main/AndroidManifest.xml", workspace["files"])
+
+    def test_workspace_can_write_and_read_file(self):
+        builder = AppBuilder()
+        app = builder.create("Projekt", "Opis", "odyn_glowny", platform="web", mode="code")
+        builder.write_file(app["app_id"], "src/App.tsx", "export default function App() { return null }")
+        self.assertIn("src/App.tsx", builder.read_file(app["app_id"])["files"])
+        self.assertIn("export default", builder.read_file(app["app_id"])["files"])
 
 class EngineTests(unittest.TestCase):
     def test_auto_without_models_uses_python_fallback(self):
