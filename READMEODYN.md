@@ -440,3 +440,52 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - resolver-level SSRF/DNS-rebinding protection,
 - rzeczywisty sandbox/container dla narzędzi wysokiego ryzyka,
 - E2E z rzeczywistym serwerem MCP obsługującym Streamable HTTP.
+
+
+### 2026-09-29 — Audyt #6 / OAuth PKCE + Native Secrets + SSRF + Sandbox
+
+**Zakres:** OAuth Authorization Code + PKCE, natywny Secret Manager, ochrona SSRF/DNS rebinding oraz rzeczywista izolacja high_risk.
+
+**Wdrożono:**
+- [x] OAuth Authorization Code + PKCE z losowym state,
+- [x] PKCE S256 z jednorazowym code_verifier,
+- [x] wymiana authorization code i refresh token flow,
+- [x] zapis refresh tokenów w natywnym Secret Managerze,
+- [x] brak plaintext-file fallback dla sekretów,
+- [x] NativeSecretManager oparty o systemowy keyring,
+- [x] API rozpoczęcia i zakończenia interaktywnego OAuth,
+- [x] resolver-level SSRF policy dla loopback/private/link-local/multicast/unspecified/reserved,
+- [x] DNS-pinned HTTP transport: połączenie do wcześniej zweryfikowanego IP przy zachowaniu hostname/SNI i Host,
+- [x] brak automatycznych redirectów dla ruchu MCP/OAuth,
+- [x] rzeczywisty SandboxRunner z Docker albo bubblewrap,
+- [x] Docker sandbox: network none, read-only root, cap-drop ALL, no-new-privileges, limity PID/RAM/CPU i izolowany tmp,
+- [x] brak backendu izolacji oznacza deny,
+- [x] high_risk pozostaje zablokowane w ścieżce zdalnego MCP, a lokalne operacje wysokiego ryzyka mają osobną ścieżkę sandboxową.
+
+**Nowe pliki:**
+- odyn_ai/core/mcp_oauth.py
+- odyn_ai/core/secret_manager.py
+- odyn_ai/core/ssrf.py
+- odyn_ai/core/sandbox.py
+
+**Zmodyfikowane:**
+- odyn_ai/core/mcp_gateway.py
+- odyn_ai/api/mcp_api_models.py
+- odyn_ai/api/server.py
+- odyn_ai/requirements_test.txt
+- odyn_ai/tests/test_mcp_gateway.py
+
+**Weryfikacja:**
+- pierwszy CI po integracji: 61 testów, 1 błąd — stary warunek typów auth nie zawierał oauth2_authorization_code,
+- poprawiono warunek,
+- następny ODYN AI CI: PASS — compileall PASS, 61/61 testów PASS,
+- po dodaniu transportu DNS pinning i testu transportowego wymagany jest kolejny pełny CI.
+
+**Uwagi bezpieczeństwa:**
+- PKCE używa S256; authorization response wymaga zgodnego state, a verifier nie jest umieszczany w URL,
+- natywny keyring jest docelowym magazynem sekretów; brak backendu nie powoduje przejścia na plaintext,
+- transport pinujący IP eliminuje podstawową lukę TOCTOU między walidacją DNS a połączeniem,
+- sandbox wymaga realnego backendu izolacji,
+- zdalnego narzędzia MCP nie można bezpośrednio osadzić w lokalnym kontenerze bez sandboxowanego MCP worker/proxy; dlatego zdalne high_risk nadal wymaga osobnego worker/proxy.
+
+**Pozostały osobny etap:** sandboxowany MCP worker/proxy dla zdalnych high_risk, platformowe adaptery Android Keystore/Apple Keychain/Windows Credential Locker, OAuth Authorization Server Metadata i issuer/mix-up validation, rotacja/revokacja refresh tokenów z obsługą invalid_grant oraz opcjonalny DPoP.
