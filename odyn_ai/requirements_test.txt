@@ -14,3 +14,5 @@ numpy>=1.26.0,<3
 pytest>=9,<10
 
 keyring>=25.6.0,<26
+
+python-multipart>=0.0.20,<1
