@@ -32,7 +32,7 @@ def validate_request(request: dict) -> dict:
         raise WorkerProtocolError("Argumenty narzędzia muszą być obiektem JSON.")
     # Secrets never travel through the worker protocol.
     forbidden = {"secret", "token", "authorization", "password", "client_secret"}
-    if forbidden.intersection(request):
+    if forbidden.intersection(request) or any(key.lower() in forbidden for key in arguments):
         raise WorkerProtocolError("Sekrety nie mogą być przekazywane w payloadzie workera.")
     return {
         "version": 1,
