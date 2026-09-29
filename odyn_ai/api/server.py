@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import os
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,12 +15,15 @@ from odyn_ai.config import load_config
 from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
+from odyn_ai.core.document_generator import OdynDocumentBuilder
+from odyn_ai.api.document_api_models import DocumentExportRequest, SpreadsheetExportRequest
 
 
 config = load_config()
 engine = DualGGUFEngine(config)
 agents = AgentManager()
 apps = AppBuilder()
+documents = OdynDocumentBuilder(os.getenv("ODYN_EXPORT_DIR", "exports"))
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
