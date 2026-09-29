@@ -257,7 +257,7 @@ async def export_agent_report(agent_id: str, payload: ReportExportRequest):
     return await export_report(payload)
 
 
-@app.post("/chat/stream", response_class=EventSourceResponse, summary="Rozpocznij strumieniową rozmowę")
+@app.post("/chat/stream", response_class=EventSourceResponse, response_model=None, summary="Rozpocznij strumieniową rozmowę")
 async def chat_stream(payload: ChatRequest) -> AsyncIterable[ServerSentEvent]:
     definition = agents.get(payload.agent_id)
     messages = [{"role": "system", "content": definition.prompt}]
