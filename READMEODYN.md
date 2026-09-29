@@ -416,3 +416,27 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - `READMEODYN.md`
 
 **Weryfikacja:** pełny CI po zmianach jest wymagany przed oznaczeniem audytu jako zakończonego.
+
+
+**Aktualizacja OAuth2:**
+- [x] OAuth 2.0 Client Credentials flow,
+- [x] token endpoint jako allowlisted HTTPS/HTTP endpoint,
+- [x] client ID i client secret wyłącznie przez `ODYN_SECRET_*`,
+- [x] cache tokena w pamięci z uwzględnieniem `expires_in`,
+- [x] automatyczne użycie `Authorization: Bearer <token>`,
+- [x] brak tokena/sekretu → fail closed.
+
+**Końcowa weryfikacja Audytu #5:**
+- wcześniejsze iteracje CI wykryły i usunęły regresje testowe dotyczące persistence, allowlisty, mocków HTTP i OAuth handshake,
+- ostatni ODYN AI CI: **PASS**,
+- compileall: **PASS**,
+- unittest: **53/53 PASS**.
+
+**Stan bezpieczeństwa:** Gateway działa w modelu deny-by-default. Sekrety nie są zapisywane w registry ani audycie; payloady narzędzi nie są zapisywane w audycie. Narzędzia oznaczone `high_risk` pozostają blokowane bez osobnego, kontrolowanego mechanizmu sandbox/approval.
+
+**Pozostaje jako osobny etap produkcyjnego hardeningu:**
+- integracja z natywnym OS/cloud Secret Manager zamiast samego environment,
+- OAuth Authorization Code + PKCE dla interaktywnych kont użytkowników,
+- resolver-level SSRF/DNS-rebinding protection,
+- rzeczywisty sandbox/container dla narzędzi wysokiego ryzyka,
+- E2E z rzeczywistym serwerem MCP obsługującym Streamable HTTP.
