@@ -210,6 +210,8 @@ class MCPGateway:
         if server.session_id:
             headers["Mcp-Session-Id"] = server.session_id
         secret = self._secret_store.get(server.auth.secret_env)
+        if server.auth.kind != "none" and not secret:
+            raise PermissionError(f"Brak sekretu MCP wskazanego przez {server.auth.secret_env}.")
         if secret:
             value = server.auth.prefix + secret if server.auth.kind == "bearer" else secret
             headers[server.auth.header] = value
