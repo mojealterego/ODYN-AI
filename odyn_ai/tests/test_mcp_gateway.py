@@ -98,13 +98,11 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gateway.get_server("narzedzia").session_id, "session-123")
         self.assertEqual(client.post.await_args.kwargs["headers"]["Mcp-Session-Id"], "session-123")
 
-    @patch("odyn_ai.core.mcp_gateway.httpx.AsyncClient")
-    async def test_rate_limit_blocks_excess_requests(self, client_cls):
+    async def test_rate_limit_blocks_excess_requests(self):
         gateway = MCPGateway(allowed_hosts={"localhost"}, rate_limit=1, rate_window=60)
-        gateway.tool_policy["search"] = "allow"
-        gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
+        await gateway._rate_limiter.acquire("narzedzia")
         with self.assertRaises(RuntimeError):
-            await gateway.execute_tool("narzedzia", "search", {})
+            await gateway._rate_limiter.acquire("narzedzia")
 
     async def test_unknown_server_is_rejected(self):
         gateway = MCPGateway()
