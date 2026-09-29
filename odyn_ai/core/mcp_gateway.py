@@ -15,7 +15,7 @@ import httpx
 from odyn_ai.core.mcp_oauth import OAuthAuthorizationClient
 from odyn_ai.core.sandbox import SandboxRunner
 from odyn_ai.core.secret_manager import NativeSecretManager
-from odyn_ai.core.ssrf import SSRFPolicy
+from odyn_ai.core.ssrf import PinnedAsyncHTTPTransport, SSRFPolicy
 
 from odyn_ai.core.state import JsonStore
 
@@ -235,6 +235,7 @@ class MCPGateway:
             client_id=auth.client_id,
             redirect_uri=auth.redirect_uri,
             scope=auth.scope or "",
+            transport=PinnedAsyncHTTPTransport(self._ssrf),
         )
         server._oauth_client = client
         return client.create_authorization_request()
@@ -294,7 +295,7 @@ class MCPGateway:
             return server._oauth_token_value
         self._validate_endpoint(auth.token_url)
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False, transport=PinnedAsyncHTTPTransport(self._ssrf)) as client:
                 response = await client.post(
                     auth.token_url,
                     data={
@@ -372,7 +373,7 @@ class MCPGateway:
         if params is not None:
             body["params"] = params
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False, transport=PinnedAsyncHTTPTransport(self._ssrf)) as client:
                 response = await client.post(server.endpoint, json=body, headers=await self._headers_async(server))
                 response.raise_for_status()
                 response_headers = getattr(response, "headers", {}) or {}
