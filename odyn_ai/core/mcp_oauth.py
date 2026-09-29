@@ -24,12 +24,13 @@ class OAuthToken:
         return self.issued_at + self.expires_in
 
 class OAuthAuthorizationClient:
-    def __init__(self, *, authorization_endpoint: str, token_endpoint: str, client_id: str, redirect_uri: str, scope: str = ""):
+    def __init__(self, *, authorization_endpoint: str, token_endpoint: str, client_id: str, redirect_uri: str, scope: str = "", transport=None):
         self.authorization_endpoint=authorization_endpoint
         self.token_endpoint=token_endpoint
         self.client_id=client_id
         self.redirect_uri=redirect_uri
         self.scope=scope
+        self.transport=transport
         self._pending: dict[str,str]={}
         self._token: OAuthToken|None=None
 
