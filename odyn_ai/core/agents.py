@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from odyn_ai.config import SYSTEM_PROMPTS
+from odyn_ai.config import SPECIALIST_PROFILES, SYSTEM_PROMPTS
 from odyn_ai.core.search import OdynInternetAccess
 from odyn_ai.core.state import JsonStore
 
@@ -34,6 +34,15 @@ class AgentManager:
                 "",
             ),
         }
+        for agent_id, profile in SPECIALIST_PROFILES.items():
+            self._agents[agent_id] = AgentDefinition(
+                agent_id,
+                profile["name"],
+                SYSTEM_PROMPTS[profile["prompt_key"]],
+                profile["can_search"],
+                profile["mode"],
+                "",
+            )
         for item in self._store.load([]):
             try:
                 value = AgentDefinition(**item)
