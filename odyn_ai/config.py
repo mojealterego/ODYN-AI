@@ -47,10 +47,10 @@ SYSTEM_PROMPTS = {
 }
 
 SPECIALIST_PROFILES = {
-    "prawo": {"name": "ODYN AI — Prawo", "prompt_key": "law", "can_search": True, "mode": "no_code"},
-    "osint": {"name": "ODYN AI — OSINT", "prompt_key": "osint", "can_search": True, "mode": "no_code"},
-    "web_builder": {"name": "ODYN AI — Web Builder", "prompt_key": "web_builder", "can_search": True, "mode": "code"},
-    "game_builder": {"name": "ODYN AI — Game Builder", "prompt_key": "game_builder", "can_search": True, "mode": "code"},
+    "prawo": {"name": "ODYN AI — Prawo", "prompt": SYSTEM_PROMPTS["law"], "can_search": True, "mode": "no_code"},
+    "osint": {"name": "ODYN AI — OSINT", "prompt": SYSTEM_PROMPTS["osint"], "can_search": True, "mode": "no_code"},
+    "web_builder": {"name": "ODYN AI — Web Builder", "prompt": SYSTEM_PROMPTS["web_builder"], "can_search": True, "mode": "code"},
+    "game_builder": {"name": "ODYN AI — Game Builder", "prompt": SYSTEM_PROMPTS["game_builder"], "can_search": True, "mode": "code"},
 }
 
 
