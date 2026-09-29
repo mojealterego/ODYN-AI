@@ -73,6 +73,16 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("ODYN_SECRET_TEST_VALUE", str(stored))
             self.assertEqual(stored[0]["auth"]["secret_env"], "ODYN_SECRET_TEST")
 
+    def test_missing_secret_fails_closed(self):
+        from odyn_ai.core.mcp_gateway import MCPAuth
+        gateway = MCPGateway(allowed_hosts={"localhost"})
+        gateway.register_mcp_server(
+            "secure", "https://localhost:9000/mcp",
+            auth=MCPAuth(kind="bearer", secret_env="ODYN_SECRET_DOES_NOT_EXIST"),
+        )
+        with self.assertRaises(PermissionError):
+            gateway._headers(gateway.get_server("secure"))
+
     def test_non_allowlisted_host_is_rejected(self):
         gateway = MCPGateway(allowed_hosts={"example.com"})
         with self.assertRaises(PermissionError):
