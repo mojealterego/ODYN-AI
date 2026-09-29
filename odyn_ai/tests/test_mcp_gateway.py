@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -9,7 +10,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         gateway = MCPGateway(allowed_hosts={"localhost"})
         server = gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
         self.assertEqual(server.name, "narzedzia")
-        self.assertEqual(gateway.list_servers(), [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp", "protocol_version": None, "tool_count": 0}])
+        self.assertEqual(gateway.list_servers(), [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp", "protocol_version": None, "tool_count": 0, "session": False, "auth": "none"}])
 
     def test_invalid_endpoint_is_rejected(self):
         gateway = MCPGateway(allowed_hosts={"localhost"})
@@ -24,7 +25,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         gateway = MCPGateway(allowed_hosts={"localhost"})
         self.assertEqual(gateway.list_servers()[0]["name"], "narzedzia")
         gateway.unregister_mcp_server("narzedzia")
-        store.save.assert_called_once_with([])
+        self.assertEqual(store.save.call_args_list[0].args, ([],))
 
     @patch("odyn_ai.core.mcp_gateway.httpx.AsyncClient")
     async def test_initialize_discovers_tools(self, client_cls):
@@ -35,7 +36,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         client.__aenter__.return_value = client
         client.__aexit__.return_value = None
         client_cls.return_value = client
-        gateway = MCPGateway()
+        gateway = MCPGateway(allowed_hosts={"localhost"})
         gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
         result = await gateway.discover_tools("narzedzia")
         self.assertEqual(result[0]["name"], "search")
@@ -66,9 +67,9 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
                 kind="bearer", secret_env="ODYN_SECRET_TEST"
             ),
         )
-        stored = gateway._store.load([])
-        self.assertNotIn("ODYN_SECRET_TEST_VALUE", str(stored))
-        self.assertEqual(stored[0]["auth"]["secret_env"], "ODYN_SECRET_TEST")
+            stored = gateway._store.load([])
+            self.assertNotIn("ODYN_SECRET_TEST_VALUE", str(stored))
+            self.assertEqual(stored[0]["auth"]["secret_env"], "ODYN_SECRET_TEST")
 
     def test_non_allowlisted_host_is_rejected(self):
         gateway = MCPGateway(allowed_hosts={"example.com"})
