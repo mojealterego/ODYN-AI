@@ -144,14 +144,17 @@ class AgentExperienceMemory:
         stage: str,
         diagnostics: list[str],
         changes: list[dict[str, str]],
+        *,
+        failed_execution_id: int | None = None,
     ) -> MemoryEpisode:
-        return self.remember_and_index(
+        episode = self.remember_and_index(
             "correction",
             {
                 "app_id": app_id,
                 "failed_stage": stage,
                 "diagnostics": diagnostics,
                 "changed_paths": [item["path"] for item in changes],
+                "failed_execution_id": failed_execution_id,
             },
             text=(
                 f"Korekta po błędzie {stage} dla {app_id}. "
@@ -159,6 +162,12 @@ class AgentExperienceMemory:
                 f"Poprawione pliki: {', '.join(item['path'] for item in changes)}."
             ),
         )
+        if failed_execution_id is not None:
+            try:
+                self.store.link(episode.id, failed_execution_id, "corrects")
+            except Exception:
+                pass
+        return episode
 
     def record_success(
         self,
@@ -166,6 +175,8 @@ class AgentExperienceMemory:
         platform: str,
         stage: str,
         artifact: str | None,
+        *,
+        source_execution_id: int | None = None,
     ) -> MemoryEpisode:
         skill_name = f"{platform}.{stage}.verified"
         episode = self.remember_and_index(
@@ -176,12 +187,18 @@ class AgentExperienceMemory:
                 "stage": stage,
                 "artifact": artifact,
                 "procedure": "edit → test → build → verify",
+                "source_execution_id": source_execution_id,
             },
             text=(
                 f"Skuteczna procedura ODYN: {platform}, {stage}. "
                 f"Projekt {app_id} przeszedł weryfikację."
             ),
         )
+        if source_execution_id is not None:
+            try:
+                self.store.link(episode.id, source_execution_id, "verified_by")
+            except Exception:
+                pass
         try:
             self.store.upsert_procedural_skill(
                 skill_name,
