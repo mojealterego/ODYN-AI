@@ -65,7 +65,7 @@ class BitemporalMemoryNode:
         with self._lock:
             self.conn.execute("PRAGMA journal_mode=WAL")
             self.conn.execute("PRAGMA foreign_keys=ON")
-            self.conn.execute("PRAGMA busy_timeout=?", (busy_timeout_ms,))
+            self.conn.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)}")
             self._initialize_schema()
 
     def _initialize_schema(self) -> None:
