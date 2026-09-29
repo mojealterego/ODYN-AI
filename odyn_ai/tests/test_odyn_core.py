@@ -56,6 +56,20 @@ class PolishLanguageTests(unittest.TestCase):
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
+    def test_no_code_agent_has_builder_mode(self):
+        manager = AgentManager()
+        agent = manager.create("analityk", "Analityk", "Analizuj dane.", can_search=True)
+        self.assertEqual(agent.mode, "no_code")
+        self.assertEqual(agent.code, "")
+
+    def test_code_agent_stores_source_without_executing_it(self):
+        manager = AgentManager()
+        source = "def agent(ctx):\n    return ctx"
+        agent = manager.create_code("koder_test", "Koder testowy", source)
+        self.assertEqual(agent.mode, "code")
+        self.assertEqual(agent.code, source)
+        self.assertEqual(agent.prompt, "Koder testowy")
+
     async def test_search_context_is_injected(self):
         manager = AgentManager()
         fake = type("R", (), {"title": "T", "url": "https://example.test", "snippet": "S"})()
