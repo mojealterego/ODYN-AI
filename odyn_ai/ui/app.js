@@ -121,13 +121,23 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#x27;");
+  }
+
   function formPreviewHtml() {
-    return `<form class="live-form"><h3>${form.name}</h3>${form.fields.map(f => {
+    return `<form class="live-form"><h3>${escapeHtml(form.name)}</h3>${form.fields.map(f => {
       const req = f.required ? " required" : "";
-      if (f.type === "textarea") return `<label>${f.label}<textarea${req}></textarea></label>`;
-      if (f.type === "select") return `<label>${f.label}<select${req}>${f.options.map(o=>`<option>${o}</option>`).join("")}</select></label>`;
-      if (f.type === "checkbox") return `<label><input type="checkbox"${req}> ${f.label}</label>`;
-      return `<label>${f.label}<input type="${f.type}"${req}></label>`;
+      const label = escapeHtml(f.label);
+      if (f.type === "textarea") return `<label>${label}<textarea${req}>${escapeHtml(f.default || "")}</textarea></label>`;
+      if (f.type === "select") return `<label>${label}<select${req}>${f.options.map(o=>`<option>${escapeHtml(o)}</option>`).join("")}</select></label>`;
+      if (f.type === "checkbox") return `<label><input type="checkbox"${req}> ${label}</label>`;
+      return `<label>${label}<input type="${escapeHtml(f.type)}"${req}></label>`;
     }).join("")}</form>`;
   }
 
