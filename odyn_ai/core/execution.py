@@ -128,6 +128,18 @@ class ExecutionEngine:
             stdout = stdout_b.decode("utf-8", errors="replace")[-20000:]
             stderr = stderr_b.decode("utf-8", errors="replace")[-20000:]
             artifact = self._artifact(request.platform, request.action, root)
+            persisted_artifact = None
+            if artifact:
+                artifact_source = root / artifact
+                artifact_dir = self.base_dir / "artifacts"
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                destination = artifact_dir / artifact_source.name
+                if artifact_source.is_dir():
+                    if destination.exists(): shutil.rmtree(destination)
+                    shutil.copytree(artifact_source, destination)
+                else:
+                    shutil.copy2(artifact_source, destination)
+                persisted_artifact = str(destination)
             diagnostics = []
             if exit_code is None:
                 diagnostics.append("Narzędzie toolchain nie jest dostępne w środowisku wykonawczym.")
@@ -143,7 +155,7 @@ class ExecutionEngine:
                 stdout=stdout,
                 stderr=stderr,
                 workspace=str(root),
-                artifact=artifact,
+                artifact=persisted_artifact,
                 duration_ms=duration_ms,
                 ok=exit_code == 0 and (request.action != "build" or artifact is not None),
                 diagnostics=diagnostics,
