@@ -1,16 +1,21 @@
 (() => {
   const $ = (id) => document.getElementById(id);
-  const history = [];
+  const histories = new Map();
   let project = null;
   let file = null;
   let form = null;
   let formAppId = null;
 
   async function loadAgents() {
-    const r = await fetch("/api/agents");
+    const r = await fetch("/api/agents", { cache: "no-store" });
     if (!r.ok) throw new Error("Nie udało się pobrać agentów.");
     const data = await r.json();
-    $("agent-select").replaceChildren(...data.agents.map((a) => new Option(a.name, a.id)));
+    const select = $("agent-select");
+    const selected = select.value;
+    select.replaceChildren(...data.agents.map((a) => new Option(a.name, a.id)));
+    if (data.agents.some((a) => a.id === selected)) select.value = selected;
+    if (!select.value && data.agents.length) select.value = data.agents[0].id;
+    return data.agents;
   }
 
   async function loadProjects() {
@@ -49,7 +54,7 @@
     const out = message("Przetwarzanie…", "assistant");
     let reply = "";
     try {
-      const r = await fetch("/chat/stream", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({message:text, agent_id:$("agent-select").value, history})});
+      const r = await fetch("/chat/stream", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({message:text, agent_id:$("agent-select").value, history:histories.get($("agent-select").value) || []})});
       if (!r.ok) throw new Error("Błąd HTTP " + r.status);
       const reader = r.body.getReader(), decoder = new TextDecoder();
       let buffer = "";
@@ -66,7 +71,10 @@
           if (type === "error") throw new Error(data);
         }
       }
-      history.push({role:"user",content:text},{role:"assistant",content:reply});
+      const agentId = $("agent-select").value;
+      const agentHistory = histories.get(agentId) || [];
+      agentHistory.push({role:"user",content:text},{role:"assistant",content:reply});
+      histories.set(agentId, agentHistory.slice(-40));
     } catch (e) { out.textContent = "[Błąd ODYN AI] " + e.message; }
   }
 
@@ -207,6 +215,12 @@
   $("chat-form").onsubmit=e=>{e.preventDefault();send();};
   $("user-input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
   $("status-btn").onclick=status;
+  $("agent-select").onchange=()=>{
+    const agentId=$("agent-select").value;
+    histories.set(agentId, (histories.get(agentId) || []).slice(-40));
+    $("chat-history").replaceChildren();
+    $("status").textContent="Aktywny agent: "+($("agent-select").selectedOptions[0]?.textContent || agentId);
+  };
   $("new-agent").onclick=()=>openBuilder("agent");
   $("new-app").onclick=()=>openBuilder("app");
   $("new-form").onclick=()=>openNoCodeForm().catch(e=>$("status").textContent=e.message);
@@ -237,4 +251,6 @@
   };
 
   Promise.all([loadAgents(),loadProjects(),status()]).catch(e=>{$("status").textContent="Nie udało się uruchomić interfejsu.";console.error(e);});
+  setInterval(()=>loadAgents().catch(()=>{}), 5000);
+  setInterval(()=>loadProjects().catch(()=>{}), 5000);
 })();
