@@ -62,6 +62,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         client_cls.return_value = client
         gateway = MCPGateway(allowed_hosts={"localhost"})
         gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
+        gateway.tool_policy["search"] = "allow"
         result = await gateway.execute_tool("narzedzia", "search", {"query": "ODYN"})
         self.assertTrue(result["result"]["ok"])
         body = client.post.await_args.kwargs["json"]
