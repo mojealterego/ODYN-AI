@@ -34,13 +34,33 @@ class CodingAgent:
             f"Platforma projektu: {platform}."
         )
 
-    async def propose(self, platform: str, instruction: str, files: dict[str, str]) -> dict[str, Any]:
+    async def propose(
+        self,
+        platform: str,
+        instruction: str,
+        files: dict[str, str],
+        *,
+        memory_context: str = "",
+    ) -> dict[str, Any]:
         if not instruction.strip():
             raise ValueError("Instrukcja zmiany jest wymagana.")
+
         compact = {k: v[: self.MAX_FILE_SIZE] for k, v in files.items()}
+        context = memory_context.strip()
         prompt = (
-            "INSTRUKCJA UŻYTKOWNIKA:\n" + instruction.strip() +
-            "\n\nPLIKI PROJEKTU:\n" + json.dumps(compact, ensure_ascii=False)
+            "INSTRUKCJA UŻYTKOWNIKA:
+" + instruction.strip() +
+            (
+                "
+
+DOŚWIADCZENIE Z PAMIĘCI ODYN:
+" + context
+                if context else ""
+            ) +
+            "
+
+PLIKI PROJEKTU:
+" + json.dumps(compact, ensure_ascii=False)
         )
         messages = [
             {"role": "system", "content": self._system(platform)},
@@ -51,16 +71,23 @@ class CodingAgent:
             text += token
             if len(text) > 25_000_000:
                 raise ValueError("Odpowiedź Coding Agent jest zbyt duża.")
+
         try:
             data = json.loads(text)
         except json.JSONDecodeError as exc:
             raise ValueError("Coding Agent nie zwrócił poprawnego JSON.") from exc
+
         changes = data.get("changes")
         if not isinstance(changes, list) or len(changes) > self.MAX_FILES:
             raise ValueError("Nieprawidłowa lista zmian Coding Agent.")
+
         normalized: list[dict[str, str]] = []
         for item in changes:
-            if not isinstance(item, dict) or not isinstance(item.get("path"), str) or not isinstance(item.get("content"), str):
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("path"), str)
+                or not isinstance(item.get("content"), str)
+            ):
                 raise ValueError("Każda zmiana musi zawierać path i content.")
             path = PurePosixPath(item["path"])
             if path.is_absolute() or ".." in path.parts or item["path"].startswith("~"):
@@ -68,10 +95,23 @@ class CodingAgent:
             if len(item["content"].encode("utf-8")) > self.MAX_FILE_SIZE:
                 raise ValueError(f"Plik jest zbyt duży: {item['path']}")
             normalized.append({"path": str(path), "content": item["content"]})
+
         return {"summary": str(data.get("summary", "")), "changes": normalized}
 
-    async def apply(self, platform: str, instruction: str, files: dict[str, str]) -> dict[str, Any]:
-        proposal = await self.propose(platform, instruction, files)
+    async def apply(
+        self,
+        platform: str,
+        instruction: str,
+        files: dict[str, str],
+        *,
+        memory_context: str = "",
+    ) -> dict[str, Any]:
+        proposal = await self.propose(
+            platform,
+            instruction,
+            files,
+            memory_context=memory_context,
+        )
         updated = dict(files)
         for change in proposal["changes"]:
             updated[change["path"]] = change["content"]
