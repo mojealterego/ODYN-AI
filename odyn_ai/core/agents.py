@@ -5,6 +5,7 @@ import re
 
 from odyn_ai.config import SYSTEM_PROMPTS
 from odyn_ai.core.search import OdynInternetAccess
+from odyn_ai.core.state import JsonStore
 
 
 @dataclass(frozen=True)
@@ -18,8 +19,9 @@ class AgentDefinition:
 
 
 class AgentManager:
-    def __init__(self) -> None:
+    def __init__(self, data_dir: str | None = None) -> None:
         self.internet = OdynInternetAccess()
+        self._store = JsonStore("agents", data_dir)
         self._agents = {
             "odyn_glowny": AgentDefinition("odyn_glowny", "ODYN AI — Ogólny", SYSTEM_PROMPTS["default"], False, "no_code", ""),
             "odyn_koder": AgentDefinition("odyn_koder", "ODYN AI — Koder", SYSTEM_PROMPTS["coder"], False, "no_code", ""),
@@ -32,6 +34,22 @@ class AgentManager:
                 "",
             ),
         }
+        for item in self._store.load([]):
+            try:
+                value = AgentDefinition(**item)
+                if value.agent_id not in self._agents:
+                    self._agents[value.agent_id] = value
+            except (TypeError, ValueError):
+                continue
+
+    def _persist(self) -> None:
+        custom = [
+            {"agent_id": a.agent_id, "name": a.name, "prompt": a.prompt,
+             "can_search": a.can_search, "mode": a.mode, "code": a.code}
+            for agent_id, a in self._agents.items()
+            if agent_id not in {"odyn_glowny", "odyn_koder", "odyn_czarny_kruk"}
+        ]
+        self._store.save(custom)
 
     def list_agents(self) -> list[dict[str, object]]:
         return [{"id": a.agent_id, "name": a.name, "can_search": a.can_search, "mode": a.mode} for a in self._agents.values()]
@@ -46,6 +64,7 @@ class AgentManager:
             raise ValueError("Nazwa agenta i instrukcja agenta są wymagane.")
         value = AgentDefinition(agent_id, name.strip(), prompt.strip(), can_search, "no_code", "")
         self._agents[agent_id] = value
+        self._persist()
         return value
 
     def create_code(self, agent_id: str, name: str, source: str) -> AgentDefinition:
