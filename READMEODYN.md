@@ -546,3 +546,5 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 **Weryfikacja:** pełny CI wymagany po integracji; nie uznawać etapu za zakończony przed compileall + pełnym unittest.
 
 **Korekta CI Audytu #8:** centralny rejestr został ujednolicony — każdy profil zawiera teraz bezpośrednio `prompt`, dzięki czemu rejestr jest samowystarczalnym kontraktem. `AgentManager` konsumuje `profile["prompt"]`.
+
+**Korekta testu Audytu #8:** usunięto przestarzałą asercję `prompt_key`; test weryfikuje obecnie rzeczywisty kontrakt samowystarczalnego profilu (`prompt`).
