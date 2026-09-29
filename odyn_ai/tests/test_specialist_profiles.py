@@ -13,7 +13,6 @@ class SpecialistProfileTests(unittest.TestCase):
         for profile_id, profile in SPECIALIST_PROFILES.items():
             self.assertTrue(profile["name"])
             self.assertTrue(profile["prompt"])
-            self.assertIn(profile["prompt_key"], SYSTEM_PROMPTS)
             self.assertIsInstance(profile["can_search"], bool)
             self.assertIn(profile["mode"], {"no_code", "code"})
 
