@@ -47,11 +47,31 @@
     return el;
   }
 
+  async function tryVoiceAutobuild(text) {
+    if (!window.ODYNVoiceAutobuild) return false;
+    const command = window.ODYNVoiceAutobuild.parse(text);
+    if (!command) return false;
+
+    const out = message("ODYN: uruchamiam autonomiczne budowanie…", "assistant");
+    try {
+      const result = await window.ODYNVoiceAutobuild.autonomousBuild(text, project?.app_id || null);
+      out.textContent = result.result?.ok
+        ? "ODYN: budowa zakończona. Artefakt: " + (result.result.build?.artifact || "brak ścieżki")
+        : "ODYN: pipeline zatrzymany na etapie " + (result.result?.stage || "unknown") + ".";
+      await loadProjects();
+      return true;
+    } catch (error) {
+      out.textContent = "[Błąd autonomicznego budowania] " + error.message;
+      return true;
+    }
+  }
+
   async function send() {
     const text = $("user-input").value.trim();
     if (!text) return;
     message(text, "user");
     $("user-input").value = "";
+    if (await tryVoiceAutobuild(text)) return;
     const out = message("Przetwarzanie…", "assistant");
     let reply = "";
     try {
