@@ -31,6 +31,7 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertNotIn("LOCAL-FIRST INTELLIGENCE", html)
 
     def test_frontend_status_and_errors_are_polish(self):
+        html = (BASE_DIR / "ui" / "index.html").read_text(encoding="utf-8")
         js = (BASE_DIR / "ui" / "app.js").read_text(encoding="utf-8")
         self.assertIn("PODWÓJNY GGUF", js)
         self.assertIn("PYTHON", js)
