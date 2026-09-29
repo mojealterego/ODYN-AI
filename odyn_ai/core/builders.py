@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from html import escape
 from pathlib import PurePosixPath
 from uuid import uuid4
 
@@ -124,21 +125,21 @@ class AppBuilder:
 
     def form_preview(self, form_id: str) -> dict[str, object]:
         form = self.get_form(form_id)
-        html = [f'<form data-form-id="{form["form_id"]}"><h2>{form["name"]}</h2>']
+        html = [f'<form data-form-id="{escape(str(form["form_id"]), quote=True)}"><h2>{escape(str(form["name"]))}</h2>']
         for field in form["fields"]:
             required = " required" if field["required"] else ""
             if field["type"] == "select":
-                options = "".join(f'<option>{option}</option>' for option in field["options"])
+                options = "".join(f'<option>{escape(str(option))}</option>' for option in field["options"])
                 html.append(f'<label>{field["label"]}<select{required}>{options}</select></label>')
             elif field["type"] == "radio":
-                controls = "".join(f'<label><input type="radio" name="{field["field_id"]}">{option}</label>' for option in field["options"])
-                html.append(f'<fieldset><legend>{field["label"]}</legend>{controls}</fieldset>')
+                controls = "".join(f'<label><input type="radio" name="{escape(str(field["field_id"]), quote=True)}">{escape(str(option))}</label>' for option in field["options"])
+                html.append(f'<fieldset><legend>{escape(str(field["label"]))}</legend>{controls}</fieldset>')
             elif field["type"] == "textarea":
-                html.append(f'<label>{field["label"]}<textarea{required}>{field["default"]}</textarea></label>')
+                html.append(f'<label>{escape(str(field["label"]))}<textarea{required}>{escape(str(field["default"]))}</textarea></label>')
             elif field["type"] == "checkbox":
-                html.append(f'<label><input type="checkbox"{required}>{field["label"]}</label>')
+                html.append(f'<label><input type="checkbox"{required}>{escape(str(field["label"]))}</label>')
             else:
-                html.append(f'<label>{field["label"]}<input type="{field["type"]}" value="{field["default"]}"{required}></label>')
+                html.append(f'<label>{escape(str(field["label"]))}<input type="{escape(str(field["type"]), quote=True)}" value="{escape(str(field["default"]), quote=True)}"{required}></label>')
         html.append("</form>")
         return {"form_id": form_id, "html": "\n".join(html)}
     def _get(self, app_id: str) -> AppDefinition:
