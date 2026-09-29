@@ -5,6 +5,7 @@
   let file = null;
   let form = null;
   let formAppId = null;
+  let lastAgentReport = null;
 
   async function loadAgents() {
     const r = await fetch("/api/agents", { cache: "no-store" });
@@ -72,10 +73,55 @@
         }
       }
       const agentId = $("agent-select").value;
+      lastAgentReport = { agentId, title: "Raport · " + ($("agent-select").selectedOptions[0]?.textContent || "ODYN AI"), content: reply };
+      if (!$("export-filename").value.trim()) $("export-filename").value = "raport-odyn";
       const agentHistory = histories.get(agentId) || [];
       agentHistory.push({role:"user",content:text},{role:"assistant",content:reply});
       histories.set(agentId, agentHistory.slice(-40));
     } catch (e) { out.textContent = "[Błąd ODYN AI] " + e.message; }
+  }
+
+
+  async function exportReport(format) {
+    if (!lastAgentReport || !lastAgentReport.content.trim()) {
+      $("status").textContent = "Najpierw wygeneruj raport odpowiedzią agenta.";
+      return;
+    }
+    const requestedFormat = format || $("export-format").value;
+    const filename = $("export-filename").value.trim() || "raport-odyn";
+    const title = lastAgentReport.title || "Raport ODYN";
+    const payload = {
+      format: requestedFormat,
+      title,
+      content: lastAgentReport.content,
+      filename,
+    };
+    $("terminal-output").textContent = "Przygotowywanie eksportu " + requestedFormat.toUpperCase() + "…";
+    try {
+      const r = await fetch("/api/agents/" + encodeURIComponent(lastAgentReport.agentId) + "/reports/export", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const detail = await r.text();
+        throw new Error(detail || ("Błąd HTTP " + r.status));
+      }
+      const blob = await r.blob();
+      const extension = requestedFormat === "docx" ? "docx" : requestedFormat;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename.replace(/\.(pdf|docx|xlsx)$/i, "") + "." + extension;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      $("terminal-output").textContent = "Eksport zakończony: " + a.download;
+      $("status").textContent = "Raport pobrany jako " + requestedFormat.toUpperCase() + ".";
+    } catch (e) {
+      $("terminal-output").textContent = "Błąd eksportu: " + e.message;
+      $("status").textContent = "Nie udało się pobrać raportu.";
+    }
   }
 
   async function openNoCodeForm() {
@@ -243,6 +289,8 @@
   $("ide-close").onclick=()=>{$("ide").hidden=true;$("chat-history").hidden=false;$("chat-form").hidden=false;};
   $("save-file").onclick=()=>saveFile().catch(e=>$("terminal-output").textContent=e.message);
   $("ide-run").onclick=()=>ideAction("run"); $("ide-build").onclick=()=>ideAction("build"); $("ide-test").onclick=()=>ideAction("test");
+  $("export-report").onclick=()=>exportReport().catch(e=>$("status").textContent=e.message);
+  document.querySelectorAll(".export-quick").forEach(b=>b.onclick=()=>{ $("export-format").value=b.dataset.exportFormat; exportReport(b.dataset.exportFormat); });
   $("ai-apply").onclick=()=>{const x=$("ai-command").value.trim(); if(x)$("terminal-output").textContent="ODYN Coding Agent:\n"+x; $("ai-command").value="";};
 
   $("builder-form").onsubmit=async e=>{
