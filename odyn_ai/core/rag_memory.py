@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from llama_cpp import Llama
+Llama = None
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -26,7 +26,10 @@ class RAGMemoryEngine:
 
         print("🐦‍⬛ ODYN AI: Inicjalizacja Pamięci Wektorowej RAG 2.0...")
         try:
-            self.embedder = Llama(
+            embedder_cls = Llama
+            if embedder_cls is None:
+                from llama_cpp import Llama as embedder_cls
+            self.embedder = embedder_cls(
                 model_path=embedding_model_path,
                 embedding=True,
                 n_ctx=n_ctx,
