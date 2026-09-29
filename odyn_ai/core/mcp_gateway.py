@@ -238,6 +238,13 @@ class MCPGateway:
             transport=PinnedAsyncHTTPTransport(self._ssrf),
         )
         server._oauth_client = client
+        refresh_name = "ODYN_SECRET_OAUTH_REFRESH_" + server.name.replace("-", "_").replace(" ", "_")
+        try:
+            refresh_token = self._secret_store.get(refresh_name)
+            if refresh_token:
+                client.restore_refresh_token(refresh_token)
+        except (RuntimeError, ValueError):
+            pass
         return client.create_authorization_request()
 
     async def complete_oauth_authorization(self, server_name: str, code: str, state: str):
@@ -245,6 +252,8 @@ class MCPGateway:
         if client is None:
             raise PermissionError("Brak oczekującej sesji OAuth PKCE.")
         token = await client.exchange_code(code, state)
+        if token.refresh_token:
+            self._secret_store.set_local("ODYN_SECRET_OAUTH_REFRESH_" + server_name.replace("-", "_").replace(" ", "_"), token.refresh_token)
         self._audit_event({"action": "oauth_authorization", "server": server_name, "result": "ok"})
         return token
 
@@ -253,6 +262,8 @@ class MCPGateway:
         if client is None:
             raise PermissionError("Brak sesji OAuth PKCE.")
         token = await client.refresh()
+        if token.refresh_token:
+            self._secret_store.set_local("ODYN_SECRET_OAUTH_REFRESH_" + server_name.replace("-", "_").replace(" ", "_"), token.refresh_token)
         self._audit_event({"action": "oauth_refresh", "server": server_name, "result": "ok"})
         return token
 
