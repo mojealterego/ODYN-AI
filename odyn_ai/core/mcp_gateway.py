@@ -208,8 +208,8 @@ class MCPGateway:
             raise ValueError("Nazwa serwera MCP nie może być pusta.")
         self._validate_endpoint(url)
         auth = auth or MCPAuth()
-        if auth.kind not in {"none", "api_key", "bearer", "oauth2_client_credentials"}:
-            raise ValueError("Typ uwierzytelniania MCP musi być: none, api_key albo bearer.")
+        if auth.kind not in {"none", "api_key", "bearer", "oauth2_client_credentials", "oauth2_authorization_code"}:
+            raise ValueError("Nieznany typ uwierzytelniania MCP.")
         if auth.kind == "oauth2_client_credentials" and (not auth.client_id_env or not auth.client_secret_env or not auth.token_url):
             raise ValueError("OAuth2 Client Credentials wymaga client_id_env, client_secret_env i token_url.")
         if auth.kind == "oauth2_authorization_code" and (not auth.authorization_url or not auth.token_url or not auth.client_id or not auth.redirect_uri):
