@@ -23,7 +23,7 @@ class MCPWorkerTests(unittest.TestCase):
                 "operation": "tools/call",
                 "server": "safe",
                 "tool": "run",
-                "arguments": {"api_key": "secret"},
+                "arguments": {"token": "secret"},
             })
 
     def test_worker_rejects_unknown_operation(self):
