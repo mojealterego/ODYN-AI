@@ -52,6 +52,11 @@ class OAuthAuthorizationClient:
         self._token=OAuthToken(str(payload["access_token"]),str(payload.get("token_type","Bearer")),int(payload.get("expires_in",300)),payload.get("refresh_token"),payload.get("scope"),time.time())
         return self._token
 
+    def restore_refresh_token(self, refresh_token: str) -> None:
+        if not refresh_token:
+            raise ValueError("Refresh token nie może być pusty.")
+        self._token = OAuthToken(access_token="", expires_in=0, refresh_token=refresh_token, issued_at=time.time())
+
     async def refresh(self) -> OAuthToken:
         if not self._token or not self._token.refresh_token: raise PermissionError("Brak refresh tokena OAuth.")
         async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
