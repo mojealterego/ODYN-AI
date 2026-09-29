@@ -170,3 +170,70 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SecurityBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    def test_pkce_authorization_request_contains_state_and_challenge(self):
+        from odyn_ai.core.mcp_oauth import OAuthAuthorizationClient
+        client = OAuthAuthorizationClient(
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            client_id="odyn",
+            redirect_uri="http://127.0.0.1:8765/callback",
+            scope="mcp",
+        )
+        request = client.create_authorization_request()
+        self.assertTrue(request.state)
+        self.assertTrue(request.code_verifier)
+        self.assertIn("code_challenge=", request.url)
+        self.assertIn("code_challenge_method=S256", request.url)
+        self.assertNotIn(request.code_verifier, request.url)
+
+    async def test_pkce_callback_exchanges_code_and_refreshes_token(self):
+        from odyn_ai.core.mcp_oauth import OAuthAuthorizationClient
+        client = OAuthAuthorizationClient(
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            client_id="odyn",
+            redirect_uri="http://127.0.0.1:8765/callback",
+        )
+        request = client.create_authorization_request()
+        response = type("Response", (), {
+            "raise_for_status": lambda self: None,
+            "json": lambda self: {"access_token": "access-1", "refresh_token": "refresh-1", "expires_in": 300},
+        })()
+        http = AsyncMock()
+        http.post.return_value = response
+        http.__aenter__.return_value = http
+        http.__aexit__.return_value = None
+        with patch("odyn_ai.core.mcp_oauth.httpx.AsyncClient", return_value=http):
+            token = await client.exchange_code("auth-code", request.state)
+        self.assertEqual(token.access_token, "access-1")
+        self.assertEqual(token.refresh_token, "refresh-1")
+        self.assertEqual(http.post.await_args.kwargs["data"]["code_verifier"], request.code_verifier)
+
+    def test_ssrf_rejects_private_and_loopback_addresses(self):
+        from odyn_ai.core.ssrf import SSRFPolicy
+        import ipaddress
+        policy = SSRFPolicy()
+        with self.assertRaises(PermissionError):
+            policy.validate_addresses([ipaddress.ip_address("127.0.0.1")])
+        with self.assertRaises(PermissionError):
+            policy.validate_addresses([ipaddress.ip_address("169.254.169.254")])
+
+    def test_ssrf_allows_public_address(self):
+        from odyn_ai.core.ssrf import SSRFPolicy
+        import ipaddress
+        SSRFPolicy().validate_addresses([ipaddress.ip_address("1.1.1.1")])
+
+    def test_native_secret_manager_does_not_fallback_to_plaintext(self):
+        from odyn_ai.core.secret_manager import NativeSecretManager
+        manager = NativeSecretManager(backend=type("Backend", (), {"get": lambda self, k: None, "set": lambda self, k, v: None})())
+        with self.assertRaises(RuntimeError):
+            manager.require("missing")
+
+    def test_high_risk_requires_real_sandbox_backend(self):
+        from odyn_ai.core.sandbox import SandboxRunner
+        runner = SandboxRunner(backend="unavailable")
+        with self.assertRaises(PermissionError):
+            runner.require_available()
