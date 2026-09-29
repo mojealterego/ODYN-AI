@@ -9,7 +9,7 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         gateway = MCPGateway()
         server = gateway.register_mcp_server("narzedzia", "http://localhost:9000/mcp")
         self.assertEqual(server.name, "narzedzia")
-        self.assertEqual(gateway.list_servers(), [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp"}])
+        self.assertEqual(gateway.list_servers(), [{"name": "narzedzia", "endpoint": "http://localhost:9000/mcp", "protocol_version": None, "tool_count": 0}])
 
     def test_invalid_endpoint_is_rejected(self):
         gateway = MCPGateway()
