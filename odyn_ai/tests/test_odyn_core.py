@@ -52,6 +52,9 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertNotIn("Builder API", js)
         self.assertIn("Kreator agentów", js)
         self.assertIn("Kreator aplikacji", js)
+        self.assertIn("Tryb bez kodu", js)
+        self.assertIn("Tryb kodowy", js)
+        self.assertIn("Kod agenta", js)
         self.assertIn("SILNIK", html)
 
 
