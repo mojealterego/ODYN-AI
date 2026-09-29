@@ -238,11 +238,12 @@ class MCPGateway:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
                 response = await client.post(server.endpoint, json=body, headers=self._headers(server))
                 response.raise_for_status()
-                session_id = response.headers.get("Mcp-Session-Id")
+                response_headers = getattr(response, "headers", {}) or {}
+                session_id = response_headers.get("Mcp-Session-Id")
                 if session_id:
                     server.session_id = session_id
                     self._persist_registry()
-                content_type = response.headers.get("content-type", "")
+                content_type = response_headers.get("content-type", "")
                 data = self._parse_sse(response.text) if "text/event-stream" in content_type else response.json()
         except httpx.TimeoutException as exc:
             self._audit_event({"action": "rpc", "server": server.name, "method": method, "result": "timeout"})
