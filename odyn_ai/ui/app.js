@@ -76,7 +76,7 @@
       lastAgentReport = { agentId, title: "Raport · " + ($("agent-select").selectedOptions[0]?.textContent || "ODYN AI"), content: reply };
       if (!$("export-filename").value.trim()) $("export-filename").value = "raport-odyn";
       const agentHistory = histories.get(agentId) || [];
-      agentHistory.push({role:"user",content:text},{role:"assistant",content:reply});
+      agentHistory.push({role:"user",content:text},{role:"assistant",content:reply});\n      speakText(reply);
       histories.set(agentId, agentHistory.slice(-40));
     } catch (e) { out.textContent = "[Błąd ODYN AI] " + e.message; }
   }
@@ -117,136 +117,126 @@
     const voiceBtn = $("voice-btn");
     const voiceStatus = $("voice-status");
     const userInput = $("user-input");
-    if (!voiceBtn || !voiceStatus || !userInput) return;
+    if (!voiceBtn || !voiceStatus || !userInput) return false;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const nativeSupported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
-
-    const setUi = (recording, status) => {
-      voiceBtn.classList.toggle("recording", recording);
-      voiceBtn.setAttribute("aria-pressed", String(recording));
-      voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎤 Głos";
-      voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj nagrywanie" : "Włącz dyktowanie");
-      if (status) voiceStatus.textContent = status;
-    };
-
-    if (nativeSupported) {
-      let recorder = null;
-      let chunks = [];
-      let baseText = "";
-
-      const pickMimeType = () => {
-        const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"];
-        return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
-      };
-
-      const uploadRecording = async (blob) => {
-        if (!blob.size) {
-          setUi(false, "Głos: puste nagranie");
-          return;
-        }
-        voiceStatus.textContent = "Głos: transkrybuję lokalnie…";
-        const formData = new FormData();
-        const extension = blob.type.includes("ogg") ? "ogg" : "webm";
-        formData.append("file", blob, "odyn-voice." + extension);
-        try {
-          const response = await fetch("/api/stt/transcribe", { method: "POST", body: formData });
-          if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(detail || ("Błąd HTTP " + response.status));
-          }
-          const data = await response.json();
-          const transcript = String(data.text || "").trim();
-          userInput.value = [baseText, transcript].filter(Boolean).join(" ");
-          userInput.dispatchEvent(new Event("input", { bubbles: true }));
-          setUi(false, transcript ? "Głos: tekst gotowy do wysłania" : "Głos: nie rozpoznano mowy");
-        } catch (error) {
-          setUi(false, "Głos: błąd transkrypcji");
-          voiceStatus.title = error.message;
-        }
-      };
-
-      voiceBtn.addEventListener("click", async () => {
-        if (recorder && recorder.state === "recording") {
-          recorder.stop();
-          return;
-        }
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          chunks = [];
-          baseText = userInput.value.trim();
-          const mimeType = pickMimeType();
-          recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-          recorder.ondataavailable = (event) => {
-            if (event.data.size) chunks.push(event.data);
-          };
-          recorder.onstop = async () => {
-            stream.getTracks().forEach((track) => track.stop());
-            const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
-            await uploadRecording(blob);
-            recorder = null;
-          };
-          recorder.onerror = () => {
-            stream.getTracks().forEach((track) => track.stop());
-            setUi(false, "Głos: błąd nagrywania");
-            recorder = null;
-          };
-          recorder.start();
-          setUi(true, "Głos: nagrywam…");
-        } catch (error) {
-          setUi(false, "Głos: brak zgody na mikrofon");
-          voiceStatus.title = error.message;
-        }
-      });
-      voiceStatus.textContent = "Głos: lokalny Whisper";
-      return;
-    }
-
-    if (!SpeechRecognition) {
-      voiceBtn.disabled = true;
-      voiceBtn.title = "Ta przeglądarka nie obsługuje nagrywania ani rozpoznawania mowy.";
-      voiceStatus.textContent = "Głos: niedostępny";
-      return;
-    }
+    if (!SpeechRecognition) return false;
 
     const recognition = new SpeechRecognition();
     recognition.lang = "pl-PL";
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+
     let baseText = "";
     let finalText = "";
+    let listening = false;
+
+    const setUi = (recording, status) => {
+      listening = recording;
+      voiceBtn.classList.toggle("recording", recording);
+      voiceBtn.setAttribute("aria-pressed", String(recording));
+      voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎤 Głos";
+      voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj rozpoznawanie mowy" : "Włącz dyktowanie po polsku");
+      if (status) voiceStatus.textContent = status;
+    };
 
     voiceBtn.addEventListener("click", () => {
-      if (voiceBtn.classList.contains("recording")) {
+      if (listening) {
         recognition.stop();
         return;
       }
       baseText = userInput.value.trim();
       finalText = "";
-      try { recognition.start(); } catch (_) { voiceStatus.textContent = "Głos: nie można uruchomić"; }
+      try {
+        recognition.start();
+      } catch (error) {
+        setUi(false, "Głos: nie można uruchomić rozpoznawania");
+        voiceStatus.title = error.message;
+      }
     });
+
     recognition.onstart = () => setUi(true, "Głos: słucham…");
+
     recognition.onresult = (event) => {
       let interimText = "";
       let completedText = finalText;
+
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const transcript = event.results[i][0].transcript.trim();
-        if (event.results[i].isFinal) completedText = (completedText + " " + transcript).trim();
+        const result = event.results[i];
+        const transcript = result[0]?.transcript?.trim() || "";
+        if (!transcript) continue;
+        if (result.isFinal) completedText = (completedText + " " + transcript).trim();
         else interimText = (interimText + " " + transcript).trim();
       }
+
       finalText = completedText;
       userInput.value = [baseText, finalText, interimText].filter(Boolean).join(" ");
+      userInput.dispatchEvent(new Event("input", { bubbles: true }));
     };
+
     recognition.onerror = (event) => {
-      const messages = {"not-allowed":"Głos: brak zgody na mikrofon","no-speech":"Głos: nie wykryto mowy","audio-capture":"Głos: brak mikrofonu","network":"Głos: błąd usługi"};
+      const messages = {
+        "not-allowed": "Głos: brak zgody na mikrofon",
+        "service-not-allowed": "Głos: usługa rozpoznawania jest zablokowana",
+        "no-speech": "Głos: nie wykryto mowy",
+        "audio-capture": "Głos: brak mikrofonu",
+        "network": "Głos: błąd usługi rozpoznawania",
+        "aborted": "Głos: nagrywanie przerwane"
+      };
       setUi(false, messages[event.error] || "Głos: błąd rozpoznawania");
     };
+
     recognition.onend = () => {
-      setUi(false, finalText.trim() ? "Głos: tekst gotowy do wysłania" : "Głos: gotowy");
+      setUi(false, finalText ? "Głos: tekst gotowy do wysłania" : "Głos: gotowy");
     };
-    voiceStatus.textContent = "Głos: tryb awaryjny";
+
+    voiceStatus.textContent = "Głos: Web Speech API · pl-PL";
+    return true;
   }
+
+  function stripMarkup(text) {
+    const container = document.createElement("div");
+    container.innerHTML = String(text || "");
+    return (container.textContent || container.innerText || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function speakText(text) {
+    if (!("speechSynthesis" in window) || !text) return;
+
+    const cleanText = stripMarkup(text);
+    if (!cleanText) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = "pl-PL";
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const polishVoice = voices.find((voice) => /^pl(-|_)/i.test(voice.lang));
+    if (polishVoice) utterance.voice = polishVoice;
+
+    utterance.onerror = () => {
+      voiceStatusIfAvailable("TTS: nie udało się odtworzyć odpowiedzi");
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function voiceStatusIfAvailable(text) {
+    const status = $("voice-status");
+    if (status) status.textContent = text;
+  }
+
+  function stopSpeech() {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
 
   async function exportReport(format) {
     if (!lastAgentReport || !lastAgentReport.content.trim()) {
@@ -434,7 +424,7 @@
     $("terminal-output").textContent=`${action.toUpperCase()} · ${project.platform === "android" ? "ANDROID NATIVE" : "WEB"}\n\n${cmd[action]}\n\nPolecenie przygotowane dla projektu.`;
   }
 
-  if (!initNativeVoiceInput()) initVoiceInput();
+  if (!initVoiceInput()) initNativeVoiceInput();
   $("chat-form").onsubmit=e=>{e.preventDefault();send();};
   $("user-input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
   $("status-btn").onclick=status;
