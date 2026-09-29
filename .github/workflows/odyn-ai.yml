@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip pydantic pytest
+        run: python -m pip install --upgrade pip -r odyn_ai/requirements_test.txt
       - name: Compile ODYN sources
         run: python -m compileall -q odyn_ai
       - name: Run ODYN unit tests
