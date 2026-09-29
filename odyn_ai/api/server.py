@@ -24,6 +24,7 @@ from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.coding_agent import CodingAgent
 from odyn_ai.core.github_integration import GitHubIntegration
 from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
+from odyn_ai.core.voice_commands import parse_voice_command
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
@@ -119,6 +120,15 @@ class GitHubCommitRequest(BaseModel):
     branch: str = "main"
     message: str = Field(min_length=1, max_length=200)
     create_branch: bool = False
+
+
+class VoiceCommandRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    app_id: str | None = None
+    timeout: float = Field(default=300, gt=0, le=900)
+    github_repository: str | None = None
+    github_branch: str = "main"
+    github_message: str = "feat(odyn): autonomous voice build"
 
 
 class AutonomousBuildRequest(BaseModel):
@@ -369,6 +379,59 @@ async def autonomous_build(app_id: str, payload: AutonomousBuildRequest):
         raise HTTPException(403, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"Pipeline ODYN: {exc}") from exc
+
+@app.post("/api/voice/command", summary="Wykonaj głosową komendę budowy aplikacji")
+async def voice_command(payload: VoiceCommandRequest):
+    command = parse_voice_command(payload.text)
+    if command is None:
+        return {
+            "executed": False,
+            "action": "chat",
+            "message": "To nie jest jawna komenda budowy aplikacji.",
+        }
+
+    app_id = payload.app_id
+    created = None
+    try:
+        if app_id:
+            project = apps.workspace(app_id)
+            platform = project["platform"]
+        else:
+            created = apps.create(
+                command.name,
+                command.instruction,
+                "odyn_glowny",
+                "pl",
+                command.platform,
+                "code",
+            )
+            app_id = str(created["app_id"])
+            platform = command.platform
+
+        result = await orchestrator.run(
+            app_id,
+            command.instruction,
+            payload.timeout,
+            payload.github_repository,
+            payload.github_branch,
+            payload.github_message,
+        )
+        return {
+            "executed": True,
+            "action": command.action,
+            "app_id": app_id,
+            "created": created is not None,
+            "name": command.name,
+            "platform": platform,
+            "result": result.__dict__,
+        }
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Głosowy pipeline ODYN: {exc}") from exc
+
 
 @app.post("/api/apps/{app_id}/github/commit", summary="Wyślij projekt do GitHub")
 async def commit_project_to_github(app_id: str, payload: GitHubCommitRequest):
