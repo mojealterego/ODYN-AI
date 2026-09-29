@@ -544,3 +544,5 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 **Profile:** `prawo`, `osint`, `web_builder`, `game_builder`.
 
 **Weryfikacja:** pełny CI wymagany po integracji; nie uznawać etapu za zakończony przed compileall + pełnym unittest.
+
+**Korekta CI Audytu #8:** centralny rejestr został ujednolicony — każdy profil zawiera teraz bezpośrednio `prompt`, dzięki czemu rejestr jest samowystarczalnym kontraktem. `AgentManager` konsumuje `profile["prompt"]`.
