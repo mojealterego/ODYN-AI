@@ -8,6 +8,10 @@ class MCPServerRequest(BaseModel):
     secret_env: str | None = Field(default=None, max_length=200)
     auth_header: str = Field(default="Authorization", max_length=100)
     auth_prefix: str = Field(default="Bearer ", max_length=50)
+    client_id_env: str | None = Field(default=None, max_length=200)
+    client_secret_env: str | None = Field(default=None, max_length=200)
+    token_url: str | None = Field(default=None, max_length=2000)
+    scope: str | None = Field(default=None, max_length=1000)
 
 
 class MCPToolRequest(BaseModel):
