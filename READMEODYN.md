@@ -550,3 +550,38 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 **Korekta testu Audytu #8:** usunięto przestarzałą asercję `prompt_key`; test weryfikuje obecnie rzeczywisty kontrakt samowystarczalnego profilu (`prompt`).
 
 **Weryfikacja końcowa Audytu #8:** ODYN AI CI #292 — **PASS**; compileall **PASS**; unittest **PASS — 76 testów**. Profile specjalistyczne są dostępne przez `AgentManager` i pochodzą z centralnego `SPECIALIST_PROFILES`.
+
+
+### 2026-09-29 — Audyt #9 / Moduł czatu głosowego STT
+
+**Cel:** dodać do interfejsu ODYN AI dostępne wejście głosowe oraz połączyć je z istniejącym polem czatu bez automatycznego wysyłania wiadomości.
+
+**Wdrożono:**
+- [x] przycisk voice-btn w formularzu czatu,
+- [x] etykietę ARIA i stan aria-pressed dla nagrywania,
+- [x] status voice-status z komunikatami dla użytkownika,
+- [x] Web Speech API z fallbackiem SpeechRecognition / webkitSpeechRecognition,
+- [x] język rozpoznawania pl-PL,
+- [x] wyniki częściowe (interimResults) i końcowe,
+- [x] zachowanie istniejącego tekstu przed dyktowaniem,
+- [x] start/stop jednym przyciskiem,
+- [x] komunikaty dla odmowy mikrofonu, braku mowy, braku mikrofonu, niedostępnej usługi i błędów sieciowych,
+- [x] graceful degradation: brak Web Speech API wyłącza kontrolkę zamiast generować błąd,
+- [x] preferencję prefers-reduced-motion dla animacji stanu nagrywania,
+- [x] brak automatycznego wywołania send() po zakończeniu dyktowania.
+
+**Zmodyfikowane pliki:**
+- odyn_ai/ui/index.html
+- odyn_ai/ui/app.js
+- odyn_ai/tests/test_voice_ui.py
+- READMEODYN.md
+
+**TDD / kontrakt regresyjny:**
+- test kontraktowy obejmuje obecność dostępnego przycisku głosowego, integrację z formularzem czatu, konfigurację polskiego SpeechRecognition oraz brak automatycznego wysyłania,
+- test został dodany przed implementacją obsługi STT,
+- test nie wymaga dostępu do rzeczywistego mikrofonu, więc pozostaje deterministyczny i uruchamialny w CI.
+
+**Ograniczenie architektoniczne:**
+- obecny moduł wykorzystuje Web Speech API przeglądarki. Nie jest to jeszcze natywne nagrywanie audio → backend Whisper/OpenAI. Taki backendowy STT pozostaje osobnym etapem i będzie wymagał API uploadu audio, kontroli MIME/rozmiaru, obsługi sekretów oraz testów integracyjnych.
+
+**Weryfikacja:** po wdrożeniu wymagany jest pełny ODYN AI CI oraz runtime browser/E2E w przeglądarce obsługującej mikrofon.
