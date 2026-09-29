@@ -38,7 +38,7 @@ class AgentManager:
             self._agents[agent_id] = AgentDefinition(
                 agent_id,
                 profile["name"],
-                SYSTEM_PROMPTS[profile["prompt_key"]],
+                profile["prompt"],
                 profile["can_search"],
                 profile["mode"],
                 "",
