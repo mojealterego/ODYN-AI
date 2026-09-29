@@ -241,6 +241,34 @@ class SecurityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             manager.require("missing")
 
+    def test_gateway_routes_high_risk_local_tool_to_sandbox(self):
+        from odyn_ai.core.sandbox import SandboxRunner
+        gateway = MCPGateway(
+            allowed_hosts={"localhost"},
+            secret_manager=self.keyring,
+            ssrf_allow_private=True,
+            sandbox=SandboxRunner(backend="unavailable"),
+        )
+        with self.assertRaises(PermissionError):
+            gateway.execute_high_risk_local(["python", "-c", "print(1)"])
+
+    def test_gateway_builds_oauth_pkce_request(self):
+        from odyn_ai.core.mcp_gateway import MCPAuth
+        gateway = MCPGateway(allowed_hosts={"localhost"}, secret_manager=self.keyring, ssrf_allow_private=True)
+        gateway.register_mcp_server(
+            "oauth-pkce",
+            "http://localhost:9000/mcp",
+            auth=MCPAuth(
+                kind="oauth2_authorization_code",
+                authorization_url="https://auth.example.com/authorize",
+                token_url="https://auth.example.com/token",
+                client_id="odyn",
+                redirect_uri="http://127.0.0.1/callback",
+            ),
+        )
+        request = gateway.create_oauth_authorization("oauth-pkce")
+        self.assertIn("code_challenge_method=S256", request.url)
+
     def test_high_risk_requires_real_sandbox_backend(self):
         from odyn_ai.core.sandbox import SandboxRunner
         runner = SandboxRunner(backend="unavailable")
