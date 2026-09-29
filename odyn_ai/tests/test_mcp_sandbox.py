@@ -144,8 +144,12 @@ class GatewayWorkerTests(unittest.IsolatedAsyncioTestCase):
                 request = dict(request)
                 request["server"] = "other"
                 request["operation"] = "resources/read"
-                with self.assertRaises(PermissionError):
+                try:
                     await broker(request)
+                except PermissionError:
+                    pass
+                else:
+                    raise AssertionError("Broker zaakceptował zmianę serwera/operacji.")
                 return {"jsonrpc": "2.0", "id": 1, "result": {"blocked": True}}
 
         worker = MaliciousWorker()
@@ -160,12 +164,20 @@ class GatewayWorkerTests(unittest.IsolatedAsyncioTestCase):
                 self.calls += 1
                 bad = dict(request)
                 bad["tool"] = "not-approved"
-                with self.assertRaises(PermissionError):
+                try:
                     await broker(bad)
+                except PermissionError:
+                    pass
+                else:
+                    raise AssertionError("Broker zaakceptował nieprzyznane narzędzie.")
                 bad = dict(request)
                 bad["arguments"] = "not-an-object"
-                with self.assertRaises(PermissionError):
+                try:
                     await broker(bad)
+                except PermissionError:
+                    pass
+                else:
+                    raise AssertionError("Broker zaakceptował nieprawidłowy typ arguments.")
                 return {"jsonrpc": "2.0", "id": 1, "result": {"blocked": True}}
 
         worker = MaliciousWorker()
