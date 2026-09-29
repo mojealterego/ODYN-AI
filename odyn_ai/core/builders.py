@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import PurePosixPath
 from uuid import uuid4
 
+from odyn_ai.core.state import JsonStore
+
 
 SUPPORTED_PLATFORMS = {"web", "android"}
 SUPPORTED_MODES = {"no_code", "code"}
@@ -44,9 +46,17 @@ def _android_files(name: str) -> dict[str, str]:
 
 
 class AppBuilder:
-    def __init__(self) -> None:
-        self._apps: dict[str, AppDefinition] = {}
-        self._forms: dict[str, dict[str, object]] = {}
+    def __init__(self, data_dir: str | None = None) -> None:
+        self._store = JsonStore("apps", data_dir)
+        raw = self._store.load({"apps": [], "forms": []})
+        self._apps = {item["app_id"]: AppDefinition(**item) for item in raw.get("apps", []) if isinstance(item, dict) and item.get("app_id")}
+        self._forms = {item["form_id"]: item for item in raw.get("forms", []) if isinstance(item, dict) and item.get("form_id")}
+
+    def _persist(self) -> None:
+        self._store.save({
+            "apps": [asdict(app) for app in self._apps.values()],
+            "forms": list(self._forms.values()),
+        })
 
     def list_apps(self) -> list[dict[str, object]]:
         return [asdict(a) | {"files": sorted(a.files)} for a in self._apps.values()]
@@ -79,6 +89,7 @@ class AppBuilder:
             files,
         )
         self._apps[app.app_id] = app
+        self._persist()
         return asdict(app) | {"files": sorted(app.files)}
 
     def create_form(self, app_id: str, name: str) -> dict[str, object]:
@@ -89,6 +100,7 @@ class AppBuilder:
             raise ValueError("Nazwa formularza jest wymagana.")
         form = {"form_id": f"form_{uuid4().hex[:12]}", "app_id": app_id, "name": name.strip(), "fields": []}
         self._forms[form["form_id"]] = form
+        self._persist()
         return form
 
     def get_form(self, form_id: str) -> dict[str, object]:
@@ -107,6 +119,7 @@ class AppBuilder:
             raise ValueError("To pole wymaga listy opcji.")
         field = {"field_id": f"field_{uuid4().hex[:10]}", "type": field_type, "label": label.strip(), "required": bool(required), "validation": validation.strip(), "default": default, "options": list(options or [])}
         form["fields"].append(field)
+        self._persist()
         return field
 
     def form_preview(self, form_id: str) -> dict[str, object]:
@@ -155,4 +168,5 @@ class AppBuilder:
         if not clean or clean.startswith("/"):
             raise ValueError("Ścieżka pliku musi być względna.")
         app.files[clean] = content
+        self._persist()
         return {"path": clean, "content": content}
