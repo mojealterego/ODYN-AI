@@ -90,9 +90,91 @@
     if (!voiceBtn || !voiceStatus || !userInput) return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const nativeSupported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+
+    const setUi = (recording, status) => {
+      voiceBtn.classList.toggle("recording", recording);
+      voiceBtn.setAttribute("aria-pressed", String(recording));
+      voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎤 Głos";
+      voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj nagrywanie" : "Włącz dyktowanie");
+      if (status) voiceStatus.textContent = status;
+    };
+
+    if (nativeSupported) {
+      let recorder = null;
+      let chunks = [];
+      let baseText = "";
+
+      const pickMimeType = () => {
+        const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"];
+        return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      };
+
+      const uploadRecording = async (blob) => {
+        if (!blob.size) {
+          setUi(false, "Głos: puste nagranie");
+          return;
+        }
+        voiceStatus.textContent = "Głos: transkrybuję lokalnie…";
+        const formData = new FormData();
+        const extension = blob.type.includes("ogg") ? "ogg" : "webm";
+        formData.append("file", blob, "odyn-voice." + extension);
+        try {
+          const response = await fetch("/api/stt/transcribe", { method: "POST", body: formData });
+          if (!response.ok) {
+            const detail = await response.text();
+            throw new Error(detail || ("Błąd HTTP " + response.status));
+          }
+          const data = await response.json();
+          const transcript = String(data.text || "").trim();
+          userInput.value = [baseText, transcript].filter(Boolean).join(" ");
+          userInput.dispatchEvent(new Event("input", { bubbles: true }));
+          setUi(false, transcript ? "Głos: tekst gotowy do wysłania" : "Głos: nie rozpoznano mowy");
+        } catch (error) {
+          setUi(false, "Głos: błąd transkrypcji");
+          voiceStatus.title = error.message;
+        }
+      };
+
+      voiceBtn.addEventListener("click", async () => {
+        if (recorder && recorder.state === "recording") {
+          recorder.stop();
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          chunks = [];
+          baseText = userInput.value.trim();
+          const mimeType = pickMimeType();
+          recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+          recorder.ondataavailable = (event) => {
+            if (event.data.size) chunks.push(event.data);
+          };
+          recorder.onstop = async () => {
+            stream.getTracks().forEach((track) => track.stop());
+            const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
+            await uploadRecording(blob);
+            recorder = null;
+          };
+          recorder.onerror = () => {
+            stream.getTracks().forEach((track) => track.stop());
+            setUi(false, "Głos: błąd nagrywania");
+            recorder = null;
+          };
+          recorder.start();
+          setUi(true, "Głos: nagrywam…");
+        } catch (error) {
+          setUi(false, "Głos: brak zgody na mikrofon");
+          voiceStatus.title = error.message;
+        }
+      });
+      voiceStatus.textContent = "Głos: lokalny Whisper";
+      return;
+    }
+
     if (!SpeechRecognition) {
       voiceBtn.disabled = true;
-      voiceBtn.title = "Ta przeglądarka nie obsługuje rozpoznawania mowy.";
+      voiceBtn.title = "Ta przeglądarka nie obsługuje nagrywania ani rozpoznawania mowy.";
       voiceStatus.textContent = "Głos: niedostępny";
       return;
     }
@@ -102,17 +184,8 @@
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-
     let baseText = "";
     let finalText = "";
-
-    const setRecordingUi = (recording) => {
-      voiceBtn.classList.toggle("recording", recording);
-      voiceBtn.setAttribute("aria-pressed", String(recording));
-      voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎤 Głos";
-      voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj dyktowanie" : "Włącz dyktowanie");
-      voiceStatus.textContent = recording ? "Głos: nasłuchiwanie…" : "Głos: gotowy";
-    };
 
     voiceBtn.addEventListener("click", () => {
       if (voiceBtn.classList.contains("recording")) {
@@ -121,18 +194,9 @@
       }
       baseText = userInput.value.trim();
       finalText = "";
-      try {
-        recognition.start();
-      } catch (error) {
-        voiceStatus.textContent = "Głos: nie można uruchomić";
-      }
+      try { recognition.start(); } catch (_) { voiceStatus.textContent = "Głos: nie można uruchomić"; }
     });
-
-    recognition.onstart = () => {
-      setRecordingUi(true);
-      voiceStatus.textContent = "Głos: słucham…";
-    };
-
+    recognition.onstart = () => setUi(true, "Głos: słucham…");
     recognition.onresult = (event) => {
       let interimText = "";
       let completedText = finalText;
@@ -143,25 +207,15 @@
       }
       finalText = completedText;
       userInput.value = [baseText, finalText, interimText].filter(Boolean).join(" ");
-      userInput.dispatchEvent(new Event("input", { bubbles: true }));
     };
-
     recognition.onerror = (event) => {
-      const messages = {
-        "not-allowed": "Głos: brak zgody na mikrofon",
-        "service-not-allowed": "Głos: usługa rozpoznawania niedostępna",
-        "no-speech": "Głos: nie wykryto mowy",
-        "audio-capture": "Głos: brak dostępnego mikrofonu",
-        "network": "Głos: błąd usługi rozpoznawania",
-      };
-      voiceStatus.textContent = messages[event.error] || "Głos: błąd rozpoznawania";
-      setRecordingUi(false);
+      const messages = {"not-allowed":"Głos: brak zgody na mikrofon","no-speech":"Głos: nie wykryto mowy","audio-capture":"Głos: brak mikrofonu","network":"Głos: błąd usługi"};
+      setUi(false, messages[event.error] || "Głos: błąd rozpoznawania");
     };
-
     recognition.onend = () => {
-      setRecordingUi(false);
-      if (finalText.trim()) voiceStatus.textContent = "Głos: tekst gotowy do wysłania";
+      setUi(false, finalText.trim() ? "Głos: tekst gotowy do wysłania" : "Głos: gotowy");
     };
+    voiceStatus.textContent = "Głos: tryb awaryjny";
   }
 
   async function exportReport(format) {
