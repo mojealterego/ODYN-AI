@@ -56,6 +56,16 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertIn("Tryb kodowy", js)
         self.assertIn("Kod agenta", js)
         self.assertIn("SILNIK", html)
+        self.assertIn("WEB", html)
+        self.assertIn("ANDROID NATIVE", html)
+        self.assertIn("ODYN IDE", html)
+        self.assertIn("Eksplorator", html)
+        self.assertIn("Edytor kodu", html)
+        self.assertIn("Terminal", html)
+        self.assertIn("Podgląd", html)
+        self.assertIn("Tryb No Code", js)
+        self.assertIn("Tryb Code", js)
+        self.assertIn("/api/apps/", js)
 
 
 class AgentTests(unittest.IsolatedAsyncioTestCase):
