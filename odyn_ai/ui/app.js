@@ -164,7 +164,7 @@
     const f = $("dialog-fields");
     f.replaceChildren();
     const isAgent = kind === "agent";
-    $("dialog-title").textContent = isAgent ? "Kreator agenta" : "Kreator aplikacji";
+    $("dialog-title").textContent = isAgent ? "Kreator agentów" : "Kreator aplikacji";
     const add = (id, label, type="input", options="") => {
       const w = document.createElement("label"); w.className = "dialog-field"; w.htmlFor=id; w.textContent=label;
       const c = type === "textarea" ? document.createElement("textarea") : document.createElement(type);
