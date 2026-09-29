@@ -36,6 +36,39 @@ class LLMConfig(BaseModel):
         return value
 
 
+class STTConfig(BaseModel):
+    model: str = os.getenv("ODYN_STT_MODEL", "tiny")
+    device: str = os.getenv("ODYN_STT_DEVICE", "cpu")
+    compute_type: str = os.getenv("ODYN_STT_COMPUTE_TYPE", "int8")
+    max_audio_bytes: int = Field(25 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
+    language: str = os.getenv("ODYN_STT_LANGUAGE", "pl")
+
+    @field_validator("model")
+    @classmethod
+    def valid_model(cls, value: str) -> str:
+        value = value.strip().lower()
+        allowed = {"tiny", "base", "small", "medium", "large-v3", "turbo"}
+        if value not in allowed:
+            raise ValueError("model STT musi być jednym z: tiny, base, small, medium, large-v3, turbo")
+        return value
+
+    @field_validator("device")
+    @classmethod
+    def valid_device(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in {"auto", "cpu", "cuda"}:
+            raise ValueError("urządzenie STT musi być: auto, cpu albo cuda")
+        return value
+
+    @field_validator("compute_type")
+    @classmethod
+    def valid_compute_type(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in {"auto", "int8", "int8_float16", "float16", "float32"}:
+            raise ValueError("compute_type STT jest nieobsługiwany")
+        return value
+
+
 SYSTEM_PROMPTS = {
     "default": "Jesteś ODYN AI. Odpowiadasz po polsku, precyzyjnie i rzeczowo. Nie zmyślasz faktów.",
     "coder": "Jesteś ODYN AI Koder. Projektujesz bezpieczne oprogramowanie produkcyjne. Odpowiadasz po polsku i stosujesz testy.",
