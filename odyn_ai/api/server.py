@@ -15,7 +15,7 @@ from odyn_ai.config import load_config
 from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
-from odyn_ai.core.mcp_gateway import MCPGateway
+from odyn_ai.core.mcp_gateway import MCPAuth, MCPGateway
 from odyn_ai.core.document_generator import OdynDocumentBuilder
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
@@ -26,7 +26,13 @@ engine = DualGGUFEngine(config)
 agents = AgentManager()
 apps = AppBuilder()
 documents = OdynDocumentBuilder(os.getenv("ODYN_EXPORT_DIR", "exports"))
-mcp_gateway = MCPGateway(timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")))
+mcp_allowed_hosts = {h.strip().lower() for h in os.getenv("ODYN_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()}
+mcp_policy = {}
+for item in os.getenv("ODYN_MCP_TOOL_POLICY", "").split(","):
+    if "=" in item:
+        tool, rule = item.split("=", 1)
+        mcp_policy[tool.strip()] = rule.strip()
+mcp_gateway = MCPGateway(timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")), allowed_hosts=mcp_allowed_hosts, tool_policy=mcp_policy, rate_limit=int(os.getenv("ODYN_MCP_RATE_LIMIT", "30")))
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
@@ -114,7 +120,7 @@ async def list_mcp_servers():
 @app.post("/api/mcp/servers", summary="Zarejestruj serwer MCP")
 async def register_mcp_server(payload: MCPServerRequest):
     try:
-        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint).__dict__
+        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix)).__dict__
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
