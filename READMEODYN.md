@@ -489,3 +489,13 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - zdalnego narzędzia MCP nie można bezpośrednio osadzić w lokalnym kontenerze bez sandboxowanego MCP worker/proxy; dlatego zdalne high_risk nadal wymaga osobnego worker/proxy.
 
 **Pozostały osobny etap:** sandboxowany MCP worker/proxy dla zdalnych high_risk, platformowe adaptery Android Keystore/Apple Keychain/Windows Credential Locker, OAuth Authorization Server Metadata i issuer/mix-up validation, rotacja/revokacja refresh tokenów z obsługą invalid_grant oraz opcjonalny DPoP.
+
+
+**Weryfikacja końcowa Audytu #6:**
+- po dodaniu DNS-pinned transportu pierwszy CI wykrył brak przekazania transportu do OAuthAuthorizationClient oraz nieasynchroniczne zamknięcie transportu w teście,
+- poprawiono oba problemy,
+- najnowszy ODYN AI CI: **PASS**,
+- compileall: **PASS**,
+- unittest: **PASS — 62 testy**.
+
+**Stan:** OAuth PKCE, natywny Secret Manager, resolver + transport DNS pinning oraz realny sandbox Docker/bubblewrap są zaimplementowane. Zdalne high_risk MCP pozostaje fail-closed do czasu dodania osobnego sandboxowanego MCP worker/proxy.
