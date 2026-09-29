@@ -35,9 +35,17 @@ class OdynDocumentBuilder:
                 return candidate
         return None
 
+    @staticmethod
+    def _safe_xlsx_value(value: object) -> object:
+        """Prevent spreadsheet formula injection while preserving real numbers."""
+        if isinstance(value, str) and value and value[0] in {"=", "+", "-", "@"}:
+            return "'" + value
+        return value
+
     def generate_pdf(self, title: str, content: str, filename: str) -> str:
         filepath = self._path(filename, ".pdf")
         pdf = FPDF()
+        pdf.set_margins(18, 18, 18)
         pdf.set_auto_page_break(auto=True, margin=18)
         pdf.add_page()
 
@@ -88,7 +96,7 @@ class OdynDocumentBuilder:
         ws.title = sheet_name[:31] or "ODYN"
 
         for row in data:
-            ws.append(list(row))
+            ws.append([self._safe_xlsx_value(value) for value in row])
 
         if header and ws.max_row:
             for cell in ws[1]:
