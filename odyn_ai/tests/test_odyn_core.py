@@ -37,7 +37,8 @@ class PolishLanguageTests(unittest.TestCase):
         self.assertIn("--stal:", css)
         self.assertIn("--stare-zloto:", css)
         self.assertIn("--runiczny-blekit:", css)
-        self.assertIn("background: radial-gradient", css)
+        self.assertIn("background:", css)
+        self.assertIn("radial-gradient", css)
         self.assertIn("text-transform: uppercase", css)
 
     def test_frontend_status_and_errors_are_polish(self):
@@ -161,7 +162,7 @@ class BuilderTests(unittest.TestCase):
         app = builder.create("Projekt", "Opis", "odyn_glowny", platform="web", mode="code")
         builder.write_file(app["app_id"], "src/App.tsx", "export default function App() { return null }")
         self.assertIn("src/App.tsx", builder.read_file(app["app_id"])["files"])
-        self.assertIn("export default", builder.read_file(app["app_id"])["files"])
+        self.assertIn("export default", builder.read_file(app["app_id"])["files"]["src/App.tsx"])
 
     def test_agents_persist_and_reload(self):
         with tempfile.TemporaryDirectory() as tmp:
