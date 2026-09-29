@@ -437,6 +437,16 @@ class MCPGateway:
         if rule == "high_risk":
             raise PermissionError(f"Narzędzie MCP '{tool_name}' wymaga jawnego zatwierdzenia operacji wysokiego ryzyka.")
 
+    def execute_high_risk_local(self, command: list[str], *, workdir: str = "/workspace", image: str = "python:3.13-slim", timeout: int = 30):
+        self._sandbox.require_available()
+        result = self._sandbox.run(command, workdir=workdir, image=image, timeout=timeout)
+        self._audit_event({
+            "action": "high_risk_sandbox",
+            "result": "ok" if result.returncode == 0 else "failed",
+            "returncode": result.returncode,
+        })
+        return result
+
     async def execute_tool(self, server_name: str, tool_name: str, payload: dict) -> dict:
         server = self.get_server(server_name)
         if not tool_name.strip():
