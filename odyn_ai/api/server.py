@@ -55,8 +55,10 @@ class ChatRequest(BaseModel):
 class AgentCreate(BaseModel):
     agent_id: str
     name: str
-    prompt: str
+    prompt: str = ""
     can_search: bool = False
+    mode: str = "no_code"
+    code: str = ""
 
 
 class AppCreate(BaseModel):
@@ -88,6 +90,10 @@ async def list_agents():
 @app.post("/api/agents", summary="Utwórz agenta")
 async def create_agent(payload: AgentCreate):
     try:
+        if payload.mode == "code":
+            return agents.create_code(payload.agent_id, payload.name, payload.code)
+        if payload.mode != "no_code":
+            raise ValueError("Tryb agenta musi być: no_code albo code.")
         return agents.create(payload.agent_id, payload.name, payload.prompt, payload.can_search)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
