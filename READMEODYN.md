@@ -499,3 +499,27 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - unittest: **PASS — 62 testy**.
 
 **Stan:** OAuth PKCE, natywny Secret Manager, resolver + transport DNS pinning oraz realny sandbox Docker/bubblewrap są zaimplementowane. Zdalne high_risk MCP pozostaje fail-closed do czasu dodania osobnego sandboxowanego MCP worker/proxy.
+
+
+### 2026-09-29 — Audyt #7 / Sandboxed MCP Worker
+
+**Wdrożono:**
+- [x] DockerMCPWorker jako osobna granica procesu,
+- [x] MCPGateway.execute_tool() deleguje high_risk do workera,
+- [x] zwykłe allow pozostaje bezpośrednim MCP RPC,
+- [x] capability broker wymusza wcześniej przyznany serwer i `tools/call`,
+- [x] broker odrzuca nieprzyznane narzędzie oraz nieprawidłowe argumenty,
+- [x] worker nie otrzymuje sekretów,
+- [x] Docker network=none, read-only, cap-drop=ALL, no-new-privileges, seccomp,
+- [x] limit CPU/RAM/PID i non-root UID 65532,
+- [x] brak host bind mounts i Docker socketu,
+- [x] brak Dockera oznacza odmowę high-risk,
+- [x] testy capability tampering dla server/operation/tool/arguments.
+
+**Nowe pliki:**
+- `odyn_ai/core/mcp_worker.py`
+- `odyn_ai/core/mcp_sandbox.py`
+- `docker/mcp-worker.Dockerfile`
+- `odyn_ai/tests/test_mcp_sandbox.py`
+
+**Weryfikacja:** pełny CI jest ostatnim krokiem przed uznaniem modułu za zakończony.
