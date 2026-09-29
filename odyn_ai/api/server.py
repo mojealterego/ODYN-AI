@@ -16,7 +16,7 @@ from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
 from odyn_ai.core.document_generator import OdynDocumentBuilder
-from odyn_ai.api.document_api_models import DocumentExportRequest, SpreadsheetExportRequest
+from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 
 
 config = load_config()
@@ -192,6 +192,69 @@ async def write_workspace_file(app_id: str, payload: WorkspaceWrite):
         return apps.write_file(app_id, payload.path, payload.content)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+
+
+def _document_response(path: str, media_type: str) -> FileResponse:
+    return FileResponse(path, media_type=media_type, filename=os.path.basename(path))
+
+
+@app.post("/api/documents/pdf", summary="Eksportuj dokument PDF")
+async def export_pdf(payload: DocumentExportRequest):
+    path = documents.generate_pdf(payload.title, payload.content, payload.filename)
+    return _document_response(path, "application/pdf")
+
+
+@app.post("/api/documents/docx", summary="Eksportuj dokument DOCX")
+async def export_docx(payload: DocumentExportRequest):
+    path = documents.generate_docx(payload.title, payload.content, payload.filename)
+    return _document_response(
+        path,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+@app.post("/api/documents/xlsx", summary="Eksportuj arkusz XLSX")
+async def export_xlsx(payload: SpreadsheetExportRequest):
+    path = documents.generate_xlsx(
+        payload.data,
+        payload.filename,
+        sheet_name=payload.sheet_name,
+        header=payload.header,
+    )
+    return _document_response(
+        path,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.post("/api/reports/export", summary="Eksportuj raport ODYN do wybranego formatu")
+async def export_report(payload: ReportExportRequest):
+    path = documents.generate_report(
+        payload.format,
+        payload.title,
+        payload.content,
+        payload.filename,
+        data=payload.data,
+        sheet_name=payload.sheet_name,
+        header=payload.header,
+    )
+    media_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+    return _document_response(path, media_types[payload.format])
+
+
+@app.post("/api/agents/{agent_id}/reports/export", summary="Eksportuj raport wygenerowany przez agenta")
+async def export_agent_report(agent_id: str, payload: ReportExportRequest):
+    try:
+        agents.get(agent_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return await export_report(payload)
 
 
 @app.post("/chat/stream", response_class=EventSourceResponse, summary="Rozpocznij strumieniową rozmowę")
