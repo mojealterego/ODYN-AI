@@ -55,13 +55,17 @@
     const out = message("ODYN: uruchamiam autonomiczne budowanie…", "assistant");
     try {
       const result = await window.ODYNVoiceAutobuild.autonomousBuild(text, project?.app_id || null);
-      out.textContent = result.result?.ok
-        ? "ODYN: budowa zakończona. Artefakt: " + (result.result.build?.artifact || "brak ścieżki")
-        : "ODYN: pipeline zatrzymany na etapie " + (result.result?.stage || "unknown") + ".";
+      const spoken = result.result?.ok
+        ? "Budowa aplikacji zakończona. Artefakt: " + (result.result.build?.artifact || "gotowy")
+        : "Budowa aplikacji została zatrzymana na etapie " + (result.result?.stage || "nieznanym") + ".";
+      out.textContent = "ODYN: " + spoken;
+      if (typeof speakText === "function") speakText(spoken);
       await loadProjects();
       return true;
     } catch (error) {
+      const spoken = "Błąd autonomicznego budowania: " + error.message;
       out.textContent = "[Błąd autonomicznego budowania] " + error.message;
+      if (typeof speakText === "function") speakText(spoken);
       return true;
     }
   }
