@@ -46,7 +46,7 @@ class OAuthAuthorizationClient:
     async def exchange_code(self, code: str, state: str) -> OAuthToken:
         verifier=self._pending.pop(state,None)
         if not verifier: raise PermissionError("Nieprawidłowy lub wygasły stan OAuth.")
-        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False, transport=self.transport) as client:
             response=await client.post(self.token_endpoint,data={"grant_type":"authorization_code","code":code,"client_id":self.client_id,"redirect_uri":self.redirect_uri,"code_verifier":verifier},headers={"Accept":"application/json"})
             response.raise_for_status(); payload=response.json()
         self._token=OAuthToken(str(payload["access_token"]),str(payload.get("token_type","Bearer")),int(payload.get("expires_in",300)),payload.get("refresh_token"),payload.get("scope"),time.time())
