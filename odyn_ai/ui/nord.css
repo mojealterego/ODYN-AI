@@ -318,3 +318,31 @@ dialog h2{
   #chat-history{padding:18px 16px}
   h1{font-size:19px;letter-spacing:2px}
 }
+
+
+.brand { display:flex; flex-direction:column; gap:6px; }
+.brand-main { color:var(--stare-zloto-jasne); font-weight:800; letter-spacing:.14em; }
+.brand-creator { color:var(--mgla); font-size:.68rem; letter-spacing:.08em; }
+.project-panel { margin-top:24px; display:grid; gap:8px; }
+.project-panel select, .project-panel button, .builder button { width:100%; }
+#ide { position:absolute; inset:0; background:var(--obsydian); z-index:20; padding:18px; overflow:auto; }
+.ide-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid var(--stal); padding-bottom:12px; }
+.ide-toolbar strong { color:var(--stare-zloto-jasne); letter-spacing:.14em; }
+#ide-project-name { color:var(--mgla); flex:1; }
+.ide-workspace { display:grid; grid-template-columns:220px minmax(0,1fr) 300px; gap:10px; margin-top:10px; min-height:55vh; }
+.ide-explorer, .ide-editor, .ide-side, .ide-preview { background:var(--noc-polnocna); border:1px solid var(--stal); padding:12px; min-width:0; }
+#file-tree { display:grid; gap:4px; margin-top:10px; }
+.file-item { text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.editor-title { color:var(--runiczny-blekit-jasny); font-family:monospace; margin-bottom:8px; }
+#code-editor, #ai-command { width:100%; min-height:46vh; resize:vertical; background:#06080b; color:var(--snieg); border:1px solid var(--stal); padding:12px; font-family:monospace; }
+#ai-command { min-height:120px; margin:10px 0; }
+#terminal-output, #preview-output { background:#050709; color:var(--mgla); padding:12px; overflow:auto; white-space:pre-wrap; }
+.ide-preview { margin-top:10px; }
+.dialog-field { display:grid; gap:6px; margin:12px 0; }
+.dialog-field input, .dialog-field select, .dialog-field textarea { width:100%; background:var(--kamien); color:var(--snieg); border:1px solid var(--stal); padding:10px; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:8px; }
+@media (max-width:900px) {
+  .ide-workspace { grid-template-columns:1fr; }
+  .ide-explorer { max-height:180px; overflow:auto; }
+  #code-editor { min-height:35vh; }
+}
