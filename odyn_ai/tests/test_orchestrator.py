@@ -53,9 +53,9 @@ class OrchestratorTests(unittest.IsolatedAsyncioTestCase):
             Apps(), execution, Coding(), GitHub(), max_corrections=1
         ).run("app", "zmień")
 
-        self.assertFalse(result.ok)
-        self.assertEqual(result.stage, "test")
-        self.assertEqual(execution.calls, ["test", "test"])
+        self.assertTrue(result.ok)
+        self.assertEqual(result.stage, "verified")
+        self.assertEqual(execution.calls, ["test", "test", "build"])
 
     async def test_successful_pipeline_records_memory(self):
         class Apps:
