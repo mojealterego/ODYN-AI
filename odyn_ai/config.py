@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 import os
 from pathlib import Path
+
 from pydantic import BaseModel, Field, field_validator
 
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
 MAIN_MODEL_PATH = MODELS_DIR / os.getenv("ODYN_MAIN_MODEL", "model_glowny_normany.gguf")
 DRAFT_MODEL_PATH = MODELS_DIR / os.getenv("ODYN_DRAFT_MODEL", "model_pomocniczy_maly.gguf")
+
 
 class LLMConfig(BaseModel):
     n_ctx: int = Field(8192, ge=512, le=131072)
@@ -29,13 +32,16 @@ class LLMConfig(BaseModel):
     def valid_backend(cls, value: str) -> str:
         value = value.strip().lower()
         if value not in {"auto", "server", "python"}:
-            raise ValueError("backend must be auto, server or python")
+            raise ValueError("tryb silnika musi mieć wartość: auto, server albo python")
         return value
+
 
 SYSTEM_PROMPTS = {
     "default": "Jesteś ODYN AI. Odpowiadasz po polsku, precyzyjnie i rzeczowo. Nie zmyślasz faktów.",
     "coder": "Jesteś ODYN AI Koder. Projektujesz bezpieczne oprogramowanie produkcyjne. Odpowiadasz po polsku i stosujesz testy.",
     "researcher": "Jesteś ODYN AI Czarny Kruk. Analizujesz źródła internetowe, oddzielasz fakty od wniosków i odpowiadasz po polsku.",
 }
+
+
 def load_config() -> LLMConfig:
     return LLMConfig()
