@@ -18,6 +18,7 @@ from odyn_ai.core.engine import DualGGUFEngine
 from odyn_ai.core.mcp_gateway import MCPGateway
 from odyn_ai.core.document_generator import OdynDocumentBuilder
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
+from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
 
 config = load_config()
@@ -111,7 +112,7 @@ async def list_mcp_servers():
 
 
 @app.post("/api/mcp/servers", summary="Zarejestruj serwer MCP")
-async def register_mcp_server(payload):
+async def register_mcp_server(payload: MCPServerRequest):
     try:
         return mcp_gateway.register_mcp_server(payload.name, payload.endpoint).__dict__
     except ValueError as exc:
@@ -142,7 +143,7 @@ async def list_mcp_tools(server_name: str):
 
 
 @app.post("/api/mcp/tools/execute", summary="Wywołaj narzędzie MCP")
-async def execute_mcp_tool(payload):
+async def execute_mcp_tool(payload: MCPToolRequest):
     try:
         return await mcp_gateway.execute_tool(payload.server_name, payload.tool_name, payload.payload)
     except ValueError as exc:
