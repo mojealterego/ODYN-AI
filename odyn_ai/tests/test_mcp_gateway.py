@@ -241,7 +241,7 @@ class SecurityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(pinned.url.host, "93.184.216.34")
         self.assertEqual(pinned.headers["Host"], "example.com")
         self.assertEqual(pinned.extensions["sni_hostname"], "example.com")
-        transport.close()
+        await transport.aclose()
 
     def test_ssrf_allows_public_address(self):
         from odyn_ai.core.ssrf import SSRFPolicy
