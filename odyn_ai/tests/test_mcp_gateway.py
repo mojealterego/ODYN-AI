@@ -83,6 +83,43 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("ODYN_SECRET_TEST_VALUE", str(stored))
             self.assertEqual(stored[0]["auth"]["secret_env"], "ODYN_SECRET_TEST")
 
+    @patch.dict(os.environ, {"ODYN_SECRET_CLIENT_ID": "client", "ODYN_SECRET_CLIENT_SECRET": "secret"})
+    @patch("odyn_ai.core.mcp_gateway.httpx.AsyncClient")
+    async def test_oauth2_client_credentials_fetches_and_uses_bearer_token(self, client_cls):
+        from odyn_ai.core.mcp_gateway import MCPAuth
+        token_response = type("Response", (), {
+            "headers": {},
+            "json": lambda self: {"access_token": "oauth-token", "expires_in": 300},
+            "raise_for_status": lambda self: None,
+        })()
+        mcp_response = type("Response", (), {
+            "headers": {},
+            "json": lambda self: {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}},
+            "raise_for_status": lambda self: None,
+        })()
+        client = AsyncMock()
+        client.post.side_effect = [token_response, mcp_response]
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = None
+        client_cls.return_value = client
+        gateway = MCPGateway(allowed_hosts={"localhost"})
+        gateway.register_mcp_server(
+            "oauth",
+            "http://localhost:9000/mcp",
+            auth=MCPAuth(
+                kind="oauth2_client_credentials",
+                client_id_env="ODYN_SECRET_CLIENT_ID",
+                client_secret_env="ODYN_SECRET_CLIENT_SECRET",
+                token_url="http://localhost:9000/oauth/token",
+            ),
+        )
+        gateway.tool_policy["search"] = "allow"
+        result = await gateway.execute_tool("oauth", "search", {})
+        self.assertTrue(result["result"]["ok"])
+        calls = client.post.await_args_list
+        self.assertEqual(calls[0].kwargs["data"]["grant_type"], "client_credentials")
+        self.assertEqual(calls[1].kwargs["headers"]["Authorization"], "Bearer oauth-token")
+
     def test_missing_secret_fails_closed(self):
         from odyn_ai.core.mcp_gateway import MCPAuth
         gateway = MCPGateway(allowed_hosts={"localhost"})
