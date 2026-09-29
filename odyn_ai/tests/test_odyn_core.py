@@ -111,6 +111,26 @@ class BuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             builder.create("Desktop", "Opis", "odyn_glowny", platform="desktop")
 
+    def test_no_code_form_builder_creates_real_fields_and_validation(self):
+        builder = AppBuilder()
+        app = builder.create("Formularz", "Formularz kontaktowy", "odyn_glowny", platform="web", mode="no_code")
+        form = builder.create_form(app["app_id"], "Kontakt")
+        field = builder.add_form_field(form["form_id"], "email", "Adres e-mail", required=True, validation="email")
+        self.assertEqual(field["type"], "email")
+        self.assertTrue(field["required"])
+        self.assertEqual(field["validation"], "email")
+        self.assertIn("Kontakt", builder.form_preview(form["form_id"])["html"])
+
+    def test_no_code_form_supports_select_options_and_order(self):
+        builder = AppBuilder()
+        app = builder.create("Formularz", "Opis", "odyn_glowny", platform="web", mode="no_code")
+        form = builder.create_form(app["app_id"], "Rejestracja")
+        builder.add_form_field(form["form_id"], "name", "Imię")
+        builder.add_form_field(form["form_id"], "select", "Rola", options=["Fotograf", "Autor"])
+        fields = builder.get_form(form["form_id"])["fields"]
+        self.assertEqual([f["type"] for f in fields], ["name", "select"])
+        self.assertEqual(fields[1]["options"], ["Fotograf", "Autor"])
+
     def test_workspace_has_ide_project_files(self):
         builder = AppBuilder()
         app = builder.create("Projekt", "Opis", "odyn_glowny", platform="android", mode="code")
