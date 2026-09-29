@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SERVER = ROOT / "api" / "server.py"
 APP = ROOT / "ui" / "app.js"
 REQUIREMENTS = ROOT / "requirements.txt"
 
@@ -16,6 +17,12 @@ class NativeSttContractTests(unittest.TestCase):
         section = js[js.index("function initNativeVoiceInput"):js.index("function initVoiceInput")]
         self.assertNotIn("send();", section)
         self.assertIn("userInput.value", section)
+
+    def test_native_stt_uses_existing_backend_endpoint(self):
+        server = SERVER.read_text(encoding="utf-8")
+        self.assertIn("/api/stt/transcribe", server)
+        self.assertIn("SpeechToText", server)
+        self.assertIn("max_audio_bytes + 1", server)
 
     def test_backend_stt_dependency_is_declared(self):
         requirements = REQUIREMENTS.read_text(encoding="utf-8")
