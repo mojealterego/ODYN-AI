@@ -199,6 +199,7 @@ class MCPGateway:
         host = (parsed.hostname or "").lower()
         if not host or host not in self.allowed_hosts:
             raise PermissionError(f"Host MCP '{host}' nie znajduje się na allowliście.")
+        self._ssrf.validate_url(endpoint)
 
     def register_mcp_server(self, server_name: str, endpoint: str, *, auth: MCPAuth | None = None) -> MCPServer:
         name = server_name.strip()
@@ -209,13 +210,50 @@ class MCPGateway:
         auth = auth or MCPAuth()
         if auth.kind not in {"none", "api_key", "bearer", "oauth2_client_credentials"}:
             raise ValueError("Typ uwierzytelniania MCP musi być: none, api_key albo bearer.")
-        if auth.kind != "none":
+        if auth.kind == "oauth2_client_credentials" and (not auth.client_id_env or not auth.client_secret_env or not auth.token_url):
+            raise ValueError("OAuth2 Client Credentials wymaga client_id_env, client_secret_env i token_url.")
+        if auth.kind == "oauth2_authorization_code" and (not auth.authorization_url or not auth.token_url or not auth.client_id or not auth.redirect_uri):
+            raise ValueError("OAuth Authorization Code wymaga authorization_url, token_url, client_id i redirect_uri.")
+        if auth.kind == "oauth2_client_credentials":
+            self._secret_store.get(auth.client_id_env); self._secret_store.get(auth.client_secret_env)
+        elif auth.kind in {"api_key", "bearer"}:
             self._secret_store.get(auth.secret_env)
         server = MCPServer(name=name, endpoint=url, auth=auth)
         self.connected_servers[name] = server
         self._persist_registry()
         self._audit_event({"action": "register", "server": name, "endpoint": url, "result": "ok"})
         return server
+
+    def create_oauth_authorization(self, server_name: str):
+        server = self.get_server(server_name)
+        auth = server.auth
+        if auth.kind != "oauth2_authorization_code" or not auth.authorization_url or not auth.token_url or not auth.client_id or not auth.redirect_uri:
+            raise ValueError("Serwer MCP nie ma kompletnej konfiguracji OAuth Authorization Code + PKCE.")
+        client = OAuthAuthorizationClient(
+            authorization_endpoint=auth.authorization_url,
+            token_endpoint=auth.token_url,
+            client_id=auth.client_id,
+            redirect_uri=auth.redirect_uri,
+            scope=auth.scope or "",
+        )
+        server._oauth_client = client
+        return client.create_authorization_request()
+
+    async def complete_oauth_authorization(self, server_name: str, code: str, state: str):
+        client = getattr(self.get_server(server_name), "_oauth_client", None)
+        if client is None:
+            raise PermissionError("Brak oczekującej sesji OAuth PKCE.")
+        token = await client.exchange_code(code, state)
+        self._audit_event({"action": "oauth_authorization", "server": server_name, "result": "ok"})
+        return token
+
+    async def refresh_oauth_authorization(self, server_name: str):
+        client = getattr(self.get_server(server_name), "_oauth_client", None)
+        if client is None:
+            raise PermissionError("Brak sesji OAuth PKCE.")
+        token = await client.refresh()
+        self._audit_event({"action": "oauth_refresh", "server": server_name, "result": "ok"})
+        return token
 
     def unregister_mcp_server(self, server_name: str) -> bool:
         removed = self.connected_servers.pop(server_name, None) is not None
