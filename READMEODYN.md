@@ -585,3 +585,70 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 - obecny moduł wykorzystuje Web Speech API przeglądarki. Nie jest to jeszcze natywne nagrywanie audio → backend Whisper/OpenAI. Taki backendowy STT pozostaje osobnym etapem i będzie wymagał API uploadu audio, kontroli MIME/rozmiaru, obsługi sekretów oraz testów integracyjnych.
 
 **Weryfikacja:** po wdrożeniu wymagany jest pełny ODYN AI CI oraz runtime browser/E2E w przeglądarce obsługującej mikrofon.
+
+
+### 2026-09-29 — Audyt #10 / Natywne STT przez lokalny Whisper
+
+**Cel:** drugi tor głosowy: mikrofon przeglądarki → nagranie audio → API ODYN → lokalny Whisper → tekst w polu czatu.
+
+**Architektura:**
+```
+Mikrofon
+   │
+   ▼
+MediaRecorder
+   │ WebM/OGG
+   ▼
+POST /api/stt/transcribe
+   │
+   ▼
+SpeechToText
+   │ lazy-load
+   ▼
+faster-whisper
+   │
+   ▼
+tekst PL → pole czatu → użytkownik naciska Wyślij
+```
+
+**Wdrożono:**
+- [x] odyn_ai/core/speech_to_text.py,
+- [x] lazy loading faster-whisper — model nie jest ładowany przy starcie ODYN,
+- [x] domyślny model tiny,
+- [x] konfiguracja modelu, urządzenia, compute type, języka i limitu audio przez STTConfig,
+- [x] POST /api/stt/transcribe,
+- [x] walidacja MIME audio,
+- [x] limit 25 MB domyślnie,
+- [x] transkrypcja przez asyncio.to_thread, aby nie blokować event loop FastAPI,
+- [x] automatyczny wybór CUDA/CPU przy device=auto,
+- [x] usuwanie pliku tymczasowego po transkrypcji,
+- [x] MediaRecorder + getUserMedia w UI,
+- [x] wysyłanie FormData do lokalnego endpointu STT,
+- [x] zachowanie tekstu wpisanego przed nagraniem,
+- [x] fallback do Web Speech API,
+- [x] brak automatycznego wysyłania transkrypcji do czatu.
+
+**Konfiguracja środowiskowa:**
+```
+ODYN_STT_MODEL=tiny
+ODYN_STT_DEVICE=cpu
+ODYN_STT_COMPUTE_TYPE=int8
+ODYN_STT_LANGUAGE=pl
+```
+
+Dla maszyny z GPU można użyć ODYN_STT_DEVICE=cuda oraz odpowiedniego compute type.
+
+**Zależności:**
+- python-multipart jest wymagane przez upload multipart FastAPI,
+- faster-whisper znajduje się w odyn_ai/requirements_extra.txt, aby podstawowy runtime nie musiał pobierać ciężkiego modelu STT.
+
+**Testy:**
+- odyn_ai/tests/test_speech_to_text.py sprawdza konfigurację, walidację audio i obecność endpointu,
+- istniejący test_voice_ui.py zachowuje regresję Web Speech API i brak automatycznego send(),
+- testy STT nie wymagają pobierania modelu ani dostępu do mikrofonu.
+
+**Pozostałe ryzyka / ograniczenia:**
+- pierwsza transkrypcja może być wolniejsza, ponieważ model jest ładowany leniwie,
+- faster-whisper wymaga dodatkowego profilu zależności; model jest pobierany przez backend przy pierwszym użyciu,
+- runtime E2E z prawdziwym mikrofonem i pobranym modelem pozostaje osobnym testem sprzętowym,
+- jakość i opóźnienie zależą od modelu, CPU/GPU oraz długości nagrania.
