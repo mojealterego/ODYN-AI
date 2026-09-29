@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 class MCPServerRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     endpoint: str = Field(min_length=8, max_length=2000)
-    auth_kind: str = Field(default="none", pattern=r"^(none|api_key|bearer)$")
+    auth_kind: str = Field(default="none", pattern=r"^(none|api_key|bearer|oauth2_client_credentials|oauth2_authorization_code)$")
     secret_env: str | None = Field(default=None, max_length=200)
     auth_header: str = Field(default="Authorization", max_length=100)
     auth_prefix: str = Field(default="Bearer ", max_length=50)
@@ -12,6 +12,9 @@ class MCPServerRequest(BaseModel):
     client_secret_env: str | None = Field(default=None, max_length=200)
     token_url: str | None = Field(default=None, max_length=2000)
     scope: str | None = Field(default=None, max_length=1000)
+    authorization_url: str | None = Field(default=None, max_length=2000)
+    redirect_uri: str | None = Field(default=None, max_length=2000)
+    client_id: str | None = Field(default=None, max_length=500)
 
 
 class MCPToolRequest(BaseModel):
