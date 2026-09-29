@@ -3,24 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#2E3440">
-  <meta name="description" content="ODYN AI — lokalna inteligencja i agenci AI.">
+  <meta name="theme-color" content="#090b0e">
+  <meta name="description" content="ODYN AI — lokalna inteligencja, agenci AI oraz tworzenie aplikacji Web i Android.">
   <title>ODYN AI</title>
   <link rel="stylesheet" href="/static/nord.css">
 </head>
 <body>
   <aside id="sidebar">
-    <div class="brand">🐦‍⬛ ODYN AI</div>
+    <div class="brand"><span class="brand-main">ODYN AI</span><span class="brand-creator">AM · ANDRZEJ MIKULSKI · MojeAlterego</span></div>
 
-    <div class="eyebrow">KREATOR AGENTÓW</div>
+    <div class="eyebrow">AGENT BUILDER</div>
     <label for="agent-select">Agent</label>
     <select id="agent-select" aria-label="Wybierz agenta"></select>
 
     <div class="builder">
-      <div class="eyebrow">KREATOR APLIKACJI</div>
+      <div class="eyebrow">APP BUILDER</div>
       <button id="new-agent" type="button">+ Nowy agent</button>
       <button id="new-app" type="button">+ Nowa aplikacja</button>
+      <button id="open-ide" type="button">ODYN IDE</button>
       <button id="status-btn" type="button">Status silnika</button>
+    </div>
+
+    <div class="project-panel">
+      <div class="eyebrow">PROJEKT</div>
+      <select id="project-select" aria-label="Wybierz projekt"><option value="">Brak projektu</option></select>
+      <button id="project-open" type="button">Otwórz w IDE</button>
     </div>
 
     <div id="status" aria-live="polite">Ładowanie…</div>
@@ -42,6 +49,39 @@
       </div>
     </section>
 
+    <section id="ide" hidden aria-label="ODYN IDE">
+      <div class="ide-toolbar">
+        <strong>ODYN IDE</strong>
+        <span id="ide-project-name">Brak projektu</span>
+        <button id="ide-run" type="button">▶ Uruchom</button>
+        <button id="ide-build" type="button">Build</button>
+        <button id="ide-test" type="button">Test</button>
+        <button id="ide-close" type="button">Zamknij IDE</button>
+      </div>
+      <div class="ide-workspace">
+        <aside class="ide-explorer">
+          <div class="eyebrow">Eksplorator</div>
+          <div id="file-tree"></div>
+        </aside>
+        <section class="ide-editor">
+          <div class="editor-title" id="editor-path">Wybierz plik</div>
+          <textarea id="code-editor" spellcheck="false" aria-label="Edytor kodu"></textarea>
+          <button id="save-file" type="button">Zapisz plik</button>
+        </section>
+        <aside class="ide-side">
+          <div class="eyebrow">ODYN CODING AGENT</div>
+          <textarea id="ai-command" placeholder="Opisz zmianę, którą ma wykonać ODYN…"></textarea>
+          <button id="ai-apply" type="button">Wykonaj</button>
+          <div class="eyebrow">Terminal</div>
+          <pre id="terminal-output">Gotowy.</pre>
+        </aside>
+      </div>
+      <div class="ide-preview">
+        <div class="eyebrow">Podgląd</div>
+        <pre id="preview-output">Wybierz projekt.</pre>
+      </div>
+    </section>
+
     <form id="chat-form">
       <label class="sr-only" for="user-input">Polecenie</label>
       <textarea id="user-input" rows="1" maxlength="20000" placeholder="Napisz polecenie do ODYN AI…" aria-label="Polecenie do ODYN AI"></textarea>
@@ -51,7 +91,7 @@
 
   <dialog id="builder-dialog" aria-labelledby="dialog-title">
     <form method="dialog" id="builder-form">
-      <h2 id="dialog-title">Kreator agenta</h2>
+      <h2 id="dialog-title">Kreator</h2>
       <div id="dialog-fields"></div>
       <div class="dialog-actions">
         <button value="cancel">Anuluj</button>
