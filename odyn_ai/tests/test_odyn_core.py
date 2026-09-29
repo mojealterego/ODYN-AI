@@ -122,6 +122,22 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(field["validation"], "email")
         self.assertIn("Kontakt", builder.form_preview(form["form_id"])["html"])
 
+
+    def test_form_preview_escapes_user_content(self):
+        builder = AppBuilder()
+        app = builder.create("Formularz", "Opis", "odyn_glowny", platform="web", mode="no_code")
+        form = builder.create_form(app["app_id"], '<img src=x onerror="alert(1)">')
+        builder.add_form_field(
+            form["form_id"],
+            "text",
+            '<script>alert("x")</script>',
+            default='"><script>alert("x")</script>',
+        )
+        html = builder.form_preview(form["form_id"])["html"]
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+        self.assertIn("&quot;", html)
+
     def test_no_code_form_supports_select_options_and_order(self):
         builder = AppBuilder()
         app = builder.create("Formularz", "Opis", "odyn_glowny", platform="web", mode="no_code")
