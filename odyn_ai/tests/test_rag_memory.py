@@ -49,6 +49,13 @@ class RAGMemoryTests(unittest.TestCase):
         self.assertFalse(engine.add_memory("tekst"))
         self.assertEqual(engine.retrieve_relevant("tekst"), "")
 
+    @patch("odyn_ai.core.rag_memory.Llama", None)
+    @patch("builtins.__import__", side_effect=ImportError("llama-cpp-python unavailable"))
+    def test_module_can_run_without_native_runtime(self, _import):
+        engine = RAGMemoryEngine("missing.gguf")
+        self.assertFalse(engine.available)
+        self.assertFalse(engine.add_memory("tekst"))
+
     @patch("odyn_ai.core.rag_memory.Llama", FakeEmbedder)
     def test_clear_removes_memory_and_persistence(self):
         with tempfile.TemporaryDirectory() as tmp:
