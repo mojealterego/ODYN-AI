@@ -350,3 +350,14 @@ Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktual
 - pełna polityka allowlist hostów, TLS pinning, OAuth/API-key vault i kontrola uprawnień narzędzi pozostają osobnym etapem hardeningu.
 
 **Weryfikacja:** oczekiwany jest pełny CI po zmianach.
+
+
+**Weryfikacja końcowa Audytu #4:**
+- pierwszy CI po implementacji: **47 testów, 1 regresja kontraktu list_servers**,
+- regresja dotyczyła wyłącznie starej asercji oczekującej dwóch pól,
+- zaktualizowano test do rozszerzonego kontraktu diagnostycznego,
+- kolejny ODYN AI CI: **PASS**,
+- compileall: **PASS**,
+- unittest: **47/47 PASS**.
+
+**Status:** MCP Gateway jest zaimplementowany na poziomie rejestracji, persistence, initialize, tools/list, tools/call oraz FastAPI API. Nie oznacza to jeszcze pełnej zgodności ze wszystkimi wariantami transportu MCP, OAuth ani polityką produkcyjnego secret managementu.
