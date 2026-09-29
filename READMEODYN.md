@@ -298,6 +298,21 @@ Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktual
   - response_model=None dla SSE,
   - jawne pdf.epw zamiast szerokości 0 w krytycznych wywołaniach PDF.
 
-**Stan po poprawkach:** oczekiwany jest kolejny pełny CI. Nie oznaczamy jeszcze tej części jako zweryfikowanej końcowo.
+**Weryfikacja końcowa:**
+- ODYN AI CI: **PASS**,
+- compileall: **PASS**,
+- unittest: **43/43 PASS**,
+- dodatkowy test ASGI/HTTP potwierdza status 200, MIME `application/pdf`, `Content-Disposition: attachment` oraz niepusty artefakt.
 
-**Pozostałe ryzyko:** test przeglądarkowy z rzeczywistym kliknięciem pobierania powinien zostać wykonany w runtime ODYN; test kontraktowy UI potwierdza obecność kontrolek i endpointu, ale nie zastępuje E2E.
+**Pozostałe ryzyko:** pełny test przeglądarkowy z rzeczywistym kliknięciem pobierania nie jest jeszcze E2E; obecny test ASGI potwierdza warstwę HTTP, a kontrakt UI potwierdza kontrolki i endpoint. Runtime browser/E2E pozostaje osobnym krokiem.
+
+
+### 2026-09-29 — Weryfikacja końcowa Audytu #3
+
+**CI:** ODYN AI CI PASS.
+
+**Wynik:** compileall PASS, **43/43 testy PASS**.
+
+**Dodatkowo:** test HTTP przez ASGI potwierdza rzeczywisty przepływ POST → FileResponse → artefakt PDF z poprawnym MIME i nagłówkiem attachment.
+
+**Status modułu eksportu:** implementacja backend + API + IDE UI + szablony jest zweryfikowana automatycznie. Pozostaje opcjonalna weryfikacja E2E w uruchomionej przeglądarce.
