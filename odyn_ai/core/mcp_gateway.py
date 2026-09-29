@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from odyn_ai.core.mcp_oauth import OAuthAuthorizationClient
+from odyn_ai.core.mcp_sandbox import DockerMCPWorker
 from odyn_ai.core.sandbox import SandboxRunner
 from odyn_ai.core.secret_manager import NativeSecretManager
 from odyn_ai.core.ssrf import PinnedAsyncHTTPTransport, SSRFPolicy
@@ -111,6 +112,7 @@ class MCPGateway:
         ssrf_allow_private: bool = False,
         secret_manager: NativeSecretManager | None = None,
         sandbox: SandboxRunner | None = None,
+        mcp_worker: DockerMCPWorker | None = None,
     ) -> None:
         self.connected_servers: dict[str, MCPServer] = {}
         self.timeout = timeout
@@ -123,6 +125,7 @@ class MCPGateway:
         self._secret_store = SecretStore(native=secret_manager, allow_env_fallback=False)
         self._ssrf = SSRFPolicy(allow_private=ssrf_allow_private)
         self._sandbox = sandbox or SandboxRunner()
+        self._mcp_worker = mcp_worker or DockerMCPWorker()
         self._rate_limiter = RateLimiter(rate_limit, rate_window)
         self._load_registry()
 
@@ -440,14 +443,13 @@ class MCPGateway:
         self._persist_registry()
         return server.tools
 
-    def _authorize_tool(self, server: MCPServer, tool_name: str) -> None:
+    def _authorize_tool(self, server: MCPServer, tool_name: str) -> str:
         rule = self.tool_policy.get(f"{server.name}:{tool_name}", self.tool_policy.get(tool_name, "deny"))
         if rule == "deny":
             raise PermissionError(f"Narzędzie MCP '{tool_name}' jest zablokowane przez politykę ODYN.")
         if rule not in {"allow", "high_risk"}:
             raise PermissionError(f"Nieznana reguła uprawnień dla narzędzia '{tool_name}'.")
-        if rule == "high_risk":
-            raise PermissionError(f"Narzędzie MCP '{tool_name}' wymaga jawnego zatwierdzenia operacji wysokiego ryzyka.")
+        return rule
 
     def execute_high_risk_local(self, command: list[str], *, workdir: str = "/workspace", image: str = "python:3.13-slim", timeout: int = 30):
         self._sandbox.require_available()
@@ -459,15 +461,52 @@ class MCPGateway:
         })
         return result
 
+    async def _broker_worker_call(self, server: MCPServer, request: dict) -> dict:
+        if request.get("server") != server.name:
+            raise PermissionError("Worker MCP próbował zmienić przyznany serwer.")
+        if request.get("operation") != "tools/call":
+            raise PermissionError("Worker MCP próbował wykonać operację spoza tools/call.")
+        allowed_tools = {
+            item["name"]
+            for item in server.tools
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        }
+        if request.get("tool") not in allowed_tools:
+            raise PermissionError("Worker MCP próbował wywołać nieprzyznane narzędzie.")
+        arguments = request.get("arguments", {})
+        if not isinstance(arguments, dict):
+            raise PermissionError("Worker MCP zwrócił nieprawidłowe argumenty.")
+        return await self._rpc(
+            server,
+            "tools/call",
+            {"name": request["tool"], "arguments": arguments},
+        )
+
     async def execute_tool(self, server_name: str, tool_name: str, payload: dict) -> dict:
         server = self.get_server(server_name)
         if not tool_name.strip():
             raise ValueError("Nazwa narzędzia MCP nie może być pusta.")
         if not isinstance(payload, dict):
             raise ValueError("Argumenty narzędzia MCP muszą być obiektem JSON.")
-        self._authorize_tool(server, tool_name)
+        risk = self._authorize_tool(server, tool_name)
         if not server.protocol_version:
             await self.initialize(server_name)
-        result = await self._rpc(server, "tools/call", {"name": tool_name, "arguments": payload})
+        if risk == "high_risk":
+            result = await self._mcp_worker.execute(
+                {
+                    "version": 1,
+                    "operation": "tools/call",
+                    "server": server.name,
+                    "tool": tool_name,
+                    "arguments": payload,
+                },
+                broker=lambda request: self._broker_worker_call(server, request),
+            )
+        else:
+            result = await self._rpc(
+                server,
+                "tools/call",
+                {"name": tool_name, "arguments": payload},
+            )
         self._audit_event({"action": "tool_call", "server": server.name, "tool": tool_name, "result": "ok"})
         return result
