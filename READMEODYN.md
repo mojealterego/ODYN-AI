@@ -526,3 +526,21 @@ ODYN_SECRET_MY_MCP_TOKEN=...
 
 
 **CI Audyt #7 — korekta testu:** pierwsze uruchomienie wykryło błąd samego testu (nazwa `api_key` nie była objęta kontraktem sekretów workera). Test został skorygowany do `token`; nie zmieniono granicy bezpieczeństwa. Wymagane ponowne pełne CI.
+
+
+### 2026-09-29 — Audyt #8 / Specjalistyczne profile agentów
+
+**Wdrożono:**
+- [x] centralny rejestr `SPECIALIST_PROFILES` w `odyn_ai/config.py`,
+- [x] profil Prawo,
+- [x] profil OSINT,
+- [x] profil Web Builder,
+- [x] profil Game Builder,
+- [x] specjalistyczne prompty w `SYSTEM_PROMPTS`,
+- [x] `AgentManager` ładuje profile z centralnego rejestru,
+- [x] profile zachowują istniejący model `AgentDefinition`, w tym `can_search` i `mode`,
+- [x] test kontraktowy rejestru i dostępności profili w `AgentManager`.
+
+**Profile:** `prawo`, `osint`, `web_builder`, `game_builder`.
+
+**Weryfikacja:** pełny CI wymagany po integracji; nie uznawać etapu za zakończony przed compileall + pełnym unittest.
