@@ -128,8 +128,8 @@ Dodano regresje dla:
 3. **MCP nie jest jeszcze wystawione jako pełny zestaw endpointów API.**
    Modele `mcp_api_models.py` istnieją, ale trzeba dokończyć warstwę HTTP zarządzającą serwerami i wywołaniami narzędzi.
 
-4. **Eksport dokumentów nie jest jeszcze podłączony do API/UI.**
-   Generator istnieje, ale brak kompletnego przepływu użytkownik → endpoint → plik/artefakt.
+4. **Eksport dokumentów wymaga jeszcze pełnej weryfikacji runtime UI.**
+   Generator i API są podłączone; po tej sesji pozostaje potwierdzenie działania pobrania artefaktu w przeglądarce.
 
 5. **RAG wymaga osobnego, świadomego zarządzania modelem embeddingowym.**
    Brak automatycznego pobierania/weryfikacji modelu.
@@ -249,3 +249,55 @@ Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktual
 - UI export actions,
 - testy pobierania PDF/DOCX/XLSX przez FastAPI,
 - ewentualne szablony dokumentów premium (okładka, stopka, numeracja stron, style DOCX/XLSX).
+
+
+### 2026-09-29 — Audyt #3 / Eksport z ODYN IDE i szablony profesjonalne
+
+**Zakres:**
+- połączenie eksportu z ODYN IDE,
+- wybór formatu i nazwy pliku,
+- pobieranie artefaktu przez przeglądarkę,
+- szablony PDF/DOCX/XLSX,
+- bezpośredni eksport raportu agenta.
+
+**Wykonane pliki:**
+- odyn_ai/core/document_generator.py
+- odyn_ai/api/document_api_models.py
+- odyn_ai/api/server.py
+- odyn_ai/ui/index.html
+- odyn_ai/ui/app.js
+- odyn_ai/ui/nord.css
+- odyn_ai/tests/test_document_generator.py
+- odyn_ai/tests/test_document_api.py
+- odyn_ai/tests/test_export_ui_contract.py
+
+**Funkcjonalność:**
+- [x] panel EKSPORT RAPORTU w ODYN IDE,
+- [x] wybór PDF / DOCX / XLSX,
+- [x] własna nazwa pliku,
+- [x] szybkie przyciski PDF/DOCX/XLSX,
+- [x] pobieranie artefaktu Blob z API jako lokalny plik,
+- [x] POST /api/reports/export,
+- [x] POST /api/agents/{agent_id}/reports/export,
+- [x] zachowane dedykowane endpointy dokumentów,
+- [x] raport ostatniej odpowiedzi agenta może zostać eksportowany bez opuszczania IDE,
+- [x] PDF: nagłówek tytułu, linia brandowa, stopka ODYN AI i numeracja stron,
+- [x] PDF: rozpoznawanie H1/H2/H3 z treści markdownowej,
+- [x] DOCX: hierarchia Heading 1/2/3, nagłówek i stopka ODYN,
+- [x] XLSX: stylowany nagłówek, tabela Excela, pasy wierszy, freeze panes, autofilter i ukryta siatka,
+- [x] XLSX: ochrona przed formula injection,
+- [x] bezpieczne nazwy plików i normalizacja rozszerzeń.
+
+**TDD / weryfikacja:**
+- dodano testy RED przed implementacją szablonów,
+- pierwsza pełna próba CI: **39 testów, 2 błędy**,
+- błędy ujawnione przez CI:
+  1. FastAPI próbował generować response model dla AsyncIterable[ServerSentEvent],
+  2. FPDF2 zgłaszał Not enough horizontal space to render a single character przy długim dokumencie.
+- poprawiono odpowiednio:
+  - response_model=None dla SSE,
+  - jawne pdf.epw zamiast szerokości 0 w krytycznych wywołaniach PDF.
+
+**Stan po poprawkach:** oczekiwany jest kolejny pełny CI. Nie oznaczamy jeszcze tej części jako zweryfikowanej końcowo.
+
+**Pozostałe ryzyko:** test przeglądarkowy z rzeczywistym kliknięciem pobierania powinien zostać wykonany w runtime ODYN; test kontraktowy UI potwierdza obecność kontrolek i endpointu, ale nie zastępuje E2E.
