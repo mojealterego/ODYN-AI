@@ -81,7 +81,7 @@ class OdynDocumentBuilder:
         pdf.add_page()
         pdf.set_font("ODYN", "B", 17)
         pdf.set_text_color(230, 233, 236)
-        pdf.cell(0, 10, text=title, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(pdf.epw, 10, text=title, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_draw_color(184, 138, 50)
         pdf.line(18, pdf.get_y() + 2, 192, pdf.get_y() + 2)
         pdf.ln(8)
@@ -95,11 +95,11 @@ class OdynDocumentBuilder:
                 pdf.ln(3)
                 pdf.set_font("ODYN", "B", {1: 14, 2: 12, 3: 11}[level])
                 pdf.set_text_color(70, 80, 90)
-                pdf.multi_cell(0, 7, text=match.group(2))
+                pdf.multi_cell(pdf.epw, 7, text=match.group(2))
                 pdf.set_font("ODYN", "", 10.5)
                 pdf.set_text_color(35, 40, 45)
             elif line.strip():
-                pdf.multi_cell(0, 6.5, text=line)
+                pdf.multi_cell(pdf.epw, 6.5, text=line)
             else:
                 pdf.ln(3)
 
