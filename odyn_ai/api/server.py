@@ -1,29 +1,33 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterable
+import asyncio
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from odyn_ai.config import load_config
+from odyn_ai.config import STTConfig, load_config
 from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
 from odyn_ai.core.mcp_gateway import MCPAuth, MCPGateway
 from odyn_ai.core.secret_manager import NativeSecretManager
 from odyn_ai.core.document_generator import OdynDocumentBuilder
+from odyn_ai.core.speech_to_text import SpeechToText, SpeechToTextError
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
 
 config = load_config()
 engine = DualGGUFEngine(config)
+stt_config = STTConfig()
+stt = SpeechToText(model_name=stt_config.model, device=stt_config.device, compute_type=stt_config.compute_type, max_audio_bytes=stt_config.max_audio_bytes, language=stt_config.language)
 agents = AgentManager()
 apps = AppBuilder()
 documents = OdynDocumentBuilder(os.getenv("ODYN_EXPORT_DIR", "exports"))
@@ -186,6 +190,21 @@ async def execute_mcp_tool(payload: MCPToolRequest):
         raise HTTPException(403, str(exc)) from exc
     except (RuntimeError, TimeoutError) as exc:
         raise HTTPException(502, str(exc)) from exc
+
+
+@app.post("/api/stt/transcribe", summary="Transkrybuj nagranie głosowe lokalnym Whisperem")
+async def transcribe_audio(file: UploadFile = File(...)):
+    content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    if content_type not in {"audio/webm", "audio/ogg", "audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/x-m4a"}:
+        raise HTTPException(415, "Nieobsługiwany format audio.")
+    audio = await file.read(stt_config.max_audio_bytes + 1)
+    if len(audio) > stt_config.max_audio_bytes:
+        raise HTTPException(413, f"Plik audio przekracza limit {stt_config.max_audio_bytes // (1024 * 1024)} MB.")
+    try:
+        text = await asyncio.to_thread(stt.transcribe_bytes, audio, content_type)
+        return {"text": text, "language": stt_config.language, "model": stt_config.model, "backend": "local-whisper"}
+    except SpeechToTextError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/api/status", summary="Pobierz status silnika")
