@@ -206,7 +206,6 @@
     search.type = "checkbox";
     search.id = "agent-search";
     search.name = "agent-search";
-    searchWrapper = searchLabel;
     searchLabel.append(search, document.createTextNode(" Agent może korzystać z wyszukiwania internetowego"));
     $("dialog-fields").appendChild(searchLabel);
 
