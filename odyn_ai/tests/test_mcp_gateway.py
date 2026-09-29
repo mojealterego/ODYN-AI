@@ -228,6 +228,21 @@ class SecurityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(PermissionError):
                 policy.validate_addresses([ipaddress.ip_address(address)])
 
+    def test_ssrf_transport_pins_ip_and_preserves_hostname(self):
+        from odyn_ai.core.ssrf import PinnedAsyncHTTPTransport, SSRFPolicy
+        import ipaddress
+        policy = SSRFPolicy()
+        transport = PinnedAsyncHTTPTransport(policy)
+        request = __import__("httpx").Request("GET", "https://example.com/path")
+        with patch("odyn_ai.core.ssrf.socket.getaddrinfo", return_value=[
+            (2, 1, 6, "", ("93.184.216.34", 443)),
+        ]):
+            pinned = transport.pin_request(request)
+        self.assertEqual(pinned.url.host, "93.184.216.34")
+        self.assertEqual(pinned.headers["Host"], "example.com")
+        self.assertEqual(pinned.extensions["sni_hostname"], "example.com")
+        transport.close()
+
     def test_ssrf_allows_public_address(self):
         from odyn_ai.core.ssrf import SSRFPolicy
         import ipaddress
