@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
+import asyncio
 from dataclasses import dataclass
 from typing import Callable
 
@@ -51,37 +51,35 @@ class DockerMCPWorker:
             "python", "-m", "odyn_ai.core.mcp_worker",
         ]
 
-    def execute(
+    async def execute(
         self,
         request: dict,
         *,
-        broker: Callable[[dict], dict],
+        broker,
     ) -> dict:
         self.require_available()
-        process = subprocess.Popen(
-            self.build_command(),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        process = await asyncio.create_subprocess_exec(
+            *self.build_command(),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        payload = (json.dumps(request, ensure_ascii=False) + "\n").encode()
         try:
-            process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
-            process.stdin.close()
-            line = process.stdout.readline()
-            if not line:
-                stderr = process.stderr.read()
-                raise RuntimeError(f"MCP Worker nie zwrócił żądania brokera: {stderr[-1000:]}")
-            message = json.loads(line)
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(payload),
+                timeout=self.limits.timeout,
+            )
+            lines = stdout.decode().splitlines()
+            if not lines:
+                raise RuntimeError(f"MCP Worker nie zwrócił żądania brokera: {stderr.decode()[-1000:]}")
+            message = json.loads(lines[0])
             if message.get("type") == "error":
                 raise PermissionError(message.get("error", "Worker odrzucił operację."))
             if message.get("type") != "broker_request":
                 raise RuntimeError("Nieprawidłowa odpowiedź protokołu MCP Worker.")
-            result = broker(message["request"])
-            if process.poll() is None:
-                process.terminate()
-            return result
-        finally:
-            if process.poll() is None:
-                process.kill()
-            process.wait(timeout=5)
+            return await broker(message["request"])
+        except asyncio.TimeoutError as exc:
+            process.kill()
+            await process.wait()
+            raise TimeoutError("MCP Worker przekroczył limit czasu.") from exc
