@@ -1,16 +1,20 @@
 from __future__ import annotations
+
 import asyncio
 from collections.abc import AsyncIterator
 import json
 import shutil
 import subprocess
 from typing import Any
+
 import httpx
+
 from odyn_ai.config import DRAFT_MODEL_PATH, MAIN_MODEL_PATH, LLMConfig
 
+
 class DualGGUFEngine:
-    """Inference facade. True neural two-GGUF speculation uses llama-server.
-    Python fallback uses llama-cpp-python prompt-lookup speculation."""
+    """Warstwa inferencji. Dwa modele GGUF korzystają z llama-server."""
+
     def __init__(self, config: LLMConfig) -> None:
         self.config = config
         self._process: subprocess.Popen[str] | None = None
@@ -20,12 +24,17 @@ class DualGGUFEngine:
     def _choose_backend(self) -> str:
         models = MAIN_MODEL_PATH.is_file() and DRAFT_MODEL_PATH.is_file()
         server = shutil.which(self.config.llama_server_bin) is not None
+
         if self.config.backend == "server":
-            if not models: raise FileNotFoundError("Brak obu modeli GGUF.")
-            if not server: raise FileNotFoundError(f"Brak llama-server: {self.config.llama_server_bin}")
+            if not models:
+                raise FileNotFoundError("Brak obu wymaganych modeli GGUF.")
+            if not server:
+                raise FileNotFoundError(f"Nie znaleziono programu llama-server: {self.config.llama_server_bin}")
             return "server"
+
         if self.config.backend == "auto" and models and server:
             return "server"
+
         return "python"
 
     @property
@@ -40,85 +49,151 @@ class DualGGUFEngine:
 
     async def _start_server(self) -> None:
         command = [
-            self.config.llama_server_bin, "-m", str(MAIN_MODEL_PATH),
-            "--model-draft", str(DRAFT_MODEL_PATH), "--spec-type", "draft-simple",
-            "--spec-draft-n-max", str(self.config.draft_tokens), "-c", str(self.config.n_ctx),
-            "-ngl", str(self.config.n_gpu_layers_main), "-ngld", str(self.config.n_gpu_layers_draft),
-            "--host", self.config.server_host, "--port", str(self.config.server_port),
-            "--jinja", "--alias", "odyn-main",
+            self.config.llama_server_bin,
+            "-m",
+            str(MAIN_MODEL_PATH),
+            "--model-draft",
+            str(DRAFT_MODEL_PATH),
+            "--spec-type",
+            "draft-simple",
+            "--spec-draft-n-max",
+            str(self.config.draft_tokens),
+            "-c",
+            str(self.config.n_ctx),
+            "-ngl",
+            str(self.config.n_gpu_layers_main),
+            "-ngld",
+            str(self.config.n_gpu_layers_draft),
+            "--host",
+            self.config.server_host,
+            "--port",
+            str(self.config.server_port),
+            "--jinja",
+            "--alias",
+            "odyn-main",
         ]
-        self._process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        self._process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         deadline = asyncio.get_running_loop().time() + self.config.server_start_timeout
+
         async with httpx.AsyncClient(timeout=2) as client:
             while asyncio.get_running_loop().time() < deadline:
                 if self._process.poll() is not None:
-                    raise RuntimeError("llama-server zakończył pracę podczas startu.")
+                    raise RuntimeError("llama-server zakończył pracę podczas uruchamiania.")
                 try:
-                    if (await client.get(f"http://{self.config.server_host}:{self.config.server_port}/health")).is_success:
+                    if (
+                        await client.get(
+                            f"http://{self.config.server_host}:{self.config.server_port}/health"
+                        )
+                    ).is_success:
                         return
                 except httpx.HTTPError:
                     pass
                 await asyncio.sleep(.25)
-        raise TimeoutError("llama-server nie osiągnął gotowości.")
+
+        raise TimeoutError("llama-server nie osiągnął gotowości w wyznaczonym czasie.")
 
     def _load_python(self) -> None:
-        if self._python_llm is not None: return
+        if self._python_llm is not None:
+            return
         if not MAIN_MODEL_PATH.is_file():
-            raise FileNotFoundError(f"Brak głównego GGUF: {MAIN_MODEL_PATH}")
+            raise FileNotFoundError(f"Brak głównego modelu GGUF: {MAIN_MODEL_PATH}")
+
         from llama_cpp import Llama
         from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
+
         self._python_llm = Llama(
-            model_path=str(MAIN_MODEL_PATH), n_ctx=self.config.n_ctx,
-            n_threads=self.config.n_threads, n_gpu_layers=self.config.n_gpu_layers_main,
+            model_path=str(MAIN_MODEL_PATH),
+            n_ctx=self.config.n_ctx,
+            n_threads=self.config.n_threads,
+            n_gpu_layers=self.config.n_gpu_layers_main,
             draft_model=LlamaPromptLookupDecoding(num_pred_tokens=self.config.draft_tokens),
             verbose=False,
         )
 
     async def stream_chat(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         if self.backend == "server":
-            async for token in self._stream_server(messages): yield token
+            async for token in self._stream_server(messages):
+                yield token
             return
-        if self._python_llm is None: await asyncio.to_thread(self._load_python)
+
+        if self._python_llm is None:
+            await asyncio.to_thread(self._load_python)
+
         queue: asyncio.Queue[str | BaseException | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
+
         def produce() -> None:
             try:
-                stream = self._python_llm.create_chat_completion(messages=messages, temperature=self.config.temperature, top_p=self.config.top_p, top_k=self.config.top_k, max_tokens=self.config.max_tokens, stream=True)
+                stream = self._python_llm.create_chat_completion(
+                    messages=messages,
+                    temperature=self.config.temperature,
+                    top_p=self.config.top_p,
+                    top_k=self.config.top_k,
+                    max_tokens=self.config.max_tokens,
+                    stream=True,
+                )
                 for chunk in stream:
                     content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
-                    if content: loop.call_soon_threadsafe(queue.put_nowait, content)
+                    if content:
+                        loop.call_soon_threadsafe(queue.put_nowait, content)
             except BaseException as exc:
                 loop.call_soon_threadsafe(queue.put_nowait, exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
+
         asyncio.create_task(asyncio.to_thread(produce))
+
         while True:
             item = await queue.get()
-            if item is None: break
-            if isinstance(item, BaseException): raise RuntimeError(str(item)) from item
+            if item is None:
+                break
+            if isinstance(item, BaseException):
+                raise RuntimeError(str(item)) from item
             yield item
 
     async def _stream_server(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         url = f"http://{self.config.server_host}:{self.config.server_port}/v1/chat/completions"
-        payload = {"model": "odyn-main", "messages": messages, "temperature": self.config.temperature, "top_p": self.config.top_p, "max_tokens": self.config.max_tokens, "stream": True}
+        payload = {
+            "model": "odyn-main",
+            "messages": messages,
+            "temperature": self.config.temperature,
+            "top_p": self.config.top_p,
+            "max_tokens": self.config.max_tokens,
+            "stream": True,
+        }
+
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
-                    if not line.startswith("data:"): continue
+                    if not line.startswith("data:"):
+                        continue
                     data = line[5:].strip()
-                    if data == "[DONE]": return
-                    try: obj = json.loads(data)
-                    except ValueError: continue
+                    if data == "[DONE]":
+                        return
+                    try:
+                        obj = json.loads(data)
+                    except ValueError:
+                        continue
                     content = obj.get("choices", [{}])[0].get("delta", {}).get("content")
-                    if content: yield content
+                    if content:
+                        yield content
 
     async def close(self) -> None:
         if self._process is not None:
             self._process.terminate()
-            try: await asyncio.to_thread(self._process.wait, 5)
-            except subprocess.TimeoutExpired: self._process.kill()
+            try:
+                await asyncio.to_thread(self._process.wait, 5)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
             self._process = None
+
         self._python_llm = None
 
     def status(self) -> dict[str, object]:
