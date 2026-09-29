@@ -19,10 +19,14 @@ from odyn_ai.core.state import JsonStore
 class MCPAuth:
     """Reference to credentials kept outside the MCP registry."""
 
-    kind: str = "none"  # none | api_key | bearer
+    kind: str = "none"  # none | api_key | bearer | oauth2_client_credentials
     secret_env: str | None = None
     header: str = "Authorization"
     prefix: str = "Bearer "
+    client_id_env: str | None = None
+    client_secret_env: str | None = None
+    token_url: str | None = None
+    scope: str | None = None
 
 
 @dataclass
@@ -107,6 +111,10 @@ class MCPGateway:
                     secret_env=auth_data.get("secret_env"),
                     header=str(auth_data.get("header", "Authorization")),
                     prefix=str(auth_data.get("prefix", "Bearer ")),
+                    client_id_env=auth_data.get("client_id_env"),
+                    client_secret_env=auth_data.get("client_secret_env"),
+                    token_url=auth_data.get("token_url"),
+                    scope=auth_data.get("scope"),
                 )
                 server = MCPServer(
                     name=str(item["name"]),
@@ -135,6 +143,10 @@ class MCPGateway:
                     "secret_env": s.auth.secret_env,
                     "header": s.auth.header,
                     "prefix": s.auth.prefix,
+                    "client_id_env": s.auth.client_id_env,
+                    "client_secret_env": s.auth.client_secret_env,
+                    "token_url": s.auth.token_url,
+                    "scope": s.auth.scope,
                 },
             }
             for s in self.connected_servers.values()
@@ -165,7 +177,7 @@ class MCPGateway:
             raise ValueError("Nazwa serwera MCP nie może być pusta.")
         self._validate_endpoint(url)
         auth = auth or MCPAuth()
-        if auth.kind not in {"none", "api_key", "bearer"}:
+        if auth.kind not in {"none", "api_key", "bearer", "oauth2_client_credentials"}:
             raise ValueError("Typ uwierzytelniania MCP musi być: none, api_key albo bearer.")
         if auth.kind != "none":
             self._secret_store.get(auth.secret_env)
@@ -200,6 +212,61 @@ class MCPGateway:
         if server is None:
             raise ValueError(f"Serwer MCP {server_name} nie jest zarejestrowany.")
         return server
+
+    async def _oauth_token(self, server: MCPServer) -> str:
+        auth = server.auth
+        client_id = self._secret_store.get(auth.client_id_env)
+        client_secret = self._secret_store.get(auth.client_secret_env)
+        if not client_id or not client_secret or not auth.token_url:
+            raise PermissionError("Brak kompletnej konfiguracji OAuth2 Client Credentials.")
+        if not hasattr(server, "_oauth_token_value"):
+            server._oauth_token_value = None
+            server._oauth_token_expiry = 0.0
+        if server._oauth_token_value and time.time() < server._oauth_token_expiry - 30:
+            return server._oauth_token_value
+        self._validate_endpoint(auth.token_url)
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
+                response = await client.post(
+                    auth.token_url,
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        **({"scope": auth.scope} if auth.scope else {}),
+                    },
+                    headers={"Accept": "application/json"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            self._audit_event({"action": "oauth_token", "server": server.name, "result": "error"})
+            raise RuntimeError(f"Nie udało się uzyskać tokena OAuth2 dla {server.name}.") from exc
+        token = payload.get("access_token") if isinstance(payload, dict) else None
+        if not token:
+            raise RuntimeError(f"Serwer OAuth2 dla {server.name} nie zwrócił access_token.")
+        server._oauth_token_value = str(token)
+        server._oauth_token_expiry = time.time() + float(payload.get("expires_in", 300))
+        self._audit_event({"action": "oauth_token", "server": server.name, "result": "ok"})
+        return server._oauth_token_value
+
+    async def _headers_async(self, server: MCPServer) -> dict[str, str]:
+        headers = {
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": server.protocol_version or "2025-06-18",
+        }
+        if server.session_id:
+            headers["Mcp-Session-Id"] = server.session_id
+        if server.auth.kind == "oauth2_client_credentials":
+            headers["Authorization"] = "Bearer " + await self._oauth_token(server)
+        else:
+            secret = self._secret_store.get(server.auth.secret_env)
+            if server.auth.kind != "none" and not secret:
+                raise PermissionError(f"Brak sekretu MCP wskazanego przez {server.auth.secret_env}.")
+            if secret:
+                headers[server.auth.header] = server.auth.prefix + secret if server.auth.kind == "bearer" else secret
+        return headers
 
     def _headers(self, server: MCPServer) -> dict[str, str]:
         headers = {
@@ -238,7 +305,7 @@ class MCPGateway:
             body["params"] = params
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
-                response = await client.post(server.endpoint, json=body, headers=self._headers(server))
+                response = await client.post(server.endpoint, json=body, headers=await self._headers_async(server))
                 response.raise_for_status()
                 response_headers = getattr(response, "headers", {}) or {}
                 session_id = response_headers.get("Mcp-Session-Id")
