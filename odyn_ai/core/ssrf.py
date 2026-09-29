@@ -18,5 +18,5 @@ class SSRFPolicy:
         return parsed.hostname,addresses
     def validate_addresses(self,addresses:list[ipaddress._BaseAddress])->None:
         for address in addresses:
-            if address.is_loopback or address.is_link_local or address.is_multicast or address.is_unspecified or address.is_reserved: raise PermissionError(f"Adres {address} jest zablokowany przez politykę SSRF.")
-            if not self.allow_private and address.is_private: raise PermissionError(f"Prywatny adres {address} jest zablokowany przez politykę SSRF.")
+            if not self.allow_private and (address.is_loopback or address.is_link_local or address.is_multicast or address.is_unspecified or address.is_reserved or address.is_private):
+                raise PermissionError(f"Adres {address} jest zablokowany przez politykę SSRF.")
