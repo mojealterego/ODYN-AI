@@ -12,6 +12,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+from odyn_ai.core.mcp_oauth import OAuthAuthorizationClient
+from odyn_ai.core.sandbox import SandboxRunner
+from odyn_ai.core.secret_manager import NativeSecretManager
+from odyn_ai.core.ssrf import SSRFPolicy
+
 from odyn_ai.core.state import JsonStore
 
 
@@ -27,6 +32,9 @@ class MCPAuth:
     client_secret_env: str | None = None
     token_url: str | None = None
     scope: str | None = None
+    authorization_url: str | None = None
+    redirect_uri: str | None = None
+    client_id: str | None = None
 
 
 @dataclass
@@ -89,6 +97,9 @@ class MCPGateway:
         rate_limit: int = 30,
         rate_window: float = 60.0,
         audit_max_entries: int = 1000,
+        ssrf_allow_private: bool = False,
+        secret_manager: NativeSecretManager | None = None,
+        sandbox: SandboxRunner | None = None,
     ) -> None:
         self.connected_servers: dict[str, MCPServer] = {}
         self.timeout = timeout
@@ -98,7 +109,9 @@ class MCPGateway:
         self._store = JsonStore("mcp_servers", data_dir)
         self._audit = JsonStore("mcp_audit", data_dir)
         self._audit_max_entries = audit_max_entries
-        self._secret_store = SecretStore()
+        self._secret_store = SecretStore(native=secret_manager, allow_env_fallback=False)
+        self._ssrf = SSRFPolicy(allow_private=ssrf_allow_private)
+        self._sandbox = sandbox or SandboxRunner()
         self._rate_limiter = RateLimiter(rate_limit, rate_window)
         self._load_registry()
 
@@ -115,6 +128,9 @@ class MCPGateway:
                     client_secret_env=auth_data.get("client_secret_env"),
                     token_url=auth_data.get("token_url"),
                     scope=auth_data.get("scope"),
+                    authorization_url=auth_data.get("authorization_url"),
+                    redirect_uri=auth_data.get("redirect_uri"),
+                    client_id=auth_data.get("client_id"),
                 )
                 server = MCPServer(
                     name=str(item["name"]),
@@ -147,6 +163,9 @@ class MCPGateway:
                     "client_secret_env": s.auth.client_secret_env,
                     "token_url": s.auth.token_url,
                     "scope": s.auth.scope,
+                    "authorization_url": s.auth.authorization_url,
+                    "redirect_uri": s.auth.redirect_uri,
+                    "client_id": s.auth.client_id,
                 },
             }
             for s in self.connected_servers.values()
