@@ -16,6 +16,7 @@ from odyn_ai.core.agents import AgentManager
 from odyn_ai.core.builders import AppBuilder
 from odyn_ai.core.engine import DualGGUFEngine
 from odyn_ai.core.mcp_gateway import MCPAuth, MCPGateway
+from odyn_ai.core.secret_manager import NativeSecretManager
 from odyn_ai.core.document_generator import OdynDocumentBuilder
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
@@ -32,7 +33,12 @@ for item in os.getenv("ODYN_MCP_TOOL_POLICY", "").split(","):
     if "=" in item:
         tool, rule = item.split("=", 1)
         mcp_policy[tool.strip()] = rule.strip()
-mcp_gateway = MCPGateway(timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")), allowed_hosts=mcp_allowed_hosts, tool_policy=mcp_policy, rate_limit=int(os.getenv("ODYN_MCP_RATE_LIMIT", "30")))
+mcp_secret_manager = None
+try:
+    mcp_secret_manager = NativeSecretManager()
+except RuntimeError:
+    mcp_secret_manager = None
+mcp_gateway = MCPGateway(secret_manager=mcp_secret_manager, timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")), allowed_hosts=mcp_allowed_hosts, tool_policy=mcp_policy, rate_limit=int(os.getenv("ODYN_MCP_RATE_LIMIT", "30")))
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
@@ -120,11 +126,31 @@ async def list_mcp_servers():
 @app.post("/api/mcp/servers", summary="Zarejestruj serwer MCP")
 async def register_mcp_server(payload: MCPServerRequest):
     try:
-        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix, client_id_env=payload.client_id_env, client_secret_env=payload.client_secret_env, token_url=payload.token_url, scope=payload.scope)).__dict__
+        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix, client_id_env=payload.client_id_env, client_secret_env=payload.client_secret_env, token_url=payload.token_url, scope=payload.scope, authorization_url=payload.authorization_url, redirect_uri=payload.redirect_uri, client_id=payload.client_id)).__dict__
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(403, str(exc)) from exc
+
+
+@app.get("/api/mcp/servers/{server_name}/oauth/authorize", summary="Rozpocznij OAuth Authorization Code + PKCE")
+async def start_mcp_oauth(server_name: str):
+    try:
+        request = mcp_gateway.create_oauth_authorization(server_name)
+        return {"url": request.url, "state": request.state}
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(403, str(exc)) from exc
+
+
+@app.post("/api/mcp/servers/{server_name}/oauth/callback", summary="Zakończ OAuth Authorization Code + PKCE")
+async def complete_mcp_oauth(server_name: str, code: str, state: str):
+    try:
+        token = await mcp_gateway.complete_oauth_authorization(server_name, code, state)
+        return {"token_type": token.token_type, "expires_in": token.expires_in, "scope": token.scope}
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)) from exc
 
 
 @app.delete("/api/mcp/servers/{server_name}", summary="Wyrejestruj serwer MCP")
