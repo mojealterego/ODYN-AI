@@ -1,6 +1,7 @@
 from __future__ import annotations
 import ipaddress, socket
 from urllib.parse import urlparse
+import httpx
 
 class SSRFPolicy:
     def __init__(self, *, allow_private:bool=False): self.allow_private=allow_private
@@ -20,3 +21,25 @@ class SSRFPolicy:
         for address in addresses:
             if not self.allow_private and (address.is_loopback or address.is_link_local or address.is_multicast or address.is_unspecified or address.is_reserved or address.is_private):
                 raise PermissionError(f"Adres {address} jest zablokowany przez politykę SSRF.")
+
+
+class PinnedAsyncHTTPTransport(httpx.AsyncHTTPTransport):
+    """Connect to a validated IP while preserving hostname/SNI for TLS and HTTP."""
+
+    def __init__(self, policy: SSRFPolicy, **kwargs):
+        super().__init__(**kwargs)
+        self.policy = policy
+
+    def pin_request(self, request: httpx.Request) -> httpx.Request:
+        hostname = request.url.host
+        _, addresses = self.policy.validate_url(str(request.url))
+        if not addresses:
+            raise PermissionError("Brak bezpiecznego adresu docelowego.")
+        target = str(addresses[0])
+        request.extensions["sni_hostname"] = hostname
+        request.headers["Host"] = hostname if request.url.port in (None, 80, 443) else f"{hostname}:{request.url.port}"
+        request.url = request.url.copy_with(host=target)
+        return request
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        return await super().handle_async_request(self.pin_request(request))
