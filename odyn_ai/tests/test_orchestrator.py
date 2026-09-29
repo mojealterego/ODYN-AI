@@ -118,7 +118,7 @@ class OrchestratorTests(unittest.IsolatedAsyncioTestCase):
                 self.events.append(stage)
                 return self.Episode(3)
 
-            def record_success(self, *args):
+            def record_success(self, *args, **kwargs):
                 self.events.append("successful_procedure")
                 return self.Episode(4)
 
