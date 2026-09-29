@@ -20,6 +20,9 @@ from odyn_ai.core.mcp_gateway import MCPAuth, MCPGateway
 from odyn_ai.core.secret_manager import NativeSecretManager
 from odyn_ai.core.document_generator import OdynDocumentBuilder
 from odyn_ai.core.speech_to_text import SpeechToText, SpeechToTextError
+from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
+from odyn_ai.core.coding_agent import CodingAgent
+from odyn_ai.core.github_integration import GitHubIntegration
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
@@ -43,6 +46,9 @@ try:
 except RuntimeError:
     mcp_secret_manager = None
 mcp_gateway = MCPGateway(secret_manager=mcp_secret_manager, timeout=float(os.getenv("ODYN_MCP_TIMEOUT", "30")), allowed_hosts=mcp_allowed_hosts, tool_policy=mcp_policy, rate_limit=int(os.getenv("ODYN_MCP_RATE_LIMIT", "30")))
+execution = ExecutionEngine()
+coding_agent = CodingAgent(engine)
+github = GitHubIntegration()
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
 
@@ -95,6 +101,22 @@ class AppCreate(BaseModel):
 class WorkspaceWrite(BaseModel):
     path: str
     content: str
+
+
+class ExecutionRequestModel(BaseModel):
+    action: str
+    timeout: float = Field(default=300, gt=0, le=900)
+
+
+class AgentEditRequest(BaseModel):
+    instruction: str = Field(min_length=1, max_length=20000)
+
+
+class GitHubCommitRequest(BaseModel):
+    repository: str
+    branch: str = "main"
+    message: str = Field(min_length=1, max_length=200)
+    create_branch: bool = False
 
 
 class FormCreate(BaseModel):
@@ -299,6 +321,45 @@ async def write_workspace_file(app_id: str, payload: WorkspaceWrite):
         raise HTTPException(422, str(exc)) from exc
 
 
+@app.post("/api/apps/{app_id}/agent/edit", summary="Agent automatycznie edytuje projekt")
+async def agent_edit_project(app_id: str, payload: AgentEditRequest):
+    try:
+        project = apps.workspace(app_id)
+        result = await coding_agent.apply(project["platform"], payload.instruction, project["files"])
+        for path, content in result["files"].items():
+            if project["files"].get(path) != content:
+                apps.write_file(app_id, path, content)
+        return {"app_id": app_id, "summary": result["summary"], "changes": result["changes"], "files": sorted(result["files"]), "persisted": True}
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Coding Agent nie wykonał zmiany: {exc}") from exc
+
+
+@app.post("/api/apps/{app_id}/execute", summary="Uruchom Test/Build/Run projektu")
+async def execute_project(app_id: str, payload: ExecutionRequestModel):
+    try:
+        project = apps.workspace(app_id)
+        if payload.action not in {"run", "build", "test"}:
+            raise ValueError("Akcja musi być: run, build albo test.")
+        result = await execution.execute(ExecutionRequest(project["platform"], payload.action, project["files"], payload.timeout))
+        return result.__dict__
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/api/apps/{app_id}/github/commit", summary="Wyślij projekt do GitHub")
+async def commit_project_to_github(app_id: str, payload: GitHubCommitRequest):
+    try:
+        project = apps.workspace(app_id)
+        result = await github.commit_files(payload.repository, project["files"], payload.message, payload.branch, payload.create_branch)
+        return result.__dict__
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"GitHub API: {exc}") from exc
 
 
 def _document_response(path: str, media_type: str) -> FileResponse:
