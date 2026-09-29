@@ -82,6 +82,88 @@
   }
 
 
+
+  function initVoiceInput() {
+    const voiceBtn = $("voice-btn");
+    const voiceStatus = $("voice-status");
+    const userInput = $("user-input");
+    if (!voiceBtn || !voiceStatus || !userInput) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      voiceBtn.disabled = true;
+      voiceBtn.title = "Ta przeglądarka nie obsługuje rozpoznawania mowy.";
+      voiceStatus.textContent = "Głos: niedostępny";
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pl-PL";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let baseText = "";
+    let finalText = "";
+
+    const setRecordingUi = (recording) => {
+      voiceBtn.classList.toggle("recording", recording);
+      voiceBtn.setAttribute("aria-pressed", String(recording));
+      voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎤 Głos";
+      voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj dyktowanie" : "Włącz dyktowanie");
+      voiceStatus.textContent = recording ? "Głos: nasłuchiwanie…" : "Głos: gotowy";
+    };
+
+    voiceBtn.addEventListener("click", () => {
+      if (voiceBtn.classList.contains("recording")) {
+        recognition.stop();
+        return;
+      }
+      baseText = userInput.value.trim();
+      finalText = "";
+      try {
+        recognition.start();
+      } catch (error) {
+        voiceStatus.textContent = "Głos: nie można uruchomić";
+      }
+    });
+
+    recognition.onstart = () => {
+      setRecordingUi(true);
+      voiceStatus.textContent = "Głos: słucham…";
+    };
+
+    recognition.onresult = (event) => {
+      let interimText = "";
+      let completedText = finalText;
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0].transcript.trim();
+        if (event.results[i].isFinal) completedText = (completedText + " " + transcript).trim();
+        else interimText = (interimText + " " + transcript).trim();
+      }
+      finalText = completedText;
+      userInput.value = [baseText, finalText, interimText].filter(Boolean).join(" ");
+      userInput.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    recognition.onerror = (event) => {
+      const messages = {
+        "not-allowed": "Głos: brak zgody na mikrofon",
+        "service-not-allowed": "Głos: usługa rozpoznawania niedostępna",
+        "no-speech": "Głos: nie wykryto mowy",
+        "audio-capture": "Głos: brak dostępnego mikrofonu",
+        "network": "Głos: błąd usługi rozpoznawania",
+      };
+      voiceStatus.textContent = messages[event.error] || "Głos: błąd rozpoznawania";
+      setRecordingUi(false);
+    };
+
+    recognition.onend = () => {
+      setRecordingUi(false);
+      if (finalText.trim()) voiceStatus.textContent = "Głos: tekst gotowy do wysłania";
+    };
+  }
+
   async function exportReport(format) {
     if (!lastAgentReport || !lastAgentReport.content.trim()) {
       $("status").textContent = "Najpierw wygeneruj raport odpowiedzią agenta.";
@@ -268,6 +350,7 @@
     $("terminal-output").textContent=`${action.toUpperCase()} · ${project.platform === "android" ? "ANDROID NATIVE" : "WEB"}\n\n${cmd[action]}\n\nPolecenie przygotowane dla projektu.`;
   }
 
+  initVoiceInput();
   $("chat-form").onsubmit=e=>{e.preventDefault();send();};
   $("user-input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
   $("status-btn").onclick=status;
