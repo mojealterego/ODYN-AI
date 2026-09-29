@@ -82,6 +82,35 @@
   }
 
 
+  async function initNativeVoiceInput() {
+    const voiceBtn = $("voice-btn"), voiceStatus = $("voice-status"), userInput = $("user-input");
+    if (!voiceBtn || !voiceStatus || !userInput || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return;
+    const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+    let mediaRecorder = null, stream = null, chunks = [], baseText = "";
+    const setUi = (recording, status) => { voiceBtn.classList.toggle("recording", recording); voiceBtn.setAttribute("aria-pressed", String(recording)); voiceBtn.textContent = recording ? "⏹ Zatrzymaj" : "🎙 STT"; voiceBtn.setAttribute("aria-label", recording ? "Zatrzymaj nagrywanie STT" : "Włącz natywne STT"); voiceStatus.textContent = status; };
+    const cleanup = () => { if (stream) stream.getTracks().forEach((track) => track.stop()); stream = null; mediaRecorder = null; chunks = []; };
+    const transcribe = async (blob) => {
+      const data = new FormData(), ext = blob.type.includes("ogg") ? "ogg" : "webm";
+      data.append("file", blob, "odyn-voice." + ext); voiceStatus.textContent = "STT: transkrypcja lokalnym Whisperem…";
+      const response = await fetch("/api/stt/transcribe", { method: "POST", body: data }); let payload = {};
+      try { payload = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(payload.detail || "Transkrypcja STT nie powiodła się.");
+      const transcript = String(payload.text || "").trim(); if (!transcript) throw new Error("Nie rozpoznano mowy.");
+      userInput.value = [baseText, transcript].filter(Boolean).join(" "); userInput.dispatchEvent(new Event("input", { bubbles: true })); userInput.focus(); voiceStatus.textContent = "STT: tekst gotowy do wysłania";
+    };
+    voiceBtn.addEventListener("click", async () => {
+      if (mediaRecorder?.state === "recording") { mediaRecorder.stop(); return; }
+      baseText = userInput.value.trim(); chunks = [];
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = supportedMime ? new MediaRecorder(stream, { mimeType: supportedMime }) : new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+        mediaRecorder.onstop = async () => { const recorder = mediaRecorder, blob = new Blob(chunks, { type: recorder?.mimeType || supportedMime || "audio/webm" }); cleanup(); if (!blob.size) { setUi(false, "STT: nagranie jest puste"); return; } try { await transcribe(blob); } catch (error) { voiceStatus.textContent = "STT: " + error.message; } setUi(false, voiceStatus.textContent); };
+        mediaRecorder.onerror = () => { cleanup(); setUi(false, "STT: błąd nagrywania"); };
+        mediaRecorder.start(250); setUi(true, "STT: nagrywam…");
+      } catch (error) { cleanup(); setUi(false, error.name === "NotAllowedError" ? "STT: brak zgody na mikrofon" : "STT: nie można uruchomić mikrofonu"); }
+    });
+  }
 
   function initVoiceInput() {
     const voiceBtn = $("voice-btn");
@@ -404,6 +433,7 @@
     $("terminal-output").textContent=`${action.toUpperCase()} · ${project.platform === "android" ? "ANDROID NATIVE" : "WEB"}\n\n${cmd[action]}\n\nPolecenie przygotowane dla projektu.`;
   }
 
+  initNativeVoiceInput();
   initVoiceInput();
   $("chat-form").onsubmit=e=>{e.preventDefault();send();};
   $("user-input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
