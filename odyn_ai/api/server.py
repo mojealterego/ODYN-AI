@@ -120,7 +120,7 @@ async def list_mcp_servers():
 @app.post("/api/mcp/servers", summary="Zarejestruj serwer MCP")
 async def register_mcp_server(payload: MCPServerRequest):
     try:
-        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix)).__dict__
+        return mcp_gateway.register_mcp_server(payload.name, payload.endpoint, auth=MCPAuth(kind=payload.auth_kind, secret_env=payload.secret_env, header=payload.auth_header, prefix=payload.auth_prefix, client_id_env=payload.client_id_env, client_secret_env=payload.client_secret_env, token_url=payload.token_url, scope=payload.scope)).__dict__
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except PermissionError as exc:
