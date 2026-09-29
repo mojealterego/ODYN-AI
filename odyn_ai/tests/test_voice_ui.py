@@ -27,7 +27,11 @@ class VoiceUiContractTests(unittest.TestCase):
 
     def test_app_initializes_polish_speech_recognition(self):
         js = APP.read_text(encoding="utf-8")
-        for token in (\n            "MediaRecorder",\n            "mediaDevices",\n            "/api/stt/transcribe",\n            "FormData",
+        for token in (
+            "MediaRecorder",
+            "mediaDevices",
+            "/api/stt/transcribe",
+            "FormData",
             "SpeechRecognition",
             "webkitSpeechRecognition",
             "recognition.lang = \"pl-PL\"",
