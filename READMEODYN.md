@@ -361,3 +361,58 @@ Ten dokument jest częścią procesu inżynierskiego ODYN i powinien być aktual
 - unittest: **47/47 PASS**.
 
 **Status:** MCP Gateway jest zaimplementowany na poziomie rejestracji, persistence, initialize, tools/list, tools/call oraz FastAPI API. Nie oznacza to jeszcze pełnej zgodności ze wszystkimi wariantami transportu MCP, OAuth ani polityką produkcyjnego secret managementu.
+
+
+### 2026-09-29 — Audyt #5 / MCP Security Hardening
+
+**Zakres:**
+- OAuth/API keys i secret storage,
+- allowlista endpointów,
+- polityka narzędzi,
+- Streamable HTTP/SSE,
+- sesje MCP,
+- rate limiting,
+- audyt wywołań,
+- izolacja narzędzi wysokiego ryzyka.
+
+**Wdrożono:**
+- [x] `SecretStore` — sekrety są pobierane wyłącznie z procesu środowiskowego; wartość sekretu nie trafia do `mcp_servers.json`,
+- [x] typy auth: `none`, `api_key`, `bearer`,
+- [x] konfigurowalne nazwy nagłówka i prefix Bearer,
+- [x] allowlista hostów `ODYN_MCP_ALLOWED_HOSTS`,
+- [x] deny-by-default dla hostów nieobecnych na allowliście,
+- [x] polityka narzędzi `allow / deny / high_risk`,
+- [x] deny-by-default dla nieznanych narzędzi,
+- [x] narzędzia wysokiego ryzyka są blokowane bez osobnego mechanizmu zatwierdzenia,
+- [x] obsługa odpowiedzi JSON i `text/event-stream`,
+- [x] przechwytywanie i ponowne używanie `Mcp-Session-Id`,
+- [x] `MCP-Protocol-Version`,
+- [x] `follow_redirects=False` dla ograniczenia niekontrolowanych przekierowań,
+- [x] per-server rate limiting,
+- [x] trwały dziennik audytowy `mcp_audit.json` bez payloadów i sekretów,
+- [x] rejestrowanie sukcesów, timeoutów, błędów HTTP i błędów MCP,
+- [x] testy zabezpieczeń, sesji SSE, rate limitingu i sekretów.
+
+**Konfiguracja:**
+```
+ODYN_MCP_ALLOWED_HOSTS=api.example.com,mcp.example.com
+ODYN_MCP_RATE_LIMIT=30
+ODYN_MCP_TIMEOUT=30
+ODYN_MCP_TOOL_POLICY=search=allow,filesystem.read=allow,filesystem.write=high_risk
+ODYN_SECRET_MY_MCP_TOKEN=...
+```
+
+**Uwagi bezpieczeństwa:**
+- `ODYN_SECRET_*` nie jest zapisywane przez Gateway; produkcyjnie zmienna powinna pochodzić z systemowego secret managera / platformowego vaulta,
+- OAuth 2.0 z interaktywnym flow i refresh-token lifecycle wymaga dalszej integracji z dostawcą tożsamości; obecna warstwa obsługuje bezpieczny transport tokena jako sekretu Bearer, ale nie udaje kompletnego OAuth clienta,
+- pełna izolacja wysokiego ryzyka wymaga osobnego sandboxa/procesu/contenera; obecna polityka stosuje bezpieczny **deny-by-default** zamiast wykonywać takie narzędzia,
+- należy rozważyć DNS rebinding/SSRF hardening na poziomie resolvera, jeśli allowlista ma dopuszczać hosty kontrolowane przez użytkownika.
+
+**Zmodyfikowane pliki:**
+- `odyn_ai/core/mcp_gateway.py`
+- `odyn_ai/api/mcp_api_models.py`
+- `odyn_ai/api/server.py`
+- `odyn_ai/tests/test_mcp_gateway.py`
+- `READMEODYN.md`
+
+**Weryfikacja:** pełny CI po zmianach jest wymagany przed oznaczeniem audytu jako zakończonego.
