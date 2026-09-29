@@ -60,13 +60,15 @@ class MCPGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["params"]["name"], "search")
 
     def test_secret_is_not_persisted(self):
-        gateway = MCPGateway(allowed_hosts={"localhost"})
-        gateway.register_mcp_server(
-            "secure", "https://localhost:9000/mcp",
-            auth=__import__("odyn_ai.core.mcp_gateway", fromlist=["MCPAuth"]).MCPAuth(
-                kind="bearer", secret_env="ODYN_SECRET_TEST"
-            ),
-        )
+        import tempfile
+        from odyn_ai.core.mcp_gateway import MCPAuth
+        with tempfile.TemporaryDirectory() as tmp:
+            gateway = MCPGateway(allowed_hosts={"localhost"}, data_dir=tmp)
+            gateway.register_mcp_server(
+                "secure",
+                "https://localhost:9000/mcp",
+                auth=MCPAuth(kind="bearer", secret_env="ODYN_SECRET_TEST"),
+            )
             stored = gateway._store.load([])
             self.assertNotIn("ODYN_SECRET_TEST_VALUE", str(stored))
             self.assertEqual(stored[0]["auth"]["secret_env"], "ODYN_SECRET_TEST")
