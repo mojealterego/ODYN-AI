@@ -14,7 +14,7 @@ class VoiceUiContractTests(unittest.TestCase):
         self.assertIn('type="button"', html)
         self.assertIn('aria-label="Włącz dyktowanie"', html)
         self.assertIn('id="voice-status"', html)
-        self.assertIn('placeholder="Mów po polsku', html)
+        self.assertIn('placeholder="Napisz polecenie lub użyj głosu', html)
 
     def test_voice_button_is_integrated_with_chat_form(self):
         html = INDEX.read_text(encoding="utf-8")
