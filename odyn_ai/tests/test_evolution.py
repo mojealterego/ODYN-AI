@@ -32,7 +32,7 @@ class FakeInternet:
     async def search_web(self, query, max_results=5):
         self.queries.append((query, max_results))
         from odyn_ai.core.search import SearchResult
-        return [SearchResult("source", "https://example.com", "evidence")]
+        return [SearchResult("source", "https://example.com", "MCP server evidence")]
 
 
 class FakeGitLab:
