@@ -81,7 +81,9 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     "test_result",
                     "reflexion",
                     "correction",
-                    "test_result",
+                    "coding_decision",
+                    "code_change",
+                    "test_retry_result",
                     "build_result",
                     "successful_procedure",
                 ],
@@ -93,13 +95,17 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
             failure = events[6]
             reflexion = events[7]
             correction = events[8]
-            retry = events[9]
-            build = events[10]
-            success = events[11]
+            correction_decision = events[9]
+            correction_change = events[10]
+            retry = events[11]
+            build = events[12]
+            success = events[13]
 
             self.assertEqual(plan.payload["selected_strategy"], "test_first")
             self.assertEqual({item.payload["strategy"] for item in strategies}, {"minimal_patch", "test_first", "architecture"})
             self.assertEqual(decision.payload["cognitive_strategy"], "test_first")
+            self.assertEqual(correction_decision.event_type, "coding_decision")
+            self.assertEqual(correction_change.event_type, "code_change")
             self.assertIn("test_first", coding.instructions[0])
             self.assertEqual(reflexion.payload["failed_execution_id"], failure.id)
             self.assertEqual(result.cognitive_graph["selected_strategy"], "test_first")
