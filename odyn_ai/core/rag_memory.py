@@ -117,7 +117,7 @@ class RAGMemoryEngine:
         scored = [
             (
                 float(cosine_similarity(query_vector, memory["vector"])[0][0]),
-                memory["text"],
+                memory,
             )
             for memory in self.memory_store
         ]
