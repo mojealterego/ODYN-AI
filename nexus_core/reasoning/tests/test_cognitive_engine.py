@@ -80,7 +80,8 @@ class CognitiveEngineTests(unittest.TestCase):
         }
 
         def fitness(node: str, action: str) -> float:
-            return scores[("root", action) if node == root else (node, action)]
+            branch = "root" if node == root else engine.get_thought(node).content
+            return scores[(branch, action)]
 
         self.assertEqual(
             engine.ab_mcts_step(
