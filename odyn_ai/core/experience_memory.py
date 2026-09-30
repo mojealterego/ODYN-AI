@@ -90,6 +90,7 @@ class AgentExperienceMemory:
         selected_strategy: str,
         *,
         cognitive_node_id: str | None = None,
+        environmental_stress: float | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "cognitive_plan",
@@ -99,6 +100,7 @@ class AgentExperienceMemory:
                 "strategies": strategies,
                 "selected_strategy": selected_strategy,
                 "cognitive_node_id": cognitive_node_id,
+                "environmental_stress": environmental_stress,
             },
             text=(
                 f"Plan kognitywny dla {app_id}: wybrano {selected_strategy}. "
