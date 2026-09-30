@@ -65,12 +65,17 @@ class CodingAgent:
             {"role": "user", "content": prompt},
         ]
         text = ""
-        async for token in self.engine.stream_chat(
-            messages, inference_params=inference_params
-        ):
-            text += token
-            if len(text) > 25_000_000:
-                raise ValueError("Odpowiedź Coding Agent jest zbyt duża.")
+        try:
+            stream = self.engine.stream_chat(
+                messages, inference_params=inference_params
+            )
+            async for token in stream:
+                text += token
+                if len(text) > 25_000_000:
+                    raise ValueError("Odpowiedź Coding Agent jest zbyt duża.")
+        except TypeError:
+            async for token in self.engine.stream_chat(messages):
+                text += token
 
         try:
             data = json.loads(text)
