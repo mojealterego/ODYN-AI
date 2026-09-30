@@ -116,9 +116,41 @@ class DualGGUFEngine:
             verbose=False,
         )
 
-    async def stream_chat(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+    @staticmethod
+    def _validate_inference_params(
+        inference_params: dict[str, float] | None,
+    ) -> dict[str, float]:
+        params = {
+            "temperature": float(inference_params["temperature"])
+            if inference_params and "temperature" in inference_params
+            else None,
+            "top_p": float(inference_params["top_p"])
+            if inference_params and "top_p" in inference_params
+            else None,
+        }
+        if params["temperature"] is not None and not 0 <= params["temperature"] <= 2:
+            raise ValueError("temperature must be between 0 and 2")
+        if params["top_p"] is not None and not 0 < params["top_p"] <= 1:
+            raise ValueError("top_p must be between 0 and 1")
+        return {key: value for key, value in params.items() if value is not None}
+
+    def effective_inference_params(
+        self, inference_params: dict[str, float] | None = None
+    ) -> dict[str, float]:
+        overrides = self._validate_inference_params(inference_params)
+        return {
+            "temperature": overrides.get("temperature", self.config.temperature),
+            "top_p": overrides.get("top_p", self.config.top_p),
+        }
+    async def stream_chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        inference_params: dict[str, float] | None = None,
+    ) -> AsyncIterator[str]:
+        params = self.effective_inference_params(inference_params)
         if self.backend == "server":
-            async for token in self._stream_server(messages):
+            async for token in self._stream_server(messages, params):
                 yield token
             return
 
@@ -132,8 +164,8 @@ class DualGGUFEngine:
             try:
                 stream = self._python_llm.create_chat_completion(
                     messages=messages,
-                    temperature=self.config.temperature,
-                    top_p=self.config.top_p,
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
                     top_k=self.config.top_k,
                     max_tokens=self.config.max_tokens,
                     stream=True,
@@ -157,13 +189,13 @@ class DualGGUFEngine:
                 raise RuntimeError(str(item)) from item
             yield item
 
-    async def _stream_server(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+    async def _stream_server(\n        self, messages: list[dict[str, str]], params: dict[str, float]\n    ) -> AsyncIterator[str]:
         url = f"http://{self.config.server_host}:{self.config.server_port}/v1/chat/completions"
         payload = {
             "model": "odyn-main",
             "messages": messages,
-            "temperature": self.config.temperature,
-            "top_p": self.config.top_p,
+            "temperature": params["temperature"],
+            "top_p": params["top_p"],
             "max_tokens": self.config.max_tokens,
             "stream": True,
         }
