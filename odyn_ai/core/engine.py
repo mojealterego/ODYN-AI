@@ -189,7 +189,9 @@ class DualGGUFEngine:
                 raise RuntimeError(str(item)) from item
             yield item
 
-    async def _stream_server(\n        self, messages: list[dict[str, str]], params: dict[str, float]\n    ) -> AsyncIterator[str]:
+    async def _stream_server(
+        self, messages: list[dict[str, str]], params: dict[str, float]
+    ) -> AsyncIterator[str]:
         url = f"http://{self.config.server_host}:{self.config.server_port}/v1/chat/completions"
         payload = {
             "model": "odyn-main",
