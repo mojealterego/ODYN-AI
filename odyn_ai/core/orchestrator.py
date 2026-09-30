@@ -71,6 +71,14 @@ class AutonomousBuildOrchestrator:
         try:
             episode = getattr(self.memory, method)(*args, **kwargs)
             return getattr(episode, "id", None)
+        except TypeError:
+            if not kwargs:
+                return None
+            try:
+                episode = getattr(self.memory, method)(*args)
+                return getattr(episode, "id", None)
+            except Exception:
+                return None
         except Exception:
             return None
 
