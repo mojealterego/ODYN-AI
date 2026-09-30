@@ -39,6 +39,27 @@ class CognitiveEngineTests(unittest.TestCase):
             "fast",
         )
 
+    def test_build_plan_creates_task_strategy_and_selection_graph(self) -> None:
+        engine = CognitiveEngine()
+        task = engine.add_thought("task", "build app")
+        plan = engine.plan_build(
+            "build app",
+            ["minimal_patch", "test_first", "architecture"],
+            lambda _, action: {"minimal_patch": 0.4, "test_first": 0.9, "architecture": 0.2}[action],
+            parent_id=task,
+        )
+        self.assertEqual(plan["selected_strategy"], "test_first")
+        snapshot = engine.snapshot()
+        kinds = [node["kind"] for node in snapshot["nodes"]]
+        self.assertIn("cognitive_plan", kinds)
+        self.assertIn("selected_strategy", kinds)
+        self.assertTrue(
+            any(
+                edge["source"] == task and edge["relation"] == "derives"
+                for edge in snapshot["edges"]
+            )
+        )
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
