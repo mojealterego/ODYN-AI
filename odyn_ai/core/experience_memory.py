@@ -307,6 +307,54 @@ class AgentExperienceMemory:
         """Create an explicit causal edge in the durable memory graph."""
         self.store.link(source_id, target_id, relation)
 
+    def environmental_stress(self, *, window: int = 24) -> float:
+        """Estimate current build stress from recent execution outcomes.
+
+        The score is deterministic and bounded to [0, 1]. Recent failures,
+        consecutive failures and correction pressure raise stress; successful
+        executions lower it.
+        """
+        if window < 1:
+            raise ValueError("window must be >= 1")
+        events = [
+            episode for episode in self.store.query(agent_id="odyn_orchestrator")
+            if episode.event_type.endswith("_result")
+            and episode.payload.get("stage") in {"test", "build"}
+        ][-window:]
+        if not events:
+            return 0.0
+
+        weighted_failures = 0.0
+        weighted_successes = 0.0
+        weight_total = 0.0
+        consecutive_failures = 0
+        correction_pressure = 0.0
+        for index, episode in enumerate(reversed(events), start=1):
+            weight = 1.0 / index
+            weight_total += weight
+            if episode.payload.get("ok", False):
+                weighted_successes += weight
+                if consecutive_failures == 0:
+                    correction_pressure *= 0.5
+            else:
+                weighted_failures += weight
+                consecutive_failures += 1
+                correction_pressure += weight
+
+        failure_rate = weighted_failures / weight_total
+        success_rate = weighted_successes / weight_total
+        consecutive_pressure = min(consecutive_failures / 3.0, 1.0)
+        correction_rate = min(correction_pressure / weight_total, 1.0)
+
+        stress = (
+            0.10
+            + 0.55 * failure_rate
+            + 0.20 * consecutive_pressure
+            + 0.15 * correction_rate
+            - 0.15 * success_rate
+        )
+        return round(max(0.0, min(1.0, stress)), 4)
+
     def snapshot(self) -> list[MemoryEpisode]:
         if self._last_task_id is None:
             return []
