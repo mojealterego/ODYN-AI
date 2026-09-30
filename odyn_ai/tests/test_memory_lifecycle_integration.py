@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from nexus_core.memory import BitemporalMemoryNode
+from nexus_core.reasoning.cognitive_engine import CognitiveEngine
 from odyn_ai.core.experience_memory import AgentExperienceMemory
 from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
 
@@ -18,8 +19,10 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         class Coding:
             calls = 0
+            instructions = []
 
             async def apply(self, platform, instruction, files, **kwargs):
+                self.instructions.append(instruction)
                 self.calls += 1
                 if self.calls == 1:
                     return {"summary": "pierwsza implementacja", "changes": [], "files": files}
@@ -55,9 +58,12 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
             memory = AgentExperienceMemory(store=store)
-            result = await AutonomousBuildOrchestrator(
-                Apps(), Execution(), Coding(), GitHub(), memory, max_corrections=1
-            ).run("app-1", "zbuduj kalkulator")
+            coding = Coding()
+            orchestrator = AutonomousBuildOrchestrator(
+                Apps(), Execution(), coding, GitHub(), memory,
+                max_corrections=1, cognitive_engine=CognitiveEngine()
+            )
+            result = await orchestrator.run("app-1", "zbuduj kalkulator")
 
             self.assertTrue(result.ok)
 
@@ -67,8 +73,13 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 event_types,
                 [
                     "task_started",
+                    "cognitive_plan",
+                    "cognitive_strategy",
+                    "cognitive_strategy",
+                    "cognitive_strategy",
                     "coding_decision",
                     "test_result",
+                    "reflexion",
                     "correction",
                     "test_result",
                     "build_result",
@@ -76,11 +87,23 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
-            failure = events[2]
-            correction = events[3]
-            retry = events[4]
-            build = events[5]
-            success = events[6]
+            plan = events[1]
+            strategies = events[2:5]
+            decision = events[5]
+            failure = events[6]
+            reflexion = events[7]
+            correction = events[8]
+            retry = events[9]
+            build = events[10]
+            success = events[11]
+
+            self.assertEqual(plan.payload["selected_strategy"], "test_first")
+            self.assertEqual({item.payload["strategy"] for item in strategies}, {"minimal_patch", "test_first", "architecture"})
+            self.assertEqual(decision.payload["cognitive_strategy"], "test_first")
+            self.assertIn("test_first", coding.instructions[0])
+            self.assertEqual(reflexion.payload["failed_execution_id"], failure.id)
+            self.assertEqual(result.cognitive_graph["selected_strategy"], "test_first")
+            self.assertTrue(any(node["kind"] == "selected_strategy" for node in result.cognitive_graph["nodes"]))
 
             self.assertEqual(failure.payload["ok"], False)
             self.assertEqual(correction.payload["failed_execution_id"], failure.id)
