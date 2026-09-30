@@ -204,6 +204,60 @@ class CognitiveEngine:
         )
         return best_action
 
+    def plan_build(
+        self,
+        task: str,
+        strategies: Sequence[str],
+        fitness_fn: Callable[[str, str], float],
+    ) -> dict[str, Any]:
+        """Create a bounded build strategy graph and select one strategy.
+
+        The graph stores compact decision summaries, not hidden chain-of-thought.
+        """
+        if not strategies:
+            raise ValueError("strategies cannot be empty")
+        root_id = self.add_thought(
+            "cognitive_plan",
+            task,
+            metadata={"strategy_count": len(strategies)},
+        )
+        branch_ids = self.branch(root_id, strategies)
+        selected = self.ab_mcts_step(root_id, strategies, fitness_fn)
+        selected_index = list(strategies).index(selected)
+        selected_id = self.add_thought(
+            "selected_strategy",
+            selected,
+            parent_id=branch_ids[selected_index],
+            score=float(fitness_fn(root_id, selected)),
+            metadata={"alternatives": list(strategies)},
+        )
+        self.decision_cycle_count += 1
+        return {
+            "root_id": root_id,
+            "branch_ids": branch_ids,
+            "selected_id": selected_id,
+            "selected_strategy": selected,
+        }
+
+    def record_reflexion(
+        self,
+        task: str,
+        failure: str,
+        *,
+        parent_id: str | None = None,
+    ) -> str:
+        """Record a compact failure -> reflection node in the decision graph."""
+        if parent_id is None:
+            parent_id = self.add_thought("failure", failure, metadata={"task": task})
+        reflection_id = self.add_thought(
+            "reflexion",
+            failure,
+            parent_id=parent_id,
+            metadata={"task": task},
+        )
+        self.decision_cycle_count += 1
+        return reflection_id
+
     def reflexion_loop(
         self,
         task: str,
