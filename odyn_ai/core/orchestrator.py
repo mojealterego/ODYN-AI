@@ -60,6 +60,36 @@ class AutonomousBuildOrchestrator:
         except Exception:
             return None
 
+    def _link_memory(self, source_id: int | None, target_id: int | None, relation: str) -> None:
+        if not self.memory or source_id is None or target_id is None:
+            return
+        try:
+            self.memory.link(source_id, target_id, relation)
+        except Exception:
+            return
+
+    def _remember_change_episodes(
+        self,
+        app_id: str,
+        changes: list[dict[str, str]],
+        *,
+        decision_id: int | None = None,
+    ) -> list[int]:
+        if not self.memory:
+            return []
+        try:
+            episodes = self.memory.record_changes(
+                app_id, changes, decision_id=decision_id
+            )
+        except TypeError:
+            try:
+                episodes = self.memory.record_changes(app_id, changes)
+            except Exception:
+                return []
+        except Exception:
+            return []
+        return [episode.id for episode in episodes if getattr(episode, "id", None) is not None]
+
     async def _apply(
         self,
         platform: str,
@@ -116,7 +146,7 @@ class AutonomousBuildOrchestrator:
         if not changes:
             return files, [], False
 
-        self._remember(
+        correction_id = self._remember_episode(
             "record_correction",
             app_id,
             stage,
@@ -124,14 +154,19 @@ class AutonomousBuildOrchestrator:
             changes,
             failed_execution_id=failed_execution_id,
         )
-        self._remember(
+        decision_id = self._remember_episode(
             "record_decision",
             app_id,
             failure,
             edited.get("summary", ""),
             changes,
         )
-        self._remember("record_changes", app_id, changes)
+        self._link_memory(decision_id, correction_id, "corrects")
+        change_ids = self._remember_change_episodes(
+            app_id, changes, decision_id=decision_id
+        )
+        for change_id in change_ids:
+            self._link_memory(change_id, failed_execution_id, "changed_before")
         return dict(edited["files"]), changes, True
 
     async def _execute_stage(
@@ -188,11 +223,12 @@ class AutonomousBuildOrchestrator:
         files = dict(project["files"])
         memory_events: list[int] = []
         changes: list[dict[str, str]] = []
+        task_id: int | None = None
 
         if self.memory:
             try:
-                task = self.memory.start_task(app_id, instruction, platform)
-                memory_events.append(task.id)
+                task_id = self.memory.start_task(app_id, instruction, platform).id
+                memory_events.append(task_id)
             except Exception:
                 pass
 
@@ -202,18 +238,20 @@ class AutonomousBuildOrchestrator:
         files = dict(edited["files"])
         changes.extend(initial_changes)
 
-        if self.memory:
-            try:
-                memory_events.append(
-                    self.memory.record_decision(
-                        app_id, instruction, edited.get("summary", ""), initial_changes
-                    ).id
-                )
-                memory_events.extend(
-                    item.id for item in self.memory.record_changes(app_id, initial_changes)
-                )
-            except Exception:
-                pass
+        decision_id = self._remember_episode(
+            "record_decision",
+            app_id,
+            instruction,
+            edited.get("summary", ""),
+            initial_changes,
+        )
+        if decision_id is not None:
+            memory_events.append(decision_id)
+        initial_change_ids = self._remember_change_episodes(
+            app_id, initial_changes, decision_id=decision_id
+        )
+        memory_events.extend(initial_change_ids)
+        self._link_memory(task_id, decision_id, "decided_by")
 
         files, test_changes, test, test_memory_id = await self._execute_stage(
             app_id, platform, files, "test", timeout,
