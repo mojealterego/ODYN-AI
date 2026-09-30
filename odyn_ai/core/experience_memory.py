@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from datetime import datetime, timezone
@@ -59,7 +60,15 @@ class AgentExperienceMemory:
         episode = self.remember(event_type, payload, agent_id=agent_id)
         if self.rag and text:
             try:
-                self.rag.add_memory(text)
+                self.rag.add_memory(
+                    text,
+                    episode_id=episode.id,
+                    metadata={
+                        "agent_id": episode.agent_id,
+                        "event_type": episode.event_type,
+                        "valid_time_start": episode.valid_time_start.isoformat(),
+                    },
+                )
             except Exception:
                 pass
         return episode
@@ -98,6 +107,8 @@ class AgentExperienceMemory:
         self,
         app_id: str,
         changes: list[dict[str, str]],
+        *,
+        decision_id: int | None = None,
     ) -> list[MemoryEpisode]:
         records = []
         for change in changes:
@@ -108,10 +119,18 @@ class AgentExperienceMemory:
                         "app_id": app_id,
                         "path": change["path"],
                         "content_size": len(change["content"].encode("utf-8")),
+                        "content_sha256": hashlib.sha256(
+                            change["content"].encode("utf-8")
+                        ).hexdigest(),
                     },
                     text=f"Zmiana kodu {app_id}: {change['path']}",
                 )
             )
+            if decision_id is not None:
+                try:
+                    self.store.link(records[-1].id, decision_id, "produced_by")
+                except Exception:
+                    pass
         return records
 
     def record_execution(
