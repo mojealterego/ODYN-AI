@@ -25,6 +25,7 @@ from odyn_ai.core.coding_agent import CodingAgent
 from odyn_ai.core.github_integration import GitHubIntegration
 from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
 from odyn_ai.core.experience_memory import AgentExperienceMemory
+from odyn_ai.core.evolution import build_production_swarm
 from odyn_ai.core.rag_memory import RAGMemoryEngine
 from odyn_ai.core.voice_commands import parse_voice_command
 from nexus_core.reasoning import CognitiveEngine
@@ -70,8 +71,24 @@ if rag_model and os.path.isfile(rag_model):
         data_path=os.getenv("ODYN_RAG_MEMORY_PATH", "odyn_rag_memory.json"),
     )
 experience_memory = AgentExperienceMemory(rag=rag)
+
+# Evolution swarm is enabled only when its external credentials are configured.
+# The core ODYN pipeline remains usable without Hugging Face/GitLab credentials.
+evolution_swarm = None
+if all(os.getenv(name) for name in ("HF_TOKEN", "GL_TOKEN", "GL_PROJECT_ID")):
+    try:
+        evolution_swarm = build_production_swarm()
+    except (RuntimeError, ValueError):
+        evolution_swarm = None
+
 orchestrator = AutonomousBuildOrchestrator(
-    apps, execution, coding_agent, github, experience_memory
+    apps,
+    execution,
+    coding_agent,
+    github,
+    experience_memory,
+    swarm=evolution_swarm,
+    evolution_branch=os.getenv("ODYN_EVOLUTION_BRANCH", "odyn-evolution"),
 )
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 
