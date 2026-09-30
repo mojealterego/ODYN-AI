@@ -339,6 +339,49 @@ class SwarmOrchestrator:
         self.dgm_core = DGMUpdateAgent(gitlab_client)
         self.app_forge = app_forge or AppForgeGenerator()
 
+    async def prepare_cycle(
+        self,
+        *,
+        topics: list[str] | None = None,
+        model_limit: int = 5,
+        download_models: bool = False,
+    ) -> dict[str, Any]:
+        """Scout and strategize without mutating a repository."""
+        app_matrix = self.app_forge.generate_application_matrix()
+        models = await self.scout.execute(model_limit, download_models)
+        recon = await self.recon.execute(topics)
+        roadmap = await self.strategist.execute(recon)
+        return {
+            "application_matrix": app_matrix,
+            "models": models,
+            "recon": recon,
+            "roadmap": roadmap,
+        }
+
+    async def apply_roadmap(
+        self,
+        roadmap: RoadmapDirective,
+        branch: str,
+        changes: list[dict[str, str]],
+    ) -> bool:
+        """Apply only changes that already passed ODYN test/build verification."""
+        actions = [
+            {
+                "action": "update",
+                "file_path": change["path"],
+                "content": change["content"],
+            }
+            for change in changes
+            if change.get("path") and "content" in change
+        ]
+        verified_roadmap = RoadmapDirective(
+            version=roadmap.version,
+            architecture_changes=roadmap.architecture_changes,
+            code_mutations_required=actions,
+            evidence=roadmap.evidence,
+        )
+        return await self.dgm_core.execute(verified_roadmap, branch)
+
     async def run_cycle(
         self,
         *,
@@ -347,19 +390,16 @@ class SwarmOrchestrator:
         download_models: bool = False,
         mutation_branch: str = "odyn-evolution",
     ) -> dict[str, Any]:
-        app_matrix = self.app_forge.generate_application_matrix()
-        models = await self.scout.execute(model_limit, download_models)
-        recon = await self.recon.execute(topics)
-        roadmap = await self.strategist.execute(recon)
-        updated = await self.dgm_core.execute(roadmap, mutation_branch)
-
-        return {
-            "application_matrix": app_matrix,
-            "models": models,
-            "recon": recon,
-            "roadmap": roadmap,
-            "updated": updated,
-        }
+        prepared = await self.prepare_cycle(
+            topics=topics,
+            model_limit=model_limit,
+            download_models=download_models,
+        )
+        updated = await self.apply_roadmap(
+            prepared["roadmap"], mutation_branch, []
+        )
+        prepared["updated"] = updated
+        return prepared
 
 
 def build_production_swarm() -> SwarmOrchestrator:
