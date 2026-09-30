@@ -1,196 +1,691 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
+  <img src="assets/banner.png" alt="ODYN AI" width="100%">
 </p>
 
-# Hermes Agent ☤
+<h1 align="center">ODYN AI 🐦‍⬛</h1>
 
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
+  <strong>Local-first cognitive AI engineering environment powered by GGUF.</strong><br>
+  Polish-native • Dual GGUF • Cognitive Engine • Agents Builder • App Builder • Autonomous Build Pipeline
 </p>
 
-**The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
-
-Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [NovitaAI](https://novita.ai) (AI-native cloud for Model API, Agent Sandbox, and GPU Cloud), [NVIDIA NIM](https://build.nvidia.com) (Nemotron), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
-
-<table>
-<tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
-<tr><td><b>Lives where you do</b></td><td>Telegram, Discord, Slack, WhatsApp, Signal, and CLI — all from a single gateway process. Voice memo transcription, cross-platform conversation continuity.</td></tr>
-<tr><td><b>A closed learning loop</b></td><td>Agent-curated memory with periodic nudges. Autonomous skill creation after complex tasks. Skills self-improve during use. FTS5 session search with LLM summarization for cross-session recall. <a href="https://github.com/plastic-labs/honcho">Honcho</a> dialectic user modeling. Compatible with the <a href="https://agentskills.io">agentskills.io</a> open standard.</td></tr>
-<tr><td><b>Scheduled automations</b></td><td>Built-in cron scheduler with delivery to any platform. Daily reports, nightly backups, weekly audits — all in natural language, running unattended.</td></tr>
-<tr><td><b>Delegates and parallelizes</b></td><td>Spawn isolated subagents for parallel workstreams. Write Python scripts that call tools via RPC, collapsing multi-step pipelines into zero-context-cost turns.</td></tr>
-<tr><td><b>Runs anywhere, not just your laptop</b></td><td>Seven terminal backends — local, Docker, SSH, Singularity, Modal, Daytona, and Vercel Sandbox. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
-<tr><td><b>Research-ready</b></td><td>Batch trajectory generation, trajectory compression for training the next generation of tool-calling models.</td></tr>
-</table>
+<p align="center">
+  <img src="https://img.shields.io/badge/AI-Local--First-111827?style=for-the-badge" alt="Local First">
+  <img src="https://img.shields.io/badge/Models-GGUF-374151?style=for-the-badge" alt="GGUF">
+  <img src="https://img.shields.io/badge/Language-Polski-2563EB?style=for-the-badge" alt="Polish">
+  <img src="https://img.shields.io/badge/Architecture-Cognitive%20AI-7C3AED?style=for-the-badge" alt="Cognitive AI">
+  <img src="https://img.shields.io/badge/License-MIT-16A34A?style=for-the-badge" alt="MIT License">
+</p>
 
 ---
 
-## Quick Install
+## Czym jest ODYN AI?
 
-### Linux, macOS, WSL2, Termux
+**ODYN AI** to lokalne środowisko AI do uruchamiania modeli GGUF, budowania agentów, tworzenia aplikacji i wykonywania zadań programistycznych z wykorzystaniem pamięci doświadczeń oraz warstwy poznawczej.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
-```
+Projekt jest projektowany jako **system lokalny i autonomiczny**, a nie jako kolejny interfejs czatu.
 
-### Windows (native, PowerShell) — Early Beta
+Główne elementy:
 
-> **Heads up:** Native Windows support is **early beta**. It installs and runs, but hasn't been road-tested as broadly as our Linux/macOS/WSL2 paths. Please [file issues](https://github.com/NousResearch/hermes-agent/issues) when you hit rough edges. For the most battle-tested Windows setup today, run the Linux/macOS one-liner above inside **WSL2**.
+- **DualGGUFEngine** — równoległa praca z modelem głównym i pomocniczym.
+- **CognitiveEngine** — planowanie, Graph of Thought, ocena strategii, refleksja i modulacja inferencji.
+- **AgentExperienceMemory** — pamięć doświadczeń oparta o historię wykonania, sukcesów, porażek i korekt.
+- **Bitemporal Memory** — trwała pamięć z osiami czasu valid-time i transaction-time.
+- **RAG Memory** — opcjonalne indeksowanie doświadczeń wektorowych.
+- **CodingAgent** — agent programistyczny operujący na rzeczywistych plikach projektu.
+- **AutonomousBuildOrchestrator** — pełny cykl: zadanie → plan → zmiana → test → korekta → build → sukces.
+- **ExecutionEngine** — wykonywanie testów, buildów i operacji na projektach web/Android.
+- **GitHub Integration** — odczyt repozytoriów i zapisywanie zmian przez Git Data API.
+- **Voice Command API** — sterowanie poleceniami głosowymi.
+- **Agents / App Builder** — fundament pod budowanie agentów i aplikacji bez konieczności ręcznego pisania całego kodu.
 
-Run this in PowerShell:
+---
 
-```powershell
-irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex
-```
+## Architektura
 
-The installer handles everything: uv, Python 3.11, Node.js, ripgrep, ffmpeg, **and a portable Git Bash** (MinGit, unpacked to `%LOCALAPPDATA%\hermes\git` — no admin required, completely isolated from any system Git install).  Hermes uses this bundled Git Bash to run shell commands.
-
-If you already have Git installed, the installer detects it and uses that instead.  Otherwise a ~45MB MinGit download is all you need — it won't touch or interfere with any system Git.
-
-> **Android / Termux:** The tested manual path is documented in the [Termux guide](https://hermes-agent.nousresearch.com/docs/getting-started/termux). On Termux, Hermes installs a curated `.[termux]` extra because the full `.[all]` extra currently pulls Android-incompatible voice dependencies.
->
-> **Android app:** The native app is published on [F-Droid](https://f-droid.org/packages/com.mobilefork.hermesagent/) and in [GitHub releases](https://github.com/adybag14-cyber/hermes-agent/releases). It supports remote providers plus release-tested on-device LiteRT-LM models and single-file, chat-ready llama.cpp/GGUF v2/v3 models with embedded chat templates, six in-app languages, phone/tablet layouts, terminal tools, and reproducible tag-driven releases. Exact model certification is release-specific; see the [Android install, model, tool, build, and troubleshooting guide](android/README.md). This app path is separate from the Termux CLI path.
->
-> **Windows:** Native Windows is supported as an **early beta** — the PowerShell one-liner above installs everything, but expect rough edges and please file issues when you hit them. If you'd rather use WSL2 (our most battle-tested Windows path), the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\hermes`; WSL2 installs under `~/.hermes` as on Linux.  The only Hermes feature that currently needs WSL2 specifically is the browser-based dashboard chat pane (it uses a POSIX PTY — classic CLI and gateway both run natively).
-
-After installation:
-
-```bash
-source ~/.bashrc    # reload shell (or: source ~/.zshrc)
-hermes              # start chatting!
+```text
+                         ┌──────────────────────┐
+                         │      ODYN AI UI      │
+                         │ Polish / Voice / API │
+                         └──────────┬───────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │   AutonomousBuildOrchestrator │
+                    └───────────────┬───────────────┘
+                                    │
+              ┌─────────────────────▼─────────────────────┐
+              │              CognitiveEngine              │
+              │                                            │
+              │ Graph of Thought                           │
+              │ Strategy Planning                           │
+              │ Reflexion                                  │
+              │ Cognitive Modulation                       │
+              └───────────────┬────────────────────────────┘
+                              │
+                 environmental_stress
+                              │
+                    ┌─────────▼─────────┐
+                    │ Inference Policy  │
+                    │ temperature       │
+                    │ top_p             │
+                    └─────────┬─────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │    CodingAgent    │
+                    └─────────┬─────────┘
+                              │
+                 ┌────────────▼────────────┐
+                 │    DualGGUFEngine       │
+                 │                         │
+                 │ MAIN MODEL + DRAFT      │
+                 │ speculative decoding    │
+                 └────────────┬────────────┘
+                              │
+                 ┌────────────▼────────────┐
+                 │ ExecutionEngine         │
+                 │ test / build / run      │
+                 └────────────┬────────────┘
+                              │
+               ┌──────────────▼──────────────┐
+               │ Experience + Bitemporal     │
+               │ Memory + optional RAG       │
+               └─────────────────────────────┘
 ```
 
 ---
 
-## Getting Started
+## Kluczowa cecha: AI uczy się z wykonania
 
-```bash
-hermes              # Interactive CLI — start a conversation
-hermes model        # Choose your LLM provider and model
-hermes tools        # Configure which tools are enabled
-hermes config set   # Set individual config values
-hermes gateway      # Start the messaging gateway (Telegram, Discord, etc.)
-hermes setup        # Run the full setup wizard (configures everything at once)
-hermes claw migrate # Migrate from OpenClaw (if coming from OpenClaw)
-hermes update       # Update to the latest version
-hermes doctor       # Diagnose any issues
+ODYN AI nie traktuje każdego zadania jako izolowanej rozmowy.
+
+Historia wykonania może zawierać:
+
+```text
+TASK
+  ↓
+COGNITIVE PLAN
+  ↓
+SELECTED STRATEGY
+  ↓
+CODING DECISION
+  ↓
+CODE CHANGE
+  ↓
+TEST / BUILD
+  ├── SUCCESS
+  │     ↓
+  │  SUCCESSFUL PROCEDURE
+  │
+  └── FAILURE
+        ↓
+     REFLEXION
+        ↓
+     CORRECTION
+        ↓
+     RETRY
+        ↓
+     SUCCESS / FAILURE
 ```
 
-📖 **[Full documentation →](https://hermes-agent.nousresearch.com/docs/)**
+Na tej podstawie wyliczany jest **environmental stress** — poziom presji wynikającej z aktualnej historii wykonania.
 
-## CLI vs Messaging Quick Reference
+Wysokie obciążenie może prowadzić do bardziej konserwatywnej inferencji:
 
-Hermes has two entry points: start the terminal UI with `hermes`, or run the gateway and talk to it from Telegram, Discord, Slack, WhatsApp, Signal, or Email. Once you're in a conversation, many slash commands are shared across both interfaces.
+```text
+history
+   ↓
+environmental_stress
+   ↓
+cognitive_modulation()
+   ↓
+temperature / top_p
+   ↓
+DualGGUFEngine
+```
 
-| Action | CLI | Messaging platforms |
-|---------|-----|---------------------|
-| Start chatting | `hermes` | Run `hermes gateway setup` + `hermes gateway start`, then send the bot a message |
-| Start fresh conversation | `/new` or `/reset` | `/new` or `/reset` |
-| Change model | `/model [provider:model]` | `/model [provider:model]` |
-| Set a personality | `/personality [name]` | `/personality [name]` |
-| Retry or undo the last turn | `/retry`, `/undo` | `/retry`, `/undo` |
-| Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]` |
-| Browse skills | `/skills` or `/<skill-name>` | `/<skill-name>` |
-| Interrupt current work | `Ctrl+C` or send a new message | `/stop` or send a new message |
-| Platform-specific status | `/platforms` | `/status`, `/sethome` |
-
-For the full command lists, see the [CLI guide](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and the [Messaging Gateway guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging).
+Parametry są stosowane per request, bez mutowania globalnej konfiguracji modelu.
 
 ---
 
-## Documentation
+## DualGGUFEngine
 
-All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**:
+Silnik obsługuje dwa modele GGUF:
 
-| Section | What's Covered |
-|---------|---------------|
-| [Quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart) | Install → setup → first conversation in 2 minutes |
-| [CLI Usage](https://hermes-agent.nousresearch.com/docs/user-guide/cli) | Commands, keybindings, personalities, sessions |
-| [Configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration) | Config file, providers, models, all options |
-| [Messaging Gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging) | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
-| [Security](https://hermes-agent.nousresearch.com/docs/user-guide/security) | Command approval, DM pairing, container isolation |
-| [Tools & Toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools) | 40+ tools, toolset system, terminal backends |
-| [Skills System](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills) | Procedural memory, Skills Hub, creating skills |
-| [Memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory) | Persistent memory, user profiles, best practices |
-| [MCP Integration](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) | Connect any MCP server for extended capabilities |
-| [Cron Scheduling](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron) | Scheduled tasks with platform delivery |
-| [Context Files](https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files) | Project context that shapes every conversation |
-| [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture) | Project structure, agent loop, key classes |
-| [Contributing](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) | Development setup, PR process, code style |
-| [CLI Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands) | All commands and flags |
-| [Environment Variables](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) | Complete env var reference |
+```text
+MAIN MODEL
+    │
+    ├── główna odpowiedź
+    │
+    └── reasoning / coding
+             ▲
+             │
+DRAFT MODEL ─┘
+```
+
+Domyślna konfiguracja projektu wykorzystuje:
+
+```text
+MAIN_MODEL_FILENAME  = model_glowny_normany.gguf
+DRAFT_MODEL_FILENAME = model_pomocniczy_maly.gguf
+
+n_ctx       = 8192
+temperature = 0.65
+top_p       = 0.90
+top_k       = 40
+```
+
+Parametry inferencji mogą być nadpisywane dla pojedynczego żądania przez warstwę Cognitive Engine.
 
 ---
 
-## Migrating from OpenClaw
+## Cognitive Engine
 
-If you're coming from OpenClaw, Hermes can automatically import your settings, memories, skills, and API keys.
+Warstwa poznawcza znajduje się w:
 
-**During first-time setup:** The setup wizard (`hermes setup`) automatically detects `~/.openclaw` and offers to migrate before configuration begins.
-
-**Anytime after install:**
-
-```bash
-hermes claw migrate              # Interactive migration (full preset)
-hermes claw migrate --dry-run    # Preview what would be migrated
-hermes claw migrate --preset user-data   # Migrate without secrets
-hermes claw migrate --overwrite  # Overwrite existing conflicts
+```text
+nexus_core/reasoning/cognitive_engine.py
 ```
 
-What gets imported:
-- **SOUL.md** — persona file
-- **Memories** — MEMORY.md and USER.md entries
-- **Skills** — user-created skills → `~/.hermes/skills/openclaw-imports/`
-- **Command allowlist** — approval patterns
-- **Messaging settings** — platform configs, allowed users, working directory
-- **API keys** — allowlisted secrets (Telegram, OpenRouter, OpenAI, Anthropic, ElevenLabs)
-- **TTS assets** — workspace audio files
-- **Workspace instructions** — AGENTS.md (with `--workspace-target`)
+Obecne komponenty:
 
-See `hermes claw migrate --help` for all options, or use the `openclaw-migration` skill for an interactive agent-guided migration with dry-run previews.
+- **ThoughtNode**
+- **CognitiveEvaluation**
+- **Graph of Thought**
+- **strategy planning**
+- **reflexion loop**
+- **cognitive modulation**
+- **embedding-based similarity evaluation**
+- **bounded adversarial search**
+- **build planning**
+
+Cognitive Engine przechowuje obserwowalne wyniki procesu decyzyjnego: wybrane strategie, oceny, zależności, błędy i rezultaty. Nie jest to zapis prywatnego chain-of-thought modelu.
+
+> Implementacja wyszukiwania jest ograniczonym wyszukiwaniem adversarial alpha-beta z opcjonalnym rolloutem; nie jest deklarowana jako pełne stochastyczne MCTS. Ocena embeddingów jest inspirowana podejściem latent-space/JEPA, a nie pełną implementacją JEPA.
 
 ---
 
-## Contributing
+## Pamięć
 
-We welcome contributions! See the [Contributing Guide](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) for development setup, code style, and PR process.
+ODYN AI posiada kilka poziomów pamięci:
 
-Quick start for contributors — clone and go with `setup-hermes.sh`:
+### Bitemporal Memory
 
-```bash
-git clone https://github.com/NousResearch/hermes-agent.git
-cd hermes-agent
-./setup-hermes.sh     # installs uv, creates venv, installs .[all], symlinks ~/.local/bin/hermes
-./hermes              # auto-detects the venv, no need to `source` first
+```text
+nexus_core/memory/
+├── bitemporal_store.py
+└── tests/
+    └── test_bitemporal_store.py
 ```
 
-Manual path (equivalent to the above):
+Obsługiwane są:
+
+- valid-time,
+- transaction-time,
+- append-only revisions,
+- `replaces_id`,
+- point-in-time recovery,
+- working memory,
+- long-term archive,
+- procedural skills,
+- graph relations,
+- SQLite WAL,
+- gzip archive.
+
+### Experience Memory
+
+```text
+odyn_ai/core/experience_memory.py
+```
+
+Zapamiętywane są m.in.:
+
+- zadania,
+- decyzje,
+- zmiany kodu,
+- wyniki testów,
+- wyniki buildów,
+- korekty,
+- refleksje,
+- skuteczne procedury,
+- wybrane strategie poznawcze.
+
+### RAG
+
+RAG jest opcjonalny.
+
+Konfiguracja:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv .venv --python 3.11
+ODYN_RAG_EMBEDDING_MODEL=/path/to/embedding-model
+ODYN_RAG_MEMORY_PATH=odyn_rag_memory.json
+```
+
+Bez modelu embeddingowego trwała pamięć doświadczeń nadal działa.
+
+---
+
+## Autonomous Build Pipeline
+
+Główny przepływ:
+
+```text
+User task
+   ↓
+Load project workspace
+   ↓
+Recall experience
+   ↓
+Calculate environmental stress
+   ↓
+Cognitive strategy planning
+   ↓
+Select strategy
+   ↓
+CodingAgent
+   ↓
+Apply changes
+   ↓
+TEST
+   │
+   ├── failure → reflexion → correction → retry
+   │
+   └── success
+           ↓
+         BUILD
+           │
+           ├── failure → correction → retry
+           │
+           └── success
+                   ↓
+            Successful procedure
+                   ↓
+             Optional GitHub commit
+```
+
+To jest podstawowa jednostka autonomicznej pracy ODYN AI.
+
+---
+
+## Coding Agent
+
+Plik:
+
+```text
+odyn_ai/core/coding_agent.py
+```
+
+Agent operuje na kontrolowanym kontrakcie JSON:
+
+```json
+{
+  "summary": "Opis wykonanej zmiany",
+  "changes": [
+    {
+      "path": "relative/path/to/file",
+      "content": "pełna zawartość pliku"
+    }
+  ]
+}
+```
+
+Obowiązują ograniczenia bezpieczeństwa:
+
+- wyłącznie ścieżki względne,
+- brak `..`,
+- brak ścieżek absolutnych,
+- limit liczby zmienianych plików,
+- limit rozmiaru pojedynczego pliku,
+- walidacja odpowiedzi przed zastosowaniem.
+
+---
+
+## Execution Engine
+
+```text
+odyn_ai/core/execution.py
+```
+
+Obsługiwane platformy:
+
+- Web
+- Android
+
+Obsługiwane operacje:
+
+- `run`
+- `test`
+- `build`
+
+Przykładowe zadania Android:
+
+```bash
+./gradlew :app:installDebug
+./gradlew assembleDebug
+./gradlew test
+```
+
+Przykładowe zadania Web:
+
+```bash
+npm run dev -- --host 127.0.0.1
+npm run build
+npm test
+```
+
+Wykonywanie jest ograniczone polityką czasu, ścieżek i środowiska. Execution Engine nie jest obecnie pełnym sandboxem systemowym.
+
+---
+
+## GitHub Integration
+
+ODYN AI może współpracować z repozytoriami GitHub poprzez Git Data API.
+
+Warstwa:
+
+```text
+odyn_ai/core/github_integration.py
+```
+
+Obsługiwane operacje obejmują:
+
+- odczyt repozytorium,
+- rozwiązywanie branchy,
+- pobieranie blobów,
+- tworzenie drzewa,
+- tworzenie commitów,
+- aktualizację refa branchu.
+
+Token:
+
+```bash
+export ODYN_GITHUB_TOKEN="..."
+```
+
+---
+
+## API
+
+Główne API znajduje się w:
+
+```text
+odyn_ai/api/server.py
+```
+
+Dostępne są m.in.:
+
+```text
+/api/apps/{app_id}/agent/edit
+/api/apps/{app_id}/execute
+/api/apps/{app_id}/autonomous-build
+/api/apps/{app_id}/github/commit
+/api/voice/command
+```
+
+Voice Command API pozwala przekazać polecenie głosowe do warstwy budowania autonomicznego.
+
+---
+
+## Voice / STT
+
+ODYN AI posiada warstwę poleceń głosowych przeznaczoną do obsługi zadań takich jak:
+
+```text
+„Zbuduj aplikację…”
+
+„Dodaj ekran logowania…”
+
+„Uruchom testy…”
+
+„Popraw błąd i zbuduj ponownie…”
+```
+
+Warstwa głosowa jest wejściem do tego samego orchestratora, którego można używać przez API.
+
+---
+
+## Agents Builder
+
+Docelowym elementem ODYN AI jest środowisko tworzenia agentów bez konieczności ręcznego budowania całej infrastruktury.
+
+Kierunek architektury:
+
+```text
+Agent Definition
+      ↓
+System Prompt
+      ↓
+Tools
+      ↓
+Memory
+      ↓
+Execution Policy
+      ↓
+Model / GGUF
+      ↓
+Agent Runtime
+```
+
+Agent może następnie korzystać z tych samych mechanizmów pamięci, inferencji, wykonania i GitHub, które wykorzystuje AutonomousBuildOrchestrator.
+
+---
+
+## App Builder
+
+ODYN AI jest rozwijany również jako **No-Code / Low-Code App Builder**.
+
+Docelowy przepływ:
+
+```text
+Opis aplikacji
+      ↓
+Cognitive Planning
+      ↓
+Project Scaffold
+      ↓
+Coding Agent
+      ↓
+Assets / UI / Logic
+      ↓
+Test
+      ↓
+Build
+      ↓
+APK / Web Artifact
+      ↓
+GitHub
+```
+
+Warstwa ta ma wykorzystywać istniejący Execution Engine i Coding Agent zamiast tworzyć drugi, niezależny system wykonywania.
+
+---
+
+## Struktura projektu
+
+```text
+ODYN-AI/
+├── odyn_ai/
+│   ├── api/
+│   │   └── server.py
+│   ├── core/
+│   │   ├── coding_agent.py
+│   │   ├── engine.py
+│   │   ├── execution.py
+│   │   ├── experience_memory.py
+│   │   ├── github_integration.py
+│   │   ├── orchestrator.py
+│   │   └── rag_memory.py
+│   ├── ui/
+│   └── tests/
+│
+├── nexus_core/
+│   ├── memory/
+│   │   ├── bitemporal_store.py
+│   │   └── tests/
+│   └── reasoning/
+│       ├── cognitive_engine.py
+│       └── tests/
+│
+├── assets/
+├── requirements.txt
+├── requirements_test.txt
+└── README.md
+```
+
+---
+
+## Konfiguracja modeli
+
+Przykładowe ustawienia:
+
+```python
+MAIN_MODEL_FILENAME = "model_glowny_normany.gguf"
+DRAFT_MODEL_FILENAME = "model_pomocniczy_maly.gguf"
+
+N_CTX = 8192
+N_THREADS = max(1, os.cpu_count() - 2)
+
+N_GPU_LAYERS_MAIN = -1
+N_GPU_LAYERS_DRAFT = -1
+
+TEMPERATURE = 0.65
+TOP_P = 0.90
+TOP_K = 40
+```
+
+Nazwy plików modeli są konfigurowalne. Modele GGUF nie są dostarczane w repozytorium.
+
+---
+
+## Instalacja developerska
+
+```bash
+git clone https://github.com/mojealterego/ODYN-AI.git
+cd ODYN-AI
+
+python -m venv .venv
 source .venv/bin/activate
-uv pip install -e ".[all,dev]"
-scripts/run_tests.sh
+
+pip install -r odyn_ai/requirements.txt
+pip install -r odyn_ai/requirements_test.txt
 ```
+
+Uruchomienie API:
+
+```bash
+python -m uvicorn odyn_ai.api.server:app --host 127.0.0.1 --port 8000
+```
+
+Dokładne zależności mogą różnić się zależnie od backendu GGUF i środowiska uruchomieniowego.
 
 ---
 
-## Community
+## Testy
 
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📚 [Skills Hub](https://agentskills.io)
-- 🐛 [Issues](https://github.com/NousResearch/hermes-agent/issues)
-- 🔌 [computer-use-linux](https://github.com/avifenesh/computer-use-linux) — Linux desktop-control MCP server for Hermes and other MCP hosts, with AT-SPI accessibility trees, Wayland/X11 input, screenshots, and compositor window targeting.
-- 🔌 [HermesClaw](https://github.com/AaronWong1999/hermesclaw) — Community WeChat bridge: Run Hermes Agent and OpenClaw on the same WeChat account.
+Testy obejmują m.in.:
+
+- Cognitive Engine,
+- bitemporal memory,
+- experience memory,
+- environmental stress,
+- inference modulation,
+- CodingAgent,
+- AutonomousBuildOrchestrator,
+- pełny cykl pamięci i korekt.
+
+Przykład:
+
+```bash
+python -m unittest discover -s odyn_ai/tests
+python -m unittest discover -s nexus_core/reasoning/tests
+python -m unittest discover -s nexus_core/memory/tests
+```
+
+Przed uznaniem zmiany za gotową należy uruchomić odpowiedni zestaw testów oraz sprawdzić wynik CI.
+
+---
+
+## Stan projektu
+
+ODYN AI jest aktywnie rozwijanym systemem.
+
+### Obecny fundament
+
+- [x] Dual GGUF Engine
+- [x] per-request inference parameters
+- [x] Cognitive Engine
+- [x] Graph of Thought
+- [x] Reflexion
+- [x] cognitive modulation
+- [x] environmental stress z historii wykonania
+- [x] bitemporal memory
+- [x] experience memory
+- [x] opcjonalny RAG
+- [x] Coding Agent
+- [x] Execution Engine
+- [x] Autonomous Build Orchestrator
+- [x] GitHub integration
+- [x] Voice Command API
+- [x] testy integracyjne warstwy poznawczej
+
+### Rozwijane kierunki
+
+- [ ] pełny Agents Builder UI
+- [ ] pełny No-Code App Builder
+- [ ] rozszerzona orkiestracja agentów
+- [ ] bogatsze modele pamięci proceduralnej
+- [ ] dynamiczna ocena strategii na podstawie długoterminowych wyników
+- [ ] dalsza automatyzacja Android Build Pipeline
+- [ ] rozszerzona obsługa modeli lokalnych
+
+---
+
+## Filozofia projektu
+
+ODYN AI ma łączyć cztery warstwy:
+
+```text
+MODEL
+  +
+MEMORY
+  +
+COGNITION
+  +
+EXECUTION
+```
+
+Sam model generuje tekst.
+
+ODYN AI ma dodatkowo:
+
+- pamiętać doświadczenia,
+- planować działanie,
+- wybierać strategię,
+- wykonywać zmiany,
+- testować rezultat,
+- reagować na błędy,
+- korygować własne działania,
+- zachowywać skuteczne procedury,
+- dostosowywać inferencję do warunków wykonania.
+
+To właśnie ta pętla stanowi podstawę autonomicznego środowiska ODYN AI.
+
+---
+
+## Autor / Projekt
+
+**ODYN AI**  
+Projekt: **Moje Alterego / Andrzej Mikulski**
+
+Repository:
+
+https://github.com/mojealterego/ODYN-AI
+
+Branch rozwojowy:
+
+`codex/odyn-ai`
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-Built by [Nous Research](https://nousresearch.com).
+MIT
