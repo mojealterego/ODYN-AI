@@ -27,6 +27,7 @@ from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
 from odyn_ai.core.experience_memory import AgentExperienceMemory
 from odyn_ai.core.rag_memory import RAGMemoryEngine
 from odyn_ai.core.voice_commands import parse_voice_command
+from nexus_core.reasoning import CognitiveEngine
 from odyn_ai.api.document_api_models import DocumentExportRequest, ReportExportRequest, SpreadsheetExportRequest
 from odyn_ai.api.mcp_api_models import MCPServerRequest, MCPToolRequest
 
@@ -53,6 +54,11 @@ mcp_gateway = MCPGateway(secret_manager=mcp_secret_manager, timeout=float(os.get
 execution = ExecutionEngine()
 coding_agent = CodingAgent(engine)
 github = GitHubIntegration()
+cognitive_engine = CognitiveEngine(
+    evaluation_threshold=float(os.getenv("ODYN_COGNITIVE_EVAL_THRESHOLD", "0.80")),
+    stress_threshold=float(os.getenv("ODYN_COGNITIVE_STRESS_THRESHOLD", "0.80")),
+    max_reflections=int(os.getenv("ODYN_COGNITIVE_MAX_REFLECTIONS", "2")),
+)
 
 # Durable experience memory is always available. RAG is enabled only when
 # an embedding GGUF is explicitly present/configured.
@@ -394,6 +400,20 @@ async def autonomous_build(app_id: str, payload: AutonomousBuildRequest):
         raise HTTPException(403, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"Pipeline ODYN: {exc}") from exc
+
+
+
+@app.get("/api/reasoning/snapshot", summary="Pobierz aktualny graf myśli ODYN")
+async def reasoning_snapshot():
+    return cognitive_engine.snapshot()
+
+
+@app.post("/api/reasoning/modulation", summary="Oblicz parametry inferencji dla poziomu stresu zadania")
+async def reasoning_modulation(stress: float):
+    try:
+        return cognitive_engine.cognitive_modulation(stress)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 @app.post("/api/voice/command", summary="Wykonaj głosową komendę budowy aplikacji")
 async def voice_command(payload: VoiceCommandRequest):
