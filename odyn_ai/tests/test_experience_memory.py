@@ -7,6 +7,35 @@ from odyn_ai.core.experience_memory import AgentExperienceMemory
 
 
 class ExperienceMemoryTests(unittest.TestCase):
+    def test_environmental_stress_reflects_recent_failures_and_successes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            for ok in (False, False, False, True):
+                memory.record_execution(
+                    "app-1",
+                    "test",
+                    {"ok": ok, "exit_code": 0 if ok else 1, "diagnostics": []},
+                )
+
+            stressed = memory.environmental_stress()
+            self.assertGreater(stressed, 0.5)
+
+            memory.record_execution(
+                "app-1", "test",
+                {"ok": True, "exit_code": 0, "diagnostics": []},
+            )
+            recovered = memory.environmental_stress()
+            self.assertLess(recovered, stressed)
+
+    def test_environmental_stress_is_bounded_without_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            self.assertEqual(memory.environmental_stress(), 0.0)
+
     def test_records_complete_autonomous_build_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             memory = AgentExperienceMemory(
