@@ -160,7 +160,12 @@ class ModelScoutAgent:
         if not download:
             return models
 
+        # Only Hugging Face candidates are downloadable automatically. Web
+        # discovery is intentionally evidence-only until a concrete repository
+        # and file have been verified.
         for model in models:
+            if model.source != "huggingface":
+                continue
             filename = f"{model.model_id.split('/')[-1]}-Q4_K_M.gguf"
             model.is_mounted = await asyncio.to_thread(
                 self.hf_client.download_and_mount_model,
