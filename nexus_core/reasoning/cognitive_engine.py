@@ -209,6 +209,8 @@ class CognitiveEngine:
         task: str,
         strategies: Sequence[str],
         fitness_fn: Callable[[str, str], float],
+        *,
+        parent_id: str | None = None,
     ) -> dict[str, Any]:
         """Create a bounded build strategy graph and select one strategy.
 
@@ -219,6 +221,7 @@ class CognitiveEngine:
         root_id = self.add_thought(
             "cognitive_plan",
             task,
+            parent_id=parent_id,
             metadata={"strategy_count": len(strategies)},
         )
         branch_ids = self.branch(root_id, strategies)
