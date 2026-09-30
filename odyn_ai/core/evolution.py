@@ -32,6 +32,7 @@ class RoadmapDirective:
     architecture_changes: list[str]
     code_mutations_required: list[dict[str, str]]
     evidence: list[str] = field(default_factory=list)
+    accepted: bool = True
 
 
 class ModelRepository(Protocol):
