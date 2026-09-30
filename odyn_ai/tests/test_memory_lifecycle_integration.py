@@ -124,8 +124,12 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
             )
             task_id = events[0].id
             self.assertEqual(
-                [item.id for item in store.related(task_id, "decided_by")],
+                [item.id for item in store.related(task_id, "planned_by")],
                 [events[1].id],
+            )
+            self.assertEqual(
+                [item.id for item in store.related(task_id, "decided_by")],
+                [events[5].id],
             )
             self.assertEqual(
                 [item.id for item in store.related(events[3].id, "corrects")],
