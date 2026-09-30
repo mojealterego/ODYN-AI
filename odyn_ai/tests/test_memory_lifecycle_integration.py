@@ -93,6 +93,18 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 [item.payload for item in store.related(success.id, "verified_by")],
                 [build.payload],
             )
+            self.assertEqual(
+                [item.id for item in store.related(task_id := events[0].id, "decided_by")],
+                [events[1].id],
+            )
+            self.assertEqual(
+                [item.id for item in store.related(events[3].id, "corrects")],
+                [events[2].id],
+            )
+            self.assertEqual(
+                [item.id for item in store.related(events[3].id, "corrects")],
+                [failure.id],
+            )
 
 
 if __name__ == "__main__":
