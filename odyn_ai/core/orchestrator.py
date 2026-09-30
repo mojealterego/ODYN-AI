@@ -139,16 +139,17 @@ class AutonomousBuildOrchestrator:
         files: dict[str, str],
         *,
         memory_context: str = "",
+        inference_params: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         if memory_context:
             try:
                 return await self.coding_agent.apply(
-                    platform, instruction, files, memory_context=memory_context
+                    platform, instruction, files, memory_context=memory_context, inference_params=inference_params
                 )
             except TypeError:
                 # Compatibility with third-party/test CodingAgent implementations.
                 pass
-        return await self.coding_agent.apply(platform, instruction, files)
+        return await self.coding_agent.apply(platform, instruction, files, inference_params=inference_params)
 
     def _persist_changes(
         self,
@@ -309,8 +310,18 @@ class AutonomousBuildOrchestrator:
                 pass
 
         context = self.memory.recall(instruction, top_k=4) if self.memory else ""
-        task_node_id = self.cognitive.add_thought("task", instruction)
-        strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
+        environmental_stress = (
+            self.memory.environmental_stress() if self.memory else 0.0
+        )
+        inference_policy = self.cognitive.cognitive_modulation(environmental_stress)
+        task_node_id = self.cognitive.add_thought(
+            "task",
+            instruction,
+            metadata={
+                "environmental_stress": environmental_stress,
+                "inference_policy": inference_policy,
+            },
+        )        strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
         strategies = ["minimal_patch", "test_first", "architecture"]
         plan = self.cognitive.plan_build(
             instruction,
@@ -327,6 +338,7 @@ class AutonomousBuildOrchestrator:
             strategies,
             selected_strategy,
             cognitive_node_id=plan["root_id"],
+            environmental_stress=environmental_stress,
         )
         if plan_memory_id is not None:
             memory_events.append(plan_memory_id)
@@ -349,7 +361,7 @@ class AutonomousBuildOrchestrator:
             f"Original task: {instruction}"
         )
         edited = await self._apply(
-            platform, selected_instruction, files, memory_context=context
+            platform, selected_instruction, files, memory_context=context, inference_params=inference_policy
         )
         initial_changes = self._persist_changes(app_id, files, edited)
         files = dict(edited["files"])
