@@ -41,6 +41,7 @@ class CodingAgent:
         files: dict[str, str],
         *,
         memory_context: str = "",
+        inference_params: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         if not instruction.strip():
             raise ValueError("Instrukcja zmiany jest wymagana.")
@@ -64,7 +65,9 @@ class CodingAgent:
             {"role": "user", "content": prompt},
         ]
         text = ""
-        async for token in self.engine.stream_chat(messages):
+        async for token in self.engine.stream_chat(
+            messages, inference_params=inference_params
+        ):
             text += token
             if len(text) > 25_000_000:
                 raise ValueError("Odpowiedź Coding Agent jest zbyt duża.")
@@ -102,12 +105,14 @@ class CodingAgent:
         files: dict[str, str],
         *,
         memory_context: str = "",
+        inference_params: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         proposal = await self.propose(
             platform,
             instruction,
             files,
             memory_context=memory_context,
+            inference_params=inference_params,
         )
         updated = dict(files)
         for change in proposal["changes"]:
