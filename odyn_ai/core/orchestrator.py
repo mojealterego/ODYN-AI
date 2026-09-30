@@ -291,17 +291,64 @@ class AutonomousBuildOrchestrator:
                 pass
 
         context = self.memory.recall(instruction, top_k=4) if self.memory else ""
-        edited = await self._apply(platform, instruction, files, memory_context=context)
+        task_node_id = self.cognitive.add_thought("task", instruction)
+        strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
+        strategies = ["minimal_patch", "test_first", "architecture"]
+        plan = self.cognitive.plan_build(
+            instruction,
+            strategies,
+            lambda _node, action: strategy_scores[action],
+            parent_id=task_node_id,
+        )
+        selected_strategy = plan["selected_strategy"]
+
+        plan_memory_id = self._remember_episode(
+            "record_cognitive_plan",
+            app_id,
+            instruction,
+            strategies,
+            selected_strategy,
+            cognitive_node_id=plan["root_id"],
+        )
+        if plan_memory_id is not None:
+            memory_events.append(plan_memory_id)
+        for strategy, node_id in zip(strategies, plan["branch_ids"]):
+            strategy_memory_id = self._remember_episode(
+                "record_cognitive_strategy",
+                app_id,
+                strategy,
+                selected=strategy == selected_strategy,
+                cognitive_node_id=node_id,
+            )
+            if strategy_memory_id is not None:
+                memory_events.append(strategy_memory_id)
+
+        selected_instruction = (
+            f"[ODYN COGNITIVE STRATEGY: {selected_strategy}] "
+            f"Apply the selected build strategy deliberately. "
+            f"Original task: {instruction}"
+        )
+        edited = await self._apply(
+            platform, selected_instruction, files, memory_context=context
+        )
         initial_changes = self._persist_changes(app_id, files, edited)
         files = dict(edited["files"])
         changes.extend(initial_changes)
 
+        decision_node_id = self.cognitive.add_thought(
+            "coding_decision",
+            edited.get("summary", ""),
+            parent_id=plan["selected_id"],
+            metadata={"strategy": selected_strategy},
+        )
         decision_id = self._remember_episode(
             "record_decision",
             app_id,
-            instruction,
+            selected_instruction,
             edited.get("summary", ""),
             initial_changes,
+            cognitive_strategy=selected_strategy,
+            cognitive_node_id=decision_node_id,
         )
         if decision_id is not None:
             memory_events.append(decision_id)
@@ -314,6 +361,8 @@ class AutonomousBuildOrchestrator:
         files, test_changes, test, test_memory_id = await self._execute_stage(
             app_id, platform, files, "test", timeout,
             allow_correction=self.max_corrections > 0,
+            cognitive_task=instruction,
+            cognitive_parent_id=decision_node_id,
         )
         changes.extend(test_changes)
         if test_memory_id is not None:
@@ -330,6 +379,8 @@ class AutonomousBuildOrchestrator:
         files, build_changes, build, build_memory_id = await self._execute_stage(
             app_id, platform, files, "build", timeout,
             allow_correction=self.max_corrections > 0,
+            cognitive_task=instruction,
+            cognitive_parent_id=decision_node_id,
         )
         changes.extend(build_changes)
         if build_memory_id is not None:
