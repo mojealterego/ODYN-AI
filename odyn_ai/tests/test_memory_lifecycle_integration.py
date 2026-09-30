@@ -132,11 +132,7 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 [events[5].id],
             )
             self.assertEqual(
-                [item.id for item in store.related(events[3].id, "corrects")],
-                [events[2].id],
-            )
-            self.assertEqual(
-                [item.id for item in store.related(events[3].id, "corrects")],
+                [item.id for item in store.related(reflexion.id, "reflects_on")],
                 [failure.id],
             )
 
