@@ -141,15 +141,23 @@ class AutonomousBuildOrchestrator:
         memory_context: str = "",
         inference_params: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        if memory_context:
-            try:
-                return await self.coding_agent.apply(
-                    platform, instruction, files, memory_context=memory_context, inference_params=inference_params
-                )
-            except TypeError:
-                # Compatibility with third-party/test CodingAgent implementations.
-                pass
-        return await self.coding_agent.apply(platform, instruction, files, inference_params=inference_params)
+        try:
+            return await self.coding_agent.apply(
+                platform,
+                instruction,
+                files,
+                memory_context=memory_context,
+                inference_params=inference_params,
+            )
+        except TypeError:
+            if memory_context:
+                try:
+                    return await self.coding_agent.apply(
+                        platform, instruction, files, memory_context=memory_context
+                    )
+                except TypeError:
+                    pass
+            return await self.coding_agent.apply(platform, instruction, files)
 
     def _persist_changes(
         self,
@@ -184,7 +192,14 @@ class AutonomousBuildOrchestrator:
             f"STDERR: {result.get('stderr', '')[-6000:]}"
         )
         context = self.memory.recall(failure, top_k=4) if self.memory else ""
-        edited = await self._apply(platform, failure, files, memory_context=context)
+        stress = self.memory.environmental_stress() if self.memory else 0.0
+        edited = await self._apply(
+            platform,
+            failure,
+            files,
+            memory_context=context,
+            inference_params=self.cognitive.cognitive_modulation(stress),
+        )
         changes = self._persist_changes(app_id, files, edited)
         if not changes:
             return files, [], False
