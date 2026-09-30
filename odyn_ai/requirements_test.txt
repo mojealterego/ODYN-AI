@@ -16,3 +16,4 @@ pytest>=9,<10
 keyring>=25.6.0,<26
 
 python-multipart>=0.0.20,<1
+networkx>=3.4,<4
