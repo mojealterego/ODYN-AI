@@ -40,8 +40,37 @@ class CognitiveEngineTests(unittest.TestCase):
         )
 
     def test_reflexion(self) -> None:
-        result = CognitiveEngine(max_reflections=2).reflexion_loop("task", "bad", FakeCritic())
+        engine = CognitiveEngine(max_reflections=2)
+        result = engine.reflexion_loop("task", "bad", FakeCritic())
         self.assertEqual(result, "bad [corrected]")
+        snapshot = engine.snapshot()
+        self.assertTrue(any(edge["relation"] == "derives" for edge in snapshot["edges"]))
+
+    def test_bounded_adversarial_search(self) -> None:
+        engine = CognitiveEngine()
+        root = engine.add_thought("root", "choose")
+        scores = {
+            ("root", "safe"): 9.0,
+            ("root", "fast"): 10.0,
+            ("safe", "bad"): 2.0,
+            ("safe", "good"): 8.0,
+            ("fast", "bad"): 1.0,
+            ("fast", "good"): 0.0,
+        }
+
+        def fitness(node: str, action: str) -> float:
+            return scores[("root", action) if node == root else (node, action)]
+
+        self.assertEqual(
+            engine.ab_mcts_step(
+                root,
+                ["safe", "fast"],
+                fitness,
+                depth=2,
+                opponent_actions_fn=lambda _: ["bad", "good"],
+            ),
+            "safe",
+        )
 
     def test_modulation(self) -> None:
         engine = CognitiveEngine()
