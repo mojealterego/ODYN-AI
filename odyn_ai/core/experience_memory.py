@@ -228,6 +228,10 @@ class AgentExperienceMemory:
             pass
         return episode
 
+    def link(self, source_id: int, target_id: int, relation: str) -> None:
+        """Create an explicit causal edge in the durable memory graph."""
+        self.store.link(source_id, target_id, relation)
+
     def snapshot(self) -> list[MemoryEpisode]:
         if self._last_task_id is None:
             return []
