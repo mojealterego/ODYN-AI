@@ -83,6 +83,82 @@ class EvolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gitlab.calls[0][0], "odyn-evolution")
         self.assertEqual(gitlab.calls[0][2][0]["file_path"], "src/core/mcp.py")
 
+
+
+    async def test_swarm_roadmap_flows_through_cognitive_coding_test_build_then_gitlab(self):
+        from odyn_ai.core.orchestrator import AutonomousBuildOrchestrator
+
+        class Apps:
+            def workspace(self, app_id):
+                return {"platform": "web", "files": {"app.py": "print('old')"}}
+
+            def write_file(self, app_id, path, content):
+                pass
+
+        class Coding:
+            async def apply(self, platform, instruction, files, **kwargs):
+                updated = dict(files)
+                updated["app.py"] = "print('new')"
+                return {
+                    "summary": "implemented roadmap directive",
+                    "changes": [{"path": "app.py", "content": updated["app.py"]}],
+                    "files": updated,
+                }
+
+        class Result:
+            def __init__(self, action):
+                self.ok = True
+                self.diagnostics = []
+                self.exit_code = 0
+                self.artifact = "dist" if action == "build" else None
+                self.stdout = "PASS"
+                self.stderr = ""
+                self.duration_ms = 1
+
+        class Execution:
+            async def execute(self, request):
+                return Result(request.action)
+
+        class GitHub:
+            async def commit_files(self, *args, **kwargs):
+                raise AssertionError("GitHub commit should be disabled in this integration test")
+
+        class Swarm:
+            def __init__(self):
+                self.events = []
+
+            async def prepare_cycle(self):
+                self.events.append("prepare")
+                return {
+                    "roadmap": RoadmapDirective(
+                        version="1.2.0",
+                        architecture_changes=["new MCP adapter"],
+                        code_mutations_required=[],
+                        evidence=["https://example.com/evidence"],
+                    )
+                }
+
+            async def apply_roadmap(self, roadmap, branch, changes):
+                self.events.append(("apply", branch, changes))
+                return True
+
+        swarm = Swarm()
+        result = await AutonomousBuildOrchestrator(
+            Apps(),
+            Execution(),
+            Coding(),
+            GitHub(),
+            swarm=swarm,
+        ).run("app-1", "dodaj adapter MCP")
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.stage, "verified")
+        self.assertEqual(swarm.events[0], "prepare")
+        self.assertEqual(swarm.events[1][0], "apply")
+        self.assertEqual(swarm.events[1][1], "odyn-evolution")
+        self.assertEqual(swarm.events[1][2], [{"path": "app.py", "content": "print('new')"}])
+        self.assertIn("new MCP adapter", result.cognitive_graph["nodes"][0]["content"])
+
     def test_app_forge_creates_66_apps(self):
         matrix = AppForgeGenerator().generate_application_matrix()
         self.assertEqual(len(matrix["niche_apps"]), 33)
