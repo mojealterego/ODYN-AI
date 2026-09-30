@@ -134,7 +134,7 @@ class AgentExperienceMemory:
         failed_execution_id: int | None = None,
         cognitive_node_id: str | None = None,
     ) -> MemoryEpisode:
-        return self.remember_and_index(
+        episode = self.remember_and_index(
             "reflexion",
             {
                 "app_id": app_id,
@@ -145,6 +145,12 @@ class AgentExperienceMemory:
             },
             text=f"Refleksja po błędzie {stage} dla {app_id}: {failure}",
         )
+        if failed_execution_id is not None:
+            try:
+                self.store.link(episode.id, failed_execution_id, "reflects_on")
+            except Exception:
+                pass
+        return episode
 
     def record_decision(
         self,
