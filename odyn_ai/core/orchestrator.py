@@ -46,6 +46,16 @@ class AutonomousBuildOrchestrator:
         self.max_corrections = max(0, max_corrections)
         self.cognitive = cognitive_engine or CognitiveEngine()
 
+    @staticmethod
+    def _result_dict(result: Any) -> dict[str, Any]:
+        if hasattr(result, "__dataclass_fields__"):
+            return asdict(result)
+        if isinstance(result, dict):
+            return dict(result)
+        if hasattr(result, "__dict__"):
+            return dict(vars(result))
+        raise TypeError("Execution result must be a dataclass, mapping, or object with attributes")
+
     def _remember(self, method: str, *args, **kwargs) -> None:
         if not self.memory:
             return
@@ -208,7 +218,7 @@ class AutonomousBuildOrchestrator:
         result = await self.execution.execute(
             ExecutionRequest(platform, stage, files, timeout)
         )
-        result_dict = asdict(result)
+        result_dict = self._result_dict(result)
         failed_execution_id = self._remember_episode(
             "record_execution", app_id, stage, result_dict
         )
@@ -263,7 +273,7 @@ class AutonomousBuildOrchestrator:
             ExecutionRequest(platform, stage, files, timeout)
         )
         retry_execution_id = self._remember_episode(
-            "record_execution", app_id, f"{stage}_retry", asdict(retry)
+            "record_execution", app_id, f"{stage}_retry", self._result_dict(retry)
         )
         return files, changes, retry, retry_execution_id
 
@@ -372,7 +382,7 @@ class AutonomousBuildOrchestrator:
 
         if not test.ok:
             return PipelineResult(
-                app_id, False, changes, asdict(test), None, None,
+                app_id, False, changes, self._result_dict(test), None, None,
                 "test",
                 test.diagnostics + ["Build został zatrzymany, ponieważ testy nie przeszły."],
                 memory_events,
@@ -391,7 +401,7 @@ class AutonomousBuildOrchestrator:
 
         if not build.ok:
             return PipelineResult(
-                app_id, False, changes, asdict(test), asdict(build), None,
+                app_id, False, changes, self._result_dict(test), self._result_dict(build), None,
                 "build",
                 build.diagnostics + ["Weryfikacja artefaktu nie powiodła się."],
                 memory_events,
@@ -417,7 +427,7 @@ class AutonomousBuildOrchestrator:
             memory_events.append(success_memory_id)
 
         return PipelineResult(
-            app_id, True, changes, asdict(test), asdict(build),
+            app_id, True, changes, self._result_dict(test), self._result_dict(build),
             github_result, "verified",
             ["Testy PASS", "Build PASS", "Artefakt zweryfikowany."],
             memory_events,
