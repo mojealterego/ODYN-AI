@@ -356,7 +356,8 @@ class AutonomousBuildOrchestrator:
                 "environmental_stress": environmental_stress,
                 "inference_policy": inference_policy,
             },
-        )        strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
+        )
+        strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
         strategies = ["minimal_patch", "test_first", "architecture"]
         plan = self.cognitive.plan_build(
             instruction,
