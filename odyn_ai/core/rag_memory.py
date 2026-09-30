@@ -52,7 +52,12 @@ class RAGMemoryEngine:
             if not isinstance(raw, list):
                 return
             self.memory_store = [
-                {"text": item["text"], "vector": np.asarray(item["vector"], dtype=np.float32).reshape(1, -1)}
+                {
+                    "text": item["text"],
+                    "vector": np.asarray(item["vector"], dtype=np.float32).reshape(1, -1),
+                    "episode_id": item.get("episode_id"),
+                    "metadata": item.get("metadata", {}),
+                }
                 for item in raw
                 if isinstance(item, dict) and isinstance(item.get("text"), str) and item.get("vector")
             ]
@@ -64,7 +69,12 @@ class RAGMemoryEngine:
             return
         self.data_path.parent.mkdir(parents=True, exist_ok=True)
         payload = [
-            {"text": item["text"], "vector": item["vector"].reshape(-1).tolist()}
+            {
+                "text": item["text"],
+                "vector": item["vector"].reshape(-1).tolist(),
+                "episode_id": item.get("episode_id"),
+                "metadata": item.get("metadata", {}),
+            }
             for item in self.memory_store
         ]
         self.data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -75,14 +85,25 @@ class RAGMemoryEngine:
         vector = np.asarray(self.embedder.embed(text), dtype=np.float32)
         return vector.reshape(1, -1)
 
-    def add_memory(self, text: str) -> bool:
-        """Embed and store an episodic memory. Returns False when RAG is unavailable."""
+    def add_memory(
+        self,
+        text: str,
+        *,
+        episode_id: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Embed and store an episodic memory with durable provenance metadata."""
         text = text.strip()
         if not text or not self.embedder:
             return False
 
         vector = self._embed(text)
-        self.memory_store.append({"text": text, "vector": vector})
+        self.memory_store.append({
+            "text": text,
+            "vector": vector,
+            "episode_id": episode_id,
+            "metadata": dict(metadata or {}),
+        })
         self._persist()
         print("✅ Zapisano wspomnienie w wektorowej pamięci epizodycznej.")
         return True
@@ -102,7 +123,10 @@ class RAGMemoryEngine:
         ]
         scored.sort(key=lambda item: item[0], reverse=True)
 
-        context = "\n".join(text for _, text in scored[:top_k])
+        context = "\n".join(
+            f"[episode={memory.get('episode_id')}] {memory['text']}"
+            for _, memory in scored[:top_k]
+        )
         return f"\n[PAMIĘĆ EPIZODYCZNA RAG]: {context}\n" if context else ""
 
     def clear(self) -> None:
