@@ -312,6 +312,7 @@ class AutonomousBuildOrchestrator:
         )
         if plan_memory_id is not None:
             memory_events.append(plan_memory_id)
+            self._link_memory(task_id, plan_memory_id, "planned_by")
         for strategy, node_id in zip(strategies, plan["branch_ids"]):
             strategy_memory_id = self._remember_episode(
                 "record_cognitive_strategy",
@@ -322,6 +323,7 @@ class AutonomousBuildOrchestrator:
             )
             if strategy_memory_id is not None:
                 memory_events.append(strategy_memory_id)
+                self._link_memory(plan_memory_id, strategy_memory_id, "branches_to")
 
         selected_instruction = (
             f"[ODYN COGNITIVE STRATEGY: {selected_strategy}] "
@@ -374,6 +376,7 @@ class AutonomousBuildOrchestrator:
                 "test",
                 test.diagnostics + ["Build został zatrzymany, ponieważ testy nie przeszły."],
                 memory_events,
+                self._cognitive_snapshot(selected_strategy),
             )
 
         files, build_changes, build, build_memory_id = await self._execute_stage(
@@ -392,9 +395,10 @@ class AutonomousBuildOrchestrator:
                 "build",
                 build.diagnostics + ["Weryfikacja artefaktu nie powiodła się."],
                 memory_events,
+                self._cognitive_snapshot(selected_strategy),
             )
 
-        self._remember(
+        success_memory_id = self._remember_episode(
             "record_success",
             app_id,
             platform,
@@ -409,9 +413,13 @@ class AutonomousBuildOrchestrator:
                 github_repository, files, github_message, github_branch, False
             ))
 
+        if success_memory_id is not None:
+            memory_events.append(success_memory_id)
+
         return PipelineResult(
             app_id, True, changes, asdict(test), asdict(build),
             github_result, "verified",
             ["Testy PASS", "Build PASS", "Artefakt zweryfikowany."],
             memory_events,
+            self._cognitive_snapshot(selected_strategy),
         )
