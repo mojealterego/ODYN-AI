@@ -142,7 +142,8 @@ class CognitiveEngine:
             if not actions:
                 return float(rollout_fn(node) if rollout_fn else 0.0)
             if remaining <= 1:
-                return max(float(fitness_fn(node, action)) for action in actions)
+                values = [float(fitness_fn(node, action)) for action in actions]
+                return max(values) if maximizing else min(values)
             values: list[float] = []
             if maximizing:
                 value = -float("inf")
