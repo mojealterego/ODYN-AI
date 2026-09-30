@@ -82,12 +82,79 @@ class AgentExperienceMemory:
         self._last_task_id = episode.id
         return episode
 
+    def record_cognitive_plan(
+        self,
+        app_id: str,
+        task: str,
+        strategies: list[str],
+        selected_strategy: str,
+        *,
+        cognitive_node_id: str | None = None,
+    ) -> MemoryEpisode:
+        return self.remember_and_index(
+            "cognitive_plan",
+            {
+                "app_id": app_id,
+                "task": task,
+                "strategies": strategies,
+                "selected_strategy": selected_strategy,
+                "cognitive_node_id": cognitive_node_id,
+            },
+            text=(
+                f"Plan kognitywny dla {app_id}: wybrano {selected_strategy}. "
+                f"Alternatywy: {', '.join(strategies)}."
+            ),
+        )
+
+    def record_cognitive_strategy(
+        self,
+        app_id: str,
+        strategy: str,
+        *,
+        selected: bool,
+        cognitive_node_id: str | None = None,
+    ) -> MemoryEpisode:
+        return self.remember_and_index(
+            "cognitive_strategy",
+            {
+                "app_id": app_id,
+                "strategy": strategy,
+                "selected": selected,
+                "cognitive_node_id": cognitive_node_id,
+            },
+            text=f"Strategia kognitywna {app_id}: {strategy}; wybrana={selected}.",
+        )
+
+    def record_reflexion(
+        self,
+        app_id: str,
+        stage: str,
+        failure: str,
+        *,
+        failed_execution_id: int | None = None,
+        cognitive_node_id: str | None = None,
+    ) -> MemoryEpisode:
+        return self.remember_and_index(
+            "reflexion",
+            {
+                "app_id": app_id,
+                "stage": stage,
+                "failure": failure,
+                "failed_execution_id": failed_execution_id,
+                "cognitive_node_id": cognitive_node_id,
+            },
+            text=f"Refleksja po błędzie {stage} dla {app_id}: {failure}",
+        )
+
     def record_decision(
         self,
         app_id: str,
         instruction: str,
         summary: str,
         changes: list[dict[str, str]],
+        *,
+        cognitive_strategy: str | None = None,
+        cognitive_node_id: str | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "coding_decision",
@@ -96,6 +163,8 @@ class AgentExperienceMemory:
                 "instruction": instruction,
                 "summary": summary,
                 "changed_paths": [item["path"] for item in changes],
+                "cognitive_strategy": cognitive_strategy,
+                "cognitive_node_id": cognitive_node_id,
             },
             text=(
                 f"Decyzja Coding Agent dla {app_id}: {summary}. "
