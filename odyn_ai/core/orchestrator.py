@@ -8,6 +8,7 @@ from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.github_integration import GitHubIntegration
 from nexus_core.reasoning.cognitive_engine import CognitiveEngine
 from odyn_ai.core.experience_memory import AgentExperienceMemory
+from odyn_ai.core.evolution import RoadmapDirective
 
 
 @dataclass
@@ -37,6 +38,8 @@ class AutonomousBuildOrchestrator:
         *,
         max_corrections: int = 1,
         cognitive_engine: CognitiveEngine | None = None,
+        swarm=None,
+        evolution_branch: str = "odyn-evolution",
     ) -> None:
         self.apps = apps
         self.execution = engine
@@ -45,6 +48,8 @@ class AutonomousBuildOrchestrator:
         self.memory = memory
         self.max_corrections = max(0, max_corrections)
         self.cognitive = cognitive_engine or CognitiveEngine()
+        self.swarm = swarm
+        self.evolution_branch = evolution_branch
 
     @staticmethod
     def _result_dict(result: Any) -> dict[str, Any]:
@@ -329,9 +334,24 @@ class AutonomousBuildOrchestrator:
             self.memory.environmental_stress() if self.memory else 0.0
         )
         inference_policy = self.cognitive.cognitive_modulation(environmental_stress)
+        evolution_context = ""
+        roadmap: RoadmapDirective | None = None
+        if self.swarm is not None:
+            prepared = await self.swarm.prepare_cycle()
+            roadmap = prepared.get("roadmap")
+            if roadmap is not None:
+                evolution_context = (
+                    "\n\n[ODYN EVOLUTION ROADMAP]\n"
+                    f"Version: {roadmap.version}\n"
+                    "Architecture directives:\n"
+                    + "\n".join(f"- {item}" for item in roadmap.architecture_changes[:20])
+                    + "\nEvidence:\n"
+                    + "\n".join(f"- {item}" for item in roadmap.evidence[:10])
+                )
+
         task_node_id = self.cognitive.add_thought(
             "task",
-            instruction,
+            instruction + evolution_context,
             metadata={
                 "environmental_stress": environmental_stress,
                 "inference_policy": inference_policy,
@@ -374,6 +394,7 @@ class AutonomousBuildOrchestrator:
             f"[ODYN COGNITIVE STRATEGY: {selected_strategy}] "
             f"Apply the selected build strategy deliberately. "
             f"Original task: {instruction}"
+            f"{evolution_context}"
         )
         edited = await self._apply(
             platform, selected_instruction, files, memory_context=context, inference_params=inference_policy
@@ -451,6 +472,22 @@ class AutonomousBuildOrchestrator:
             build.artifact,
             source_execution_id=build_memory_id,
         )
+
+        dgm_result = None
+        if self.swarm is not None and roadmap is not None:
+            dgm_result = await self.swarm.apply_roadmap(
+                roadmap,
+                self.evolution_branch,
+                changes,
+            )
+            if not dgm_result:
+                return PipelineResult(
+                    app_id, False, changes, self._result_dict(test), self._result_dict(build), None,
+                    "dgm",
+                    ["Testy PASS", "Build PASS", "DGM/GitLab commit nie powiódł się."],
+                    memory_events,
+                    self._cognitive_snapshot(selected_strategy),
+                )
 
         github_result = None
         if github_repository:
