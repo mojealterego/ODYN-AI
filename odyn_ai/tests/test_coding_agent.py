@@ -17,6 +17,28 @@ class CodingAgentValidationTests(unittest.TestCase):
         )
         self.assertEqual(result["changes"][0]["path"], "src/App.tsx")
 
+    def test_forwards_cognitive_inference_policy(self):
+        class FakeEngine:
+            def __init__(self):
+                self.policy = None
+
+            async def stream_chat(self, messages, *, inference_params=None):
+                self.policy = inference_params
+                yield '{"summary":"policy aware","changes":[]}'
+
+        import asyncio
+        engine = FakeEngine()
+        result = asyncio.run(
+            CodingAgent(engine).propose(
+                "web",
+                "napraw build",
+                {"package.json": "{}"},
+                inference_params={"temperature": 0.2, "top_p": 0.65},
+            )
+        )
+        self.assertEqual(result["summary"], "policy aware")
+        self.assertEqual(engine.policy, {"temperature": 0.2, "top_p": 0.65})
+
     def test_rejects_traversal_from_model(self):
         class FakeEngine:
             async def stream_chat(self, messages):
