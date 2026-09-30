@@ -137,3 +137,62 @@ class OrchestratorTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SwarmIntegrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_verified_changes_are_sent_to_swarm_after_build(self):
+        class Apps:
+            def workspace(self, app_id):
+                return {"platform": "web", "files": {"package.json": "{}"}}
+            def write_file(self, app_id, path, content):
+                pass
+
+        class Coding:
+            async def apply(self, platform, instruction, files, **kwargs):
+                updated = dict(files)
+                updated["app.py"] = "print('verified')"
+                return {"summary": "evolution", "changes": [{"path": "app.py", "content": updated["app.py"]}], "files": updated}
+
+        class Result:
+            def __init__(self, action):
+                self.ok = True
+                self.diagnostics = []
+                self.exit_code = 0
+                self.artifact = "dist" if action == "build" else None
+                self.stdout = "PASS"
+                self.stderr = ""
+                self.duration_ms = 1
+
+        class Execution:
+            async def execute(self, request):
+                return Result(request.action)
+
+        class GitHub:
+            async def commit_files(self, *args, **kwargs):
+                raise AssertionError("GitHub nie jest częścią tego testu.")
+
+        class Swarm:
+            def __init__(self):
+                self.prepared = 0
+                self.applied = []
+            async def prepare_cycle(self):
+                self.prepared += 1
+                from odyn_ai.core.evolution import RoadmapDirective
+                return {"roadmap": RoadmapDirective("1.1.0", ["directive"], [], ["evidence"])}
+            async def apply_roadmap(self, roadmap, branch, changes):
+                self.applied.append((roadmap, branch, list(changes)))
+                return True
+
+        swarm = Swarm()
+        result = await AutonomousBuildOrchestrator(
+            Apps(), Execution(), Coding(), GitHub(), swarm=swarm, evolution_branch="odyn-evolution"
+        ).run("app", "zbuduj")
+
+        self.assertTrue(result.ok)
+        self.assertEqual(swarm.prepared, 1)
+        self.assertEqual(len(swarm.applied), 1)
+        self.assertEqual(swarm.applied[0][1], "odyn-evolution")
+        self.assertEqual(swarm.applied[0][2], [{"path": "app.py", "content": "print('verified')"}])
+
+if __name__ == "__main__":
+    unittest.main()
