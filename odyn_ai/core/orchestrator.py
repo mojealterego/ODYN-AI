@@ -6,6 +6,7 @@ from typing import Any
 from odyn_ai.core.coding_agent import CodingAgent
 from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.github_integration import GitHubIntegration
+from nexus_core.reasoning.cognitive_engine import CognitiveEngine
 from odyn_ai.core.experience_memory import AgentExperienceMemory
 
 
@@ -20,6 +21,7 @@ class PipelineResult:
     stage: str
     diagnostics: list[str]
     memory_events: list[int] = field(default_factory=list)
+    cognitive_graph: dict[str, Any] = field(default_factory=dict)
 
 
 class AutonomousBuildOrchestrator:
@@ -34,6 +36,7 @@ class AutonomousBuildOrchestrator:
         memory: AgentExperienceMemory | None = None,
         *,
         max_corrections: int = 1,
+        cognitive_engine: CognitiveEngine | None = None,
     ) -> None:
         self.apps = apps
         self.execution = engine
@@ -41,6 +44,7 @@ class AutonomousBuildOrchestrator:
         self.github = github
         self.memory = memory
         self.max_corrections = max(0, max_corrections)
+        self.cognitive = cognitive_engine or CognitiveEngine()
 
     def _remember(self, method: str, *args, **kwargs) -> None:
         if not self.memory:
@@ -90,6 +94,26 @@ class AutonomousBuildOrchestrator:
             return []
         return [episode.id for episode in episodes if getattr(episode, "id", None) is not None]
 
+    def _cognitive_strategy_scores(
+        self, instruction: str, files: dict[str, str], memory_context: str
+    ) -> dict[str, float]:
+        text = f"{instruction} {memory_context}".lower()
+        scores = {"minimal_patch": 0.75, "test_first": 0.85, "architecture": 0.55}
+        if any(word in text for word in ("refactor", "architecture", "architekt", "redesign")):
+            scores["architecture"] += 0.35
+        if any(word in text for word in ("failure", "fail", "błąd", "error", "napraw", "korekta")):
+            scores["test_first"] += 0.10
+        if len(files) >= 10:
+            scores["test_first"] += 0.05
+            scores["architecture"] += 0.05
+        if any(word in text for word in ("simple", "prosty", "small", "mała")):
+            scores["minimal_patch"] += 0.10
+        return scores
+
+    def _cognitive_snapshot(self, selected_strategy: str) -> dict[str, Any]:
+        snapshot = self.cognitive.snapshot()
+        snapshot["selected_strategy"] = selected_strategy
+        return snapshot
     async def _apply(
         self,
         platform: str,
