@@ -20,9 +20,11 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
         class Coding:
             calls = 0
             instructions = []
+            inference_policies = []
 
             async def apply(self, platform, instruction, files, **kwargs):
                 self.instructions.append(instruction)
+                self.inference_policies.append(kwargs.get("inference_params"))
                 self.calls += 1
                 if self.calls == 1:
                     return {"summary": "pierwsza implementacja", "changes": [], "files": files}
@@ -107,6 +109,9 @@ class MemoryLifecycleIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(correction_decision.event_type, "coding_decision")
             self.assertEqual(correction_change.event_type, "code_change")
             self.assertIn("test_first", coding.instructions[0])
+            self.assertEqual(coding.inference_policies[0], {"temperature": 0.7, "top_p": 0.9})
+            self.assertEqual(len(coding.inference_policies), 2)
+            self.assertLessEqual(coding.inference_policies[1]["temperature"], 0.7)
             self.assertEqual(reflexion.payload["failed_execution_id"], failure.id)
             self.assertEqual(result.cognitive_graph["selected_strategy"], "test_first")
             self.assertTrue(any(node["kind"] == "selected_strategy" for node in result.cognitive_graph["nodes"]))
