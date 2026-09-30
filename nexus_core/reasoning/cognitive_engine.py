@@ -119,16 +119,89 @@ class CognitiveEngine:
         current_node: str,
         possible_actions: Sequence[str],
         fitness_fn: Callable[[str, str], float],
+        *,
+        depth: int = 1,
+        opponent_actions_fn: Callable[[str], Sequence[str]] | None = None,
+        rollout_fn: Callable[[str], float] | None = None,
     ) -> str:
-        """Deterministic fitness selection primitive; not a full MCTS implementation."""
+        """Select an action with bounded alpha-beta search over a GoT branch.
+
+        With depth=1 this is the deterministic fitness selector used by the
+        original API. With deeper search, optional opponent branches and
+        rollouts provide a bounded adversarial tree search; it is deliberately
+        deterministic and does not pretend to be a stochastic full MCTS.
+        """
         if current_node not in self.thought_graph:
             raise KeyError(f"Unknown current node: {current_node}")
         if not possible_actions:
             raise ValueError("possible_actions cannot be empty")
-        scored = [(action, float(fitness_fn(current_node, action))) for action in possible_actions]
-        action, score = max(scored, key=lambda item: item[1])
-        self.add_thought("action", action, parent_id=current_node, score=score, metadata={"fitness": score})
-        return action
+        if depth < 1:
+            raise ValueError("depth must be >= 1")
+
+        def evaluate(node: str, actions: Sequence[str], remaining: int, alpha: float, beta: float, maximizing: bool) -> float:
+            if not actions:
+                return float(rollout_fn(node) if rollout_fn else 0.0)
+            if remaining <= 1:
+                return max(float(fitness_fn(node, action)) for action in actions)
+            values: list[float] = []
+            if maximizing:
+                value = -float("inf")
+                for action in actions:
+                    immediate = float(fitness_fn(node, action))
+                    next_node = self.add_thought(
+                        "search", action, parent_id=node, score=immediate,
+                        metadata={"depth": remaining, "maximizing": True},
+                    )
+                    replies = list(opponent_actions_fn(action)) if opponent_actions_fn else []
+                    child = immediate if not replies else evaluate(
+                        next_node, replies, remaining - 1, alpha, beta, False
+                    )
+                    value = max(value, child)
+                    alpha = max(alpha, value)
+                    if alpha >= beta:
+                        break
+                return value
+            value = float("inf")
+            for action in actions:
+                immediate = float(fitness_fn(node, action))
+                next_node = self.add_thought(
+                    "search", action, parent_id=node, score=immediate,
+                    metadata={"depth": remaining, "maximizing": False},
+                )
+                replies = list(opponent_actions_fn(action)) if opponent_actions_fn else []
+                child = immediate if not replies else evaluate(
+                    next_node, replies, remaining - 1, alpha, beta, True
+                )
+                value = min(value, child)
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
+            return value
+
+        best_action = possible_actions[0]
+        best_score = -float("inf")
+        for action in possible_actions:
+            immediate = float(fitness_fn(current_node, action))
+            score = immediate
+            if depth > 1 and opponent_actions_fn:
+                node_id = self.add_thought(
+                    "search", action, parent_id=current_node, score=immediate,
+                    metadata={"depth": depth, "root": True},
+                )
+                replies = list(opponent_actions_fn(action))
+                if replies:
+                    score = evaluate(
+                        node_id, replies, depth - 1,
+                        -float("inf"), float("inf"), False
+                    )
+            if score > best_score:
+                best_action, best_score = action, score
+
+        self.add_thought(
+            "action", best_action, parent_id=current_node, score=best_score,
+            metadata={"fitness": best_score, "search_depth": depth},
+        )
+        return best_action
 
     def reflexion_loop(
         self,
