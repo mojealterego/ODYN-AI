@@ -202,6 +202,8 @@ class AutonomousBuildOrchestrator:
         timeout: float,
         *,
         allow_correction: bool,
+        cognitive_task: str | None = None,
+        cognitive_parent_id: str | None = None,
     ):
         result = await self.execution.execute(
             ExecutionRequest(platform, stage, files, timeout)
@@ -214,6 +216,31 @@ class AutonomousBuildOrchestrator:
         if result.ok or not allow_correction:
             return files, [], result, failed_execution_id
 
+        failure_text = (
+            f"{stage} failed for {app_id}: "
+            f"{' | '.join(result_dict.get('diagnostics', []))} "
+            f"{result_dict.get('stderr', '')[-2000:]}"
+        )
+        failure_node = self.cognitive.add_thought(
+            "failure",
+            failure_text,
+            parent_id=cognitive_parent_id,
+            metadata={"stage": stage},
+        )
+        reflexion_node = self.cognitive.record_reflexion(
+            cognitive_task or stage,
+            failure_text,
+            parent_id=failure_node,
+        )
+        self._remember_episode(
+            "record_reflexion",
+            app_id,
+            stage,
+            failure_text,
+            failed_execution_id=failed_execution_id,
+            cognitive_node_id=reflexion_node,
+        )
+
         files, changes, corrected = await self._correct(
             app_id,
             platform,
@@ -224,6 +251,13 @@ class AutonomousBuildOrchestrator:
         )
         if not corrected:
             return files, [], result, failed_execution_id
+
+        self.cognitive.add_thought(
+            "correction",
+            f"{stage}: corrected {', '.join(item['path'] for item in changes)}",
+            parent_id=reflexion_node,
+            metadata={"changed_paths": [item["path"] for item in changes]},
+        )
 
         retry = await self.execution.execute(
             ExecutionRequest(platform, stage, files, timeout)
