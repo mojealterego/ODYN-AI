@@ -40,6 +40,19 @@ class AdversarialGateResult:
     reason: str
 
 
+@dataclass(frozen=True)
+class DecisionCycle:
+    decision_id: str
+    context: dict[str, Any]
+    candidate_strategies: tuple[str, ...]
+    historical_evidence: dict[str, Any]
+    got_evaluation: dict[str, float]
+    gate: AdversarialGateResult
+    selected_strategy: str | None
+    phases: tuple[str, ...]
+    status: str
+
+
 class CognitiveEngine:
     """Graph-of-Thought reasoning, bounded Reflexion and adaptive inference policy."""
 
@@ -246,6 +259,127 @@ class CognitiveEngine:
             metadata={"fitness": best_score, "search_depth": depth},
         )
         return best_action
+
+    def decision_cycle(
+        self,
+        task: str,
+        strategies: Sequence[str],
+        fitness_fn: Callable[[str, str], float],
+        *,
+        context: dict[str, Any],
+        history_context: dict[str, Any] | None = None,
+        critic_result: str = "PASS",
+        state_embedding: Sequence[float] | None = None,
+        target_embedding: Sequence[float] | None = None,
+        parent_id: str | None = None,
+        search_depth: int = 1,
+    ) -> DecisionCycle:
+        """Run the bounded Decision Cycle 2.0 as one causal reasoning unit."""
+        if not strategies:
+            raise ValueError("strategies cannot be empty")
+        decision_id = f"decision_{self.decision_cycle_count}_{self.thought_graph.number_of_nodes()}"
+        history = dict(history_context or {})
+        state_embedding = state_embedding if state_embedding is not None else [1.0]
+        target_embedding = target_embedding if target_embedding is not None else [1.0]
+
+        phases = (
+            "context",
+            "candidate_strategies",
+            "historical_evidence",
+            "got_evaluation",
+            "adversarial_gate",
+            "strategy_selection",
+        )
+        root_id = self.add_thought(
+            "decision_cycle",
+            task,
+            parent_id=parent_id,
+            metadata={"decision_id": decision_id, "phase": "context", "context": dict(context)},
+        )
+        candidate_id = self.add_thought(
+            "candidate_strategies",
+            ", ".join(strategies),
+            parent_id=root_id,
+            metadata={"decision_id": decision_id, "phase": "candidate_strategies"},
+        )
+        evidence_id = self.add_thought(
+            "historical_evidence",
+            "contextual strategy evidence",
+            parent_id=candidate_id,
+            metadata={
+                "decision_id": decision_id,
+                "phase": "historical_evidence",
+                "strategy_stats": history.get("strategy_stats", {}),
+                "evidence_count": history.get("evidence_count", 0),
+                "weighted_evidence": history.get("weighted_evidence", 0.0),
+            },
+        )
+
+        base_scores = {
+            strategy: float(fitness_fn(evidence_id, strategy))
+            for strategy in strategies
+        }
+        plan = self.plan_build(
+            task,
+            strategies,
+            lambda _node, action: base_scores[action],
+            parent_id=evidence_id,
+            history_context=history,
+        )
+        got_scores = {
+            strategy: float(base_scores[strategy] + plan["historical_bias"].get(strategy, 0.0))
+            for strategy in strategies
+        }
+        got_id = self.add_thought(
+            "got_evaluation",
+            "strategy fitness evaluated",
+            parent_id=evidence_id,
+            metadata={"decision_id": decision_id, "phase": "got_evaluation", "scores": got_scores},
+        )
+        gate = self.adversarial_gate(
+            task,
+            task,
+            critic_result=critic_result,
+            state_embedding=state_embedding,
+            target_embedding=target_embedding,
+        )
+        gate_id = self.add_thought(
+            "adversarial_gate",
+            gate.reason,
+            parent_id=got_id,
+            metadata={
+                "decision_id": decision_id,
+                "phase": "adversarial_gate",
+                "similarity": gate.similarity,
+                "passed": gate.passed,
+                "rejected": gate.rejected,
+            },
+        )
+        if not gate.passed:
+            self.decision_cycle_count += 1
+            return DecisionCycle(
+                decision_id, dict(context), tuple(strategies), history, got_scores,
+                gate, None, phases, "rejected",
+            )
+
+        selected = self.ab_mcts_step(
+            got_id,
+            strategies,
+            lambda _node, action: got_scores[action],
+            depth=search_depth,
+        )
+        selection_id = self.add_thought(
+            "strategy_selection",
+            selected,
+            parent_id=gate_id,
+            score=got_scores[selected],
+            metadata={"decision_id": decision_id, "phase": "strategy_selection"},
+        )
+        self.decision_cycle_count += 1
+        return DecisionCycle(
+            decision_id, dict(context), tuple(strategies), history, got_scores,
+            gate, selected, phases, "selected",
+        )
 
     def plan_build(
         self,
