@@ -219,7 +219,8 @@ class AutonomousBuildOrchestrator:
             decision_cycle_id=decision_cycle_id,
             decision_memory_id=decision_memory_id,
         )
-        decision_id = self._remember_episode(
+        decision_cycle_id = decision_id
+        decision_memory_id = self._remember_episode(
             "record_decision",
             app_id,
             failure,
@@ -405,20 +406,12 @@ class AutonomousBuildOrchestrator:
                 self._cognitive_snapshot(None),
             )
         plan = {
-            "root_id": next(
-                node["id"] for node in self.cognitive.snapshot()["nodes"]
-                if node["metadata"].get("decision_id") == decision_id
-                and node["metadata"].get("phase") == "context"
-            ),
-            "branch_ids": [],
-            "selected_id": next(
-                node["id"] for node in self.cognitive.snapshot()["nodes"]
-                if node["metadata"].get("decision_id") == decision_id
-                and node["metadata"].get("phase") == "strategy_selection"
-            ),
+            "root_id": decision.decision_id,
+            "branch_ids": list(decision.branch_ids),
+            "selected_id": decision.selected_node_id,
             "selected_strategy": decision.selected_strategy,
             "history_aware": bool(history_context),
-            "historical_bias": decision.historical_evidence.get("strategy_stats", {}),
+            "historical_bias": decision.got_evaluation,
         }
         selected_strategy = decision.selected_strategy
         history_instruction = ""
@@ -484,23 +477,23 @@ class AutonomousBuildOrchestrator:
             initial_changes,
             cognitive_strategy=selected_strategy,
             cognitive_node_id=decision_node_id,
-            decision_cycle_id=decision_id,
+            decision_cycle_id=decision_cycle_id,
         )
-        if decision_id is not None:
-            memory_events.append(decision_id)
+        if decision_memory_id is not None:
+            memory_events.append(decision_memory_id)
         initial_change_ids = self._remember_change_episodes(
-            app_id, initial_changes, decision_id=decision_id
+            app_id, initial_changes, decision_id=decision_memory_id
         )
         memory_events.extend(initial_change_ids)
-        self._link_memory(task_id, decision_id, "decided_by")
+        self._link_memory(task_id, decision_memory_id, "decided_by")
 
         files, test_changes, test, test_memory_id = await self._execute_stage(
             app_id, platform, files, "test", timeout,
             allow_correction=self.max_corrections > 0,
             cognitive_task=instruction,
             cognitive_parent_id=decision_node_id,
-            decision_cycle_id=decision_id,
-            decision_memory_id=decision_id if isinstance(decision_id, int) else None,
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
         changes.extend(test_changes)
         if test_memory_id is not None:
@@ -520,6 +513,8 @@ class AutonomousBuildOrchestrator:
             allow_correction=self.max_corrections > 0,
             cognitive_task=instruction,
             cognitive_parent_id=decision_node_id,
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
         changes.extend(build_changes)
         if build_memory_id is not None:
@@ -541,7 +536,7 @@ class AutonomousBuildOrchestrator:
             "verified",
             build.artifact,
             source_execution_id=build_memory_id,
-            decision_cycle_id=decision_id,
+            decision_cycle_id=decision_cycle_id,
             decision_memory_id=decision_memory_id,
         )
 
