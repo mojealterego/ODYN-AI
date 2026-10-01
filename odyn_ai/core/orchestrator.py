@@ -510,6 +510,7 @@ class AutonomousBuildOrchestrator:
                 strategy,
                 selected=strategy == selected_strategy,
                 cognitive_node_id=node_id,
+                decision_cycle_id=decision_cycle_id,
             )
             if strategy_memory_id is not None:
                 memory_events.append(strategy_memory_id)
