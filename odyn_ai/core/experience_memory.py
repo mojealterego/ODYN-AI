@@ -357,6 +357,94 @@ class AgentExperienceMemory:
         )
         return round(max(0.0, min(1.0, stress)), 4)
 
+    def history_context(
+        self,
+        *,
+        historical_transaction_at: datetime | None = None,
+        valid_at: datetime | None = None,
+        recent_limit: int = 8,
+    ) -> dict[str, Any]:
+        """Build a compact, structured context for history-aware reasoning."""
+        if recent_limit < 1:
+            raise ValueError("recent_limit must be >= 1")
+
+        current = self.store.query(agent_id="odyn_orchestrator")
+        historical_snapshot = None
+        if historical_transaction_at is not None:
+            snapshot = self.store.memory_snapshot(
+                valid_at=valid_at or historical_transaction_at,
+                transaction_at=historical_transaction_at,
+            )
+            historical_snapshot = {
+                "valid_at": snapshot.valid_at.isoformat(),
+                "transaction_at": snapshot.transaction_at.isoformat(),
+                "episodic_count": len(snapshot.episodic),
+                "procedural_count": len(snapshot.procedural),
+                "edge_count": len(snapshot.edges),
+                "procedures": [
+                    {
+                        "skill_name": skill.skill_name,
+                        "code_reference": skill.code_reference,
+                        "fitness_score": skill.fitness_score,
+                    }
+                    for skill in snapshot.procedural[-recent_limit:]
+                ],
+            }
+
+        successes = [
+            episode for episode in current
+            if episode.event_type == "successful_procedure"
+        ]
+        failures = [
+            episode for episode in current
+            if episode.event_type.endswith("_result")
+            and episode.payload.get("ok") is False
+        ]
+        corrections = [
+            episode for episode in current
+            if episode.event_type == "correction"
+        ]
+
+        strategy_stats: dict[str, dict[str, int]] = {}
+        plans = [
+            episode for episode in current
+            if episode.event_type == "cognitive_plan"
+            and episode.payload.get("selected_strategy")
+        ]
+        for index, plan in enumerate(plans):
+            strategy = str(plan.payload["selected_strategy"])
+            next_plan_time = plans[index + 1].transaction_time_start if index + 1 < len(plans) else None
+            window = [
+                episode for episode in current
+                if episode.transaction_time_start > plan.transaction_time_start
+                and (next_plan_time is None or episode.transaction_time_start < next_plan_time)
+            ]
+            stats = strategy_stats.setdefault(strategy, {"successes": 0, "failures": 0})
+            if any(item.event_type == "successful_procedure" for item in window):
+                stats["successes"] += 1
+            elif any(item.event_type.endswith("_result") and item.payload.get("ok") is False for item in window):
+                stats["failures"] += 1
+
+        def compact(episodes: list[MemoryEpisode]) -> list[dict[str, Any]]:
+            return [
+                {
+                    "id": episode.id,
+                    "event_type": episode.event_type,
+                    "payload": episode.payload,
+                    "transaction_time": episode.transaction_time_start.isoformat(),
+                }
+                for episode in episodes[-recent_limit:]
+            ]
+
+        return {
+            "current_memory": compact(current),
+            "historical_snapshot": historical_snapshot,
+            "successful_procedures": compact(successes),
+            "failed_procedures": compact(failures),
+            "corrections": compact(corrections),
+            "strategy_stats": strategy_stats,
+        }
+
     def snapshot(self) -> list[MemoryEpisode]:
         if self._last_task_id is None:
             return []
