@@ -331,6 +331,10 @@ class AutonomousBuildOrchestrator:
 
         context = self.memory.recall(instruction, top_k=4) if self.memory else ""
         history_context = {}
+        meta_context = (
+            self.memory.infer_task_context(instruction, platform, files)
+            if self.memory else {}
+        )
         if self.memory and task_id is not None:
             try:
                 task_episode = self.memory.store.get_episode(task_id)
@@ -338,6 +342,9 @@ class AutonomousBuildOrchestrator:
                     historical_transaction_at=task_episode.transaction_time_start,
                     valid_at=task_episode.valid_time_start,
                 )
+                meta_history = self.memory.meta_learning_context(meta_context)
+                history_context["strategy_stats"] = meta_history["strategy_stats"]
+                history_context["meta_learning"] = meta_history
             except Exception:
                 history_context = {}
         environmental_stress = (
@@ -395,6 +402,7 @@ class AutonomousBuildOrchestrator:
             selected_strategy,
             cognitive_node_id=plan["root_id"],
             environmental_stress=environmental_stress,
+            context=meta_context,
         )
         if plan_memory_id is not None:
             memory_events.append(plan_memory_id)
