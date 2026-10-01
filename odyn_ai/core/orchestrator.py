@@ -440,6 +440,7 @@ class AutonomousBuildOrchestrator:
             cognitive_node_id=plan["root_id"],
             environmental_stress=environmental_stress,
             context=meta_context,
+            decision_cycle_id=decision_cycle_id,
         )
         if plan_memory_id is not None:
             memory_events.append(plan_memory_id)
