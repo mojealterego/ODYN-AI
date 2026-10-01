@@ -148,6 +148,56 @@ class CognitiveEngineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             engine.connect_thought(child, root)
 
+
+    def test_decision_cycle_has_stable_id_and_phase_trace(self) -> None:
+        engine = CognitiveEngine()
+        cycle = engine.decision_cycle(
+            "refactor web UI",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 0.9 if action == "test_first" else 0.8,
+            context={"platform": "web", "task_type": "refactor", "architecture": "react"},
+            history_context={
+                "strategy_stats": {
+                    "test_first": {"successes": 2, "failures": 0},
+                    "minimal_patch": {"successes": 0, "failures": 2},
+                },
+                "evidence_count": 4,
+            },
+            critic_result="PASS",
+            state_embedding=[1, 0],
+            target_embedding=[1, 0],
+        )
+        self.assertTrue(cycle.decision_id)
+        self.assertEqual(cycle.selected_strategy, "test_first")
+        self.assertEqual(
+            cycle.phases,
+            ["context", "candidate_strategies", "historical_evidence",
+             "got_evaluation", "adversarial_gate", "strategy_selection"],
+        )
+        self.assertEqual(cycle.status, "selected")
+        snapshot = engine.snapshot()
+        cycle_nodes = [
+            node for node in snapshot["nodes"]
+            if node["metadata"].get("decision_id") == cycle.decision_id
+        ]
+        self.assertGreaterEqual(len(cycle_nodes), 3)
+
+    def test_decision_cycle_rejects_before_strategy_selection(self) -> None:
+        engine = CognitiveEngine()
+        cycle = engine.decision_cycle(
+            "unsafe task",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 1.0,
+            context={"platform": "web", "task_type": "general", "architecture": "react"},
+            history_context={"evidence_count": 2},
+            critic_result="UNSAFE: reject",
+            state_embedding=[1, 0],
+            target_embedding=[1, 0],
+        )
+        self.assertTrue(cycle.rejected)
+        self.assertIsNone(cycle.selected_strategy)
+        self.assertEqual(cycle.status, "rejected")
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
