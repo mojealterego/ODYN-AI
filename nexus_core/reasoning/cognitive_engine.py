@@ -211,6 +211,7 @@ class CognitiveEngine:
         fitness_fn: Callable[[str, str], float],
         *,
         parent_id: str | None = None,
+        history_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a bounded build strategy graph and select one strategy.
 
@@ -218,21 +219,51 @@ class CognitiveEngine:
         """
         if not strategies:
             raise ValueError("strategies cannot be empty")
+        history = dict(history_context or {})
+        strategy_history = history.get("strategy_stats", {})
+        historical_bias: dict[str, float] = {}
+        for strategy in strategies:
+            stats = strategy_history.get(strategy, {})
+            successes = float(stats.get("successes", 0))
+            failures = float(stats.get("failures", 0))
+            attempts = successes + failures
+            if attempts:
+                historical_bias[strategy] = max(-0.25, min(0.25, (successes - failures) / attempts * 0.25))
+            else:
+                historical_bias[strategy] = 0.0
+
         root_id = self.add_thought(
             "cognitive_plan",
             task,
             parent_id=parent_id,
-            metadata={"strategy_count": len(strategies)},
+            metadata={
+                "strategy_count": len(strategies),
+                "history_aware": bool(history),
+                "historical_bias": historical_bias,
+                "historical_snapshot": history.get("historical_snapshot"),
+            },
         )
         branch_ids = self.branch(root_id, strategies)
-        selected = self.ab_mcts_step(root_id, strategies, fitness_fn)
+        branch_scores = {
+            strategy: float(fitness_fn(root_id, strategy)) + historical_bias.get(strategy, 0.0)
+            for strategy in strategies
+        }
+        selected = self.ab_mcts_step(
+            root_id,
+            strategies,
+            lambda _node, action: branch_scores[action],
+        )
         selected_index = list(strategies).index(selected)
         selected_id = self.add_thought(
             "selected_strategy",
             selected,
             parent_id=branch_ids[selected_index],
-            score=float(fitness_fn(root_id, selected)),
-            metadata={"alternatives": list(strategies)},
+            score=branch_scores[selected],
+            metadata={
+                "alternatives": list(strategies),
+                "base_scores": {key: float(fitness_fn(root_id, key)) for key in strategies},
+                "historical_bias": historical_bias,
+            },
         )
         self.decision_cycle_count += 1
         return {
@@ -240,6 +271,8 @@ class CognitiveEngine:
             "branch_ids": branch_ids,
             "selected_id": selected_id,
             "selected_strategy": selected,
+            "history_aware": bool(history),
+            "historical_bias": historical_bias,
         }
 
     def record_reflexion(
