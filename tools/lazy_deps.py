@@ -167,7 +167,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # ACP adapter (VS Code / Zed / JetBrains integration)
     "tool.acp": ("agent-client-protocol==0.9.0",),
     # Dashboard (`hermes dashboard`)
-    "tool.dashboard": (
+    # GitHub Agent Devel / Scaffold Modules\n    "github.agent_devel": ("PyGithub==2.10.0",),\n\n    "tool.dashboard": (
         "fastapi==0.133.1",
         "uvicorn[standard]==0.41.0",
     ),
