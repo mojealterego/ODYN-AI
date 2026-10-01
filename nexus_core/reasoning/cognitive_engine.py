@@ -381,8 +381,35 @@ class CognitiveEngine:
         self.decision_cycle_count += 1
         return DecisionCycle(
             decision_id, root_id, dict(context), tuple(strategies), history, got_scores,
-            gate, selected, plan["selected_id"], tuple(plan["branch_ids"]), phases, "selected",
+            gate, selected, selection_id, tuple(plan["branch_ids"]), phases, "selected",
         )
+
+    def record_decision_outcome(
+        self,
+        cycle: DecisionCycle,
+        *,
+        outcome: str,
+        execution_id: int | None = None,
+        correction: bool = False,
+    ) -> str:
+        """Close a Decision Cycle with an explicit outcome node."""
+        if cycle.status != "selected":
+            raise ValueError("Only a selected Decision Cycle can be closed")
+        if not outcome.strip():
+            raise ValueError("outcome cannot be empty")
+        outcome_id = self.add_thought(
+            "decision_outcome",
+            outcome,
+            parent_id=cycle.selected_node_id,
+            metadata={
+                "decision_id": cycle.decision_id,
+                "phase": "outcome",
+                "execution_id": execution_id,
+                "correction": correction,
+                "status": "completed",
+            },
+        )
+        return outcome_id
 
     def plan_build(
         self,
