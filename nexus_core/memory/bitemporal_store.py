@@ -24,7 +24,10 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _parse(value: str | None) -> datetime | None:
-    return datetime.fromisoformat(value) if value else None
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(value)
+    return _utc(parsed)
 
 
 @dataclass(frozen=True)
@@ -70,6 +73,7 @@ class BitemporalMemoryNode:
 
     def _initialize_schema(self) -> None:
         with self.conn:
+            self._migrate_legacy_schema()
             self.conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS episodic_memory (
@@ -114,6 +118,36 @@ class BitemporalMemoryNode:
                     FOREIGN KEY(episode_id) REFERENCES episodic_memory(id)
                 );
                 """
+            )
+
+    def _migrate_legacy_schema(self) -> None:
+        """Upgrade the original single transaction-time schema in place.
+
+        Older ODYN databases used one transaction timestamp. The bitemporal
+        implementation needs an explicit transaction interval, so existing
+        rows become open transaction versions starting at their legacy time.
+        """
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(episodic_memory)").fetchall()
+        }
+        if not columns:
+            return
+        if "transaction_time_start" not in columns:
+            self.conn.execute(
+                "ALTER TABLE episodic_memory ADD COLUMN transaction_time_start TEXT"
+            )
+            if "transaction_time" in columns:
+                self.conn.execute(
+                    """
+                    UPDATE episodic_memory
+                    SET transaction_time_start = transaction_time
+                    WHERE transaction_time_start IS NULL
+                    """
+                )
+        if "transaction_time_end" not in columns:
+            self.conn.execute(
+                "ALTER TABLE episodic_memory ADD COLUMN transaction_time_end TEXT"
             )
 
     def _now(self) -> datetime:
@@ -267,15 +301,41 @@ class BitemporalMemoryNode:
         return self.working_memory.get(key, default)
 
     def commit_to_long_term_archive(self) -> list[MemoryEpisode]:
+        """Atomically persist and clear the current Working Memory snapshot.
+
+        If a database operation fails, working memory remains intact so the
+        caller can retry without silently losing state.
+        """
         if not self.working_memory:
             return []
+
         now = self._now()
-        records = [
-            self.record_episode("nexus_core", "cognitive_consolidation",
-                                {"key": key, "value": value}, now)
-            for key, value in list(self.working_memory.items())
-        ]
-        self.working_memory.clear()
+        tx_start = _iso(now)
+        snapshot = list(self.working_memory.items())
+        inserted_ids: list[int] = []
+
+        with self._lock, self.conn:
+            for key, value in snapshot:
+                payload = json.dumps(
+                    {"key": key, "value": value},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO episodic_memory (
+                        agent_id, event_type, payload, valid_time_start, valid_time_end,
+                        transaction_time_start, transaction_time_end
+                    ) VALUES (?, ?, ?, ?, ?, ?, NULL)
+                    """,
+                    ("nexus_core", "cognitive_consolidation", payload, tx_start, None, tx_start),
+                )
+                inserted_ids.append(int(cursor.lastrowid))
+
+        records = [self.get_episode(item_id) for item_id in inserted_ids]
+        for key, _ in snapshot:
+            self.working_memory.pop(key, None)
         return records
 
     def upsert_procedural_skill(
