@@ -128,3 +128,67 @@ def test_working_memory_consolidation_is_atomic(tmp_path):
     assert {item.payload["key"] for item in records} == {"first", "second"}
     assert {item.payload["value"] for item in records} == {1, 2}
     assert store.working_memory == {}
+
+
+def test_procedural_skill_versions_are_bitemporal(tmp_path):
+    store = BitemporalMemoryNode(str(tmp_path / "memory.db"))
+    valid = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    tx1 = datetime(2026, 3, 2, tzinfo=timezone.utc)
+    tx2 = datetime(2026, 3, 3, tzinfo=timezone.utc)
+
+    first = store.upsert_procedural_skill(
+        "web.build.verified", "builder.v1", 0.6,
+        updated_at=tx1, valid_time=valid,
+        transaction_time=tx1,
+    )
+    second = store.upsert_procedural_skill(
+        "web.build.verified", "builder.v2", 0.95,
+        updated_at=tx2, valid_time=valid,
+        transaction_time=tx2,
+    )
+
+    assert first.code_reference == "builder.v1"
+    assert second.code_reference == "builder.v2"
+
+    historical = store.procedural_query(
+        valid_at=valid,
+        transaction_at=tx1,
+    )
+    assert [(skill.skill_name, skill.code_reference) for skill in historical] == [
+        ("web.build.verified", "builder.v1")
+    ]
+
+    current = store.procedural_query(
+        valid_at=valid,
+        transaction_at=tx2,
+    )
+    assert [(skill.skill_name, skill.code_reference) for skill in current] == [
+        ("web.build.verified", "builder.v2")
+    ]
+
+
+def test_memory_snapshot_reconstructs_episodic_procedural_and_graph_state(tmp_path):
+    store = BitemporalMemoryNode(str(tmp_path / "memory.db"))
+    valid = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    tx = datetime(2026, 4, 2, tzinfo=timezone.utc)
+
+    episode = store.record_episode(
+        "odyn", "decision", {"value": "accepted"}, valid,
+        transaction_time=tx,
+    )
+    store.upsert_procedural_skill(
+        "coding.test", "skill.v1", 0.9,
+        updated_at=tx, valid_time=valid,
+        transaction_time=tx,
+    )
+    target = store.record_episode(
+        "odyn", "result", {"ok": True}, valid,
+        transaction_time=datetime(2026, 4, 3, tzinfo=timezone.utc),
+    )
+    store.link(episode.id, target.id, "verified_by", created_at=datetime(2026, 4, 3, tzinfo=timezone.utc))
+
+    snapshot = store.memory_snapshot(valid_at=valid, transaction_at=tx)
+
+    assert [item.payload for item in snapshot.episodic] == [{"value": "accepted"}]
+    assert [item.code_reference for item in snapshot.procedural] == ["skill.v1"]
+    assert snapshot.edges == []
