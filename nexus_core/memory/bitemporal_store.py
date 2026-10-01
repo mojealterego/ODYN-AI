@@ -295,10 +295,12 @@ class BitemporalMemoryNode:
     def update_working_memory(self, key: str, value: Any) -> None:
         if not key.strip():
             raise ValueError("working-memory key cannot be empty")
-        self.working_memory[key] = value
+        with self._lock:
+            self.working_memory[key] = value
 
     def get_working_memory(self, key: str, default: Any = None) -> Any:
-        return self.working_memory.get(key, default)
+        with self._lock:
+            return self.working_memory.get(key, default)
 
     def commit_to_long_term_archive(self) -> list[MemoryEpisode]:
         """Atomically persist and clear the current Working Memory snapshot.
@@ -306,15 +308,16 @@ class BitemporalMemoryNode:
         If a database operation fails, working memory remains intact so the
         caller can retry without silently losing state.
         """
-        if not self.working_memory:
-            return []
+        with self._lock:
+            if not self.working_memory:
+                return []
 
-        now = self._now()
-        tx_start = _iso(now)
-        snapshot = list(self.working_memory.items())
-        inserted_ids: list[int] = []
+            now = self._now()
+            tx_start = _iso(now)
+            snapshot = list(self.working_memory.items())
+            inserted_ids: list[int] = []
 
-        with self._lock, self.conn:
+            with self.conn:
             for key, value in snapshot:
                 payload = json.dumps(
                     {"key": key, "value": value},
@@ -331,12 +334,13 @@ class BitemporalMemoryNode:
                     """,
                     ("nexus_core", "cognitive_consolidation", payload, tx_start, None, tx_start),
                 )
-                inserted_ids.append(int(cursor.lastrowid))
+                    inserted_ids.append(int(cursor.lastrowid))
 
-        records = [self.get_episode(item_id) for item_id in inserted_ids]
-        for key, _ in snapshot:
-            self.working_memory.pop(key, None)
-        return records
+            records = [self._row_to_episode(
+                self.conn.execute("SELECT * FROM episodic_memory WHERE id = ?", (item_id,)).fetchone()
+            ) for item_id in inserted_ids]
+            self.working_memory.clear()
+            return records
 
     def upsert_procedural_skill(
         self, skill_name: str, code_reference: str, fitness_score: float, *,
