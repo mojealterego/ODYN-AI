@@ -344,6 +344,8 @@ class AutonomousBuildOrchestrator:
                 )
                 meta_history = self.memory.meta_learning_context(meta_context)
                 history_context["strategy_stats"] = meta_history["strategy_stats"]
+                history_context["evidence_count"] = meta_history["evidence_count"]
+                history_context["weighted_evidence"] = meta_history["weighted_evidence"]
                 history_context["meta_learning"] = meta_history
             except Exception:
                 history_context = {}
@@ -535,3 +537,4 @@ class AutonomousBuildOrchestrator:
             memory_events,
             self._cognitive_snapshot(selected_strategy),
         )
+
