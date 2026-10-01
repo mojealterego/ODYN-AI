@@ -92,6 +92,7 @@ class AgentExperienceMemory:
         cognitive_node_id: str | None = None,
         environmental_stress: float | None = None,
         context: dict[str, Any] | None = None,
+        decision_cycle_id: str | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "cognitive_plan",
@@ -103,6 +104,7 @@ class AgentExperienceMemory:
                 "cognitive_node_id": cognitive_node_id,
                 "environmental_stress": environmental_stress,
                 "context": dict(context or {}),
+                "decision_cycle_id": decision_cycle_id,
             },
             text=(
                 f"Plan kognitywny dla {app_id}: wybrano {selected_strategy}. "
