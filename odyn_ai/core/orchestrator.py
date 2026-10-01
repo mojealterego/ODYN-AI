@@ -508,6 +508,12 @@ class AutonomousBuildOrchestrator:
             memory_events.append(test_memory_id)
 
         if not test.ok:
+            self.cognitive.record_decision_outcome(
+                decision,
+                outcome="test_failure",
+                execution_id=test_memory_id,
+                correction=bool(test_changes),
+            )
             return PipelineResult(
                 app_id, False, changes, self._result_dict(test), None, None,
                 "test",
@@ -529,6 +535,12 @@ class AutonomousBuildOrchestrator:
             memory_events.append(build_memory_id)
 
         if not build.ok:
+            self.cognitive.record_decision_outcome(
+                decision,
+                outcome="build_failure",
+                execution_id=build_memory_id,
+                correction=bool(build_changes),
+            )
             return PipelineResult(
                 app_id, False, changes, self._result_dict(test), self._result_dict(build), None,
                 "build",
@@ -556,6 +568,12 @@ class AutonomousBuildOrchestrator:
                 changes,
             )
             if not dgm_result:
+                self.cognitive.record_decision_outcome(
+                    decision,
+                    outcome="dgm_failure",
+                    execution_id=build_memory_id,
+                    correction=False,
+                )
                 return PipelineResult(
                     app_id, False, changes, self._result_dict(test), self._result_dict(build), None,
                     "dgm",
@@ -572,6 +590,12 @@ class AutonomousBuildOrchestrator:
 
         if success_memory_id is not None:
             memory_events.append(success_memory_id)
+        self.cognitive.record_decision_outcome(
+            decision,
+            outcome="verified",
+            execution_id=build_memory_id,
+            correction=bool(test_changes or build_changes),
+        )
 
         return PipelineResult(
             app_id, True, changes, self._result_dict(test), self._result_dict(build),
