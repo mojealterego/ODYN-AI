@@ -113,6 +113,92 @@ class AgentExperienceMemory:
         )
 
     @staticmethod
+    def record_research_pipeline(
+        self,
+        *,
+        task: MemoryEpisode,
+        report: Any,
+        decision_cycle_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a Deep Research trace and index its consolidated RAG context."""
+        report_query = str(getattr(report, "query", "")).strip()
+        sources = list(getattr(report, "sources", ()) or ())
+        context = str(getattr(report, "context", "")).strip()
+        if not report_query:
+            raise ValueError("research report query cannot be empty")
+        if not context:
+            raise ValueError("research report context cannot be empty")
+
+        research = self.remember_and_index(
+            "research_decision",
+            {
+                "task_id": task.id,
+                "query": report_query,
+                "hops": int(getattr(report, "hops", 0)),
+                "source_count": len(sources),
+                "decision_cycle_id": decision_cycle_id,
+            },
+            text=f"Research decision dla zadania {task.id}: {report_query}",
+        )
+        self.link(task.id, research.id, "research_decision")
+
+        hop_episodes: dict[int, MemoryEpisode] = {}
+        source_episodes: list[MemoryEpisode] = []
+        for source in sources:
+            hop = int(getattr(source, "hop", 0))
+            hop_episode = hop_episodes.get(hop)
+            if hop_episode is None:
+                hop_episode = self.remember(
+                    "research_search_hop",
+                    {
+                        "task_id": task.id,
+                        "research_decision_id": research.id,
+                        "hop": hop,
+                        "query": str(getattr(source, "query", "")),
+                        "decision_cycle_id": decision_cycle_id,
+                    },
+                )
+                self.link(research.id, hop_episode.id, "search_hop")
+                hop_episodes[hop] = hop_episode
+
+            source_episode = self.remember(
+                "research_source",
+                {
+                    "task_id": task.id,
+                    "research_decision_id": research.id,
+                    "search_hop_id": hop_episode.id,
+                    "title": str(getattr(source, "title", "")),
+                    "url": str(getattr(source, "url", "")),
+                    "body": str(getattr(source, "body", "")),
+                    "query": str(getattr(source, "query", "")),
+                    "hop": hop,
+                    "metadata": dict(getattr(source, "metadata", {}) or {}),
+                    "decision_cycle_id": decision_cycle_id,
+                },
+            )
+            self.link(hop_episode.id, source_episode.id, "source")
+            source_episodes.append(source_episode)
+
+        rag_episode = self.remember_and_index(
+            "rag_context",
+            {
+                "task_id": task.id,
+                "research_decision_id": research.id,
+                "source_ids": [episode.id for episode in source_episodes],
+                "hops": int(getattr(report, "hops", 0)),
+                "decision_cycle_id": decision_cycle_id,
+            },
+            text=context,
+        )
+        self.link(research.id, rag_episode.id, "rag_context")
+
+        return {
+            "research_decision": research,
+            "search_hops": hop_episodes,
+            "sources": source_episodes,
+            "rag_context": rag_episode,
+        }
+
     def infer_task_context(task: str, platform: str, files: dict[str, str] | None = None) -> dict[str, Any]:
         """Derive stable, non-sensitive features used to scope meta-learning."""
         text = task.lower()
@@ -209,6 +295,7 @@ class AgentExperienceMemory:
                 "changed_paths": [item["path"] for item in changes],
                 "cognitive_strategy": cognitive_strategy,
                 "cognitive_node_id": cognitive_node_id,
+                "decision_cycle_id": decision_cycle_id,
             },
             text=(
                 f"Decyzja Coding Agent dla {app_id}: {summary}. "
