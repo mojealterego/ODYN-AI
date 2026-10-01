@@ -155,5 +155,67 @@ class ExperienceMemoryTests(unittest.TestCase):
             )
 
 
+    def test_meta_learning_uses_similarity_weighted_transfer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            memory.start_task("web-react", "refactor frontend", "web")
+            memory.record_cognitive_plan(
+                "web-react", "refactor frontend",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "refactor", "platform": "web", "architecture": "react"},
+            )
+            memory.record_execution("web-react", "test", {"ok": True, "exit_code": 0, "diagnostics": []})
+            memory.start_task("android-react", "refactor mobile frontend", "android")
+            memory.record_cognitive_plan(
+                "android-react", "refactor mobile frontend",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "refactor", "platform": "android", "architecture": "react"},
+            )
+            memory.record_execution("android-react", "test", {"ok": False, "exit_code": 1, "diagnostics": ["compile failed"]})
+
+            result = memory.meta_learning_context(
+                {"task_type": "refactor", "platform": "web", "architecture": "react"}
+            )
+
+            self.assertAlmostEqual(result["strategy_stats"]["minimal_patch"]["successes"], 1.0)
+            self.assertAlmostEqual(result["strategy_stats"]["minimal_patch"]["failures"], 0.7)
+            self.assertEqual(result["evidence_count"], 2)
+            self.assertEqual(result["weighted_evidence"], 1.7)
+            self.assertEqual([round(item["similarity"], 2) for item in result["evidence"]], [1.0, 0.7])
+
+    def test_meta_learning_ignores_distant_context_and_cross_task_outcomes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            memory.start_task("web-1", "refactor frontend", "web")
+            memory.record_cognitive_plan(
+                "web-1", "refactor frontend",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "refactor", "platform": "web", "architecture": "react"},
+            )
+            memory.record_execution("web-1", "test", {"ok": True, "exit_code": 0, "diagnostics": []})
+            memory.start_task("android-1", "fix backend", "android")
+            memory.record_cognitive_plan(
+                "android-1", "fix backend",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "bugfix", "platform": "android", "architecture": "python"},
+            )
+            memory.record_execution("android-1", "test", {"ok": False, "exit_code": 1, "diagnostics": ["failed"]})
+
+            result = memory.meta_learning_context(
+                {"task_type": "refactor", "platform": "web", "architecture": "react"}
+            )
+
+            self.assertEqual(result["strategy_stats"]["minimal_patch"]["successes"], 1.0)
+            self.assertEqual(result["strategy_stats"]["minimal_patch"]["failures"], 0.0)
+            self.assertEqual(result["evidence_count"], 1)
+            self.assertEqual(result["ignored_evidence_count"], 1)
+            self.assertEqual(result["evidence"][0]["outcome"], "success")
+
+
+
 if __name__ == "__main__":
     unittest.main()
