@@ -155,6 +155,7 @@ class AgentExperienceMemory:
                 "strategy": strategy,
                 "selected": selected,
                 "cognitive_node_id": cognitive_node_id,
+                "decision_cycle_id": decision_cycle_id,
             },
             text=f"Strategia kognitywna {app_id}: {strategy}; wybrana={selected}.",
         )
@@ -195,6 +196,7 @@ class AgentExperienceMemory:
         *,
         cognitive_strategy: str | None = None,
         cognitive_node_id: str | None = None,
+        decision_cycle_id: str | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "coding_decision",
@@ -247,6 +249,9 @@ class AgentExperienceMemory:
         app_id: str,
         stage: str,
         result: dict[str, Any],
+        *,
+        decision_cycle_id: str | None = None,
+        decision_memory_id: int | None = None,
     ) -> MemoryEpisode:
         payload = {
             "app_id": app_id,
@@ -258,13 +263,20 @@ class AgentExperienceMemory:
             "diagnostics": result.get("diagnostics", []),
             "stdout": result.get("stdout", "")[-4000:],
             "stderr": result.get("stderr", "")[-4000:],
+            "decision_cycle_id": decision_cycle_id,
         }
         text = (
             f"Wynik {stage} dla {app_id}: "
             f"{'PASS' if payload['ok'] else 'FAIL'}. "
             f"Diagnostyka: {' | '.join(payload['diagnostics'])}"
         )
-        return self.remember_and_index(f"{stage}_result", payload, text=text)
+        episode = self.remember_and_index(f"{stage}_result", payload, text=text)
+        if decision_memory_id is not None:
+            try:
+                self.store.link(decision_memory_id, episode.id, "executed_as")
+            except Exception:
+                pass
+        return episode
 
     def record_correction(
         self,
@@ -274,6 +286,8 @@ class AgentExperienceMemory:
         changes: list[dict[str, str]],
         *,
         failed_execution_id: int | None = None,
+        decision_cycle_id: str | None = None,
+        decision_memory_id: int | None = None,
     ) -> MemoryEpisode:
         episode = self.remember_and_index(
             "correction",
@@ -283,6 +297,7 @@ class AgentExperienceMemory:
                 "diagnostics": diagnostics,
                 "changed_paths": [item["path"] for item in changes],
                 "failed_execution_id": failed_execution_id,
+                "decision_cycle_id": decision_cycle_id,
             },
             text=(
                 f"Korekta po błędzie {stage} dla {app_id}. "
@@ -295,6 +310,11 @@ class AgentExperienceMemory:
                 self.store.link(episode.id, failed_execution_id, "corrects")
             except Exception:
                 pass
+        if decision_memory_id is not None:
+            try:
+                self.store.link(decision_memory_id, episode.id, "corrected_by")
+            except Exception:
+                pass
         return episode
 
     def record_success(
@@ -305,6 +325,8 @@ class AgentExperienceMemory:
         artifact: str | None,
         *,
         source_execution_id: int | None = None,
+        decision_cycle_id: str | None = None,
+        decision_memory_id: int | None = None,
     ) -> MemoryEpisode:
         skill_name = f"{platform}.{stage}.verified"
         episode = self.remember_and_index(
@@ -316,6 +338,7 @@ class AgentExperienceMemory:
                 "artifact": artifact,
                 "procedure": "edit → test → build → verify",
                 "source_execution_id": source_execution_id,
+                "decision_cycle_id": decision_cycle_id,
             },
             text=(
                 f"Skuteczna procedura ODYN: {platform}, {stage}. "
@@ -325,6 +348,11 @@ class AgentExperienceMemory:
         if source_execution_id is not None:
             try:
                 self.store.link(episode.id, source_execution_id, "verified_by")
+            except Exception:
+                pass
+        if decision_memory_id is not None:
+            try:
+                self.store.link(decision_memory_id, episode.id, "verified_by")
             except Exception:
                 pass
         try:
