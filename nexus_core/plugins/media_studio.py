@@ -71,12 +71,14 @@ class MediaOrchestrator:
     @staticmethod
     def _load_moviepy() -> tuple[Any, Any]:
         try:
+            from tools.lazy_deps import ensure
+
+            ensure("media.moviepy")
             from moviepy import VideoFileClip, concatenate_videoclips
         except ImportError as exc:
             raise MediaCompositionError(
                 "MoviePy nie jest zainstalowane. Zainstaluj zależność media."
             ) from exc
-        return VideoFileClip, concatenate_videoclips
 
     def compose_long_feature_video(
         self,
