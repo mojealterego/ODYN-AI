@@ -450,11 +450,11 @@ class AutonomousBuildOrchestrator:
             parent_id=decision_parent_id,
         )
         decision_cycle_id = decision.decision_id
-        if decision.rejected or decision.selected_strategy is None:
+        if decision.gate.rejected or decision.selected_strategy is None:
             return PipelineResult(
                 app_id, False, changes, {}, None, None,
                 "cognitive_gate",
-                [f"Decision Cycle {decision_id} został odrzucony przez Adversarial Gate."],
+                [f"Decision Cycle {decision_cycle_id} został odrzucony przez Adversarial Gate."],
                 memory_events,
                 self._cognitive_snapshot(None),
             )
