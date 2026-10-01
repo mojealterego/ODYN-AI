@@ -79,6 +79,7 @@ class MediaOrchestrator:
             raise MediaCompositionError(
                 "MoviePy nie jest zainstalowane. Zainstaluj zależność media."
             ) from exc
+        return VideoFileClip, concatenate_videoclips
 
     def compose_long_feature_video(
         self,
