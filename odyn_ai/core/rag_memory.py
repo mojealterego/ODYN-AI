@@ -129,6 +129,39 @@ class RAGMemoryEngine:
         )
         return f"\n[PAMIĘĆ EPIZODYCZNA RAG]: {context}\n" if context else ""
 
+    def retrieve_relevant_scoped(
+        self,
+        query: str,
+        *,
+        episode_ids: tuple[int, ...],
+        top_k: int = 4,
+    ) -> list[dict[str, Any]]:
+        """Return semantic candidates restricted to temporal-eligible episodes."""
+        if not self.embedder or not episode_ids or top_k <= 0:
+            return []
+
+        allowed = set(episode_ids)
+        query_vector = self._embed(query)
+        scored: list[dict[str, Any]] = []
+        for memory in self.memory_store:
+            episode_id = memory.get("episode_id")
+            if episode_id not in allowed:
+                continue
+            score = float(
+                cosine_similarity(query_vector, memory["vector"])[0][0]
+            )
+            scored.append(
+                {
+                    "episode_id": episode_id,
+                    "text": memory["text"],
+                    "score": score,
+                    "metadata": dict(memory.get("metadata", {})),
+                }
+            )
+
+        scored.sort(key=lambda item: item["score"], reverse=True)
+        return scored[:top_k]
+
     def clear(self) -> None:
         """Clear in-memory and persisted episodic memory."""
         self.memory_store.clear()
