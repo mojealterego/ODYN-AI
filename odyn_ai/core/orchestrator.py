@@ -8,6 +8,7 @@ from odyn_ai.core.execution import ExecutionEngine, ExecutionRequest
 from odyn_ai.core.github_integration import GitHubIntegration
 from nexus_core.reasoning.cognitive_engine import CognitiveEngine
 from odyn_ai.core.experience_memory import AgentExperienceMemory
+from nexus_core.plugins.deep_research import DeepResearchEngine
 from odyn_ai.core.evolution import RoadmapDirective
 
 
@@ -40,6 +41,7 @@ class AutonomousBuildOrchestrator:
         cognitive_engine: CognitiveEngine | None = None,
         swarm=None,
         evolution_branch: str = "odyn-evolution",
+        deep_research: DeepResearchEngine | None = None,
     ) -> None:
         self.apps = apps
         self.execution = engine
@@ -50,6 +52,7 @@ class AutonomousBuildOrchestrator:
         self.cognitive = cognitive_engine or CognitiveEngine()
         self.swarm = swarm
         self.evolution_branch = evolution_branch
+        self.deep_research = deep_research
 
     @staticmethod
     def _result_dict(result: Any) -> dict[str, Any]:
@@ -392,6 +395,49 @@ class AutonomousBuildOrchestrator:
                 "inference_policy": inference_policy,
             },
         )
+
+        research_trace = None
+        research_context = ""
+        decision_parent_id = task_node_id
+        if self.deep_research is not None:
+            try:
+                report = await self.deep_research.execute_rag_pipeline(
+                    [instruction],
+                    max_hops=2,
+                    max_results=5,
+                    max_followup_queries=4,
+                )
+                research_node_id = self.cognitive.add_thought(
+                    "research_decision",
+                    report.query,
+                    parent_id=task_node_id,
+                    metadata={
+                        "hops": report.hops,
+                        "source_count": len(report.sources),
+                    },
+                )
+                decision_parent_id = research_node_id
+                research_context = report.context
+                if self.memory and task_id is not None:
+                    task_episode = self.memory.store.get_episode(task_id)
+                    research_trace = self.memory.record_research_pipeline(
+                        task=task_episode,
+                        report=report,
+                        decision_cycle_id=None,
+                    )
+                    research_id = research_trace["research_decision"].id
+                    memory_events.append(research_id)
+                    for episode in research_trace["search_hops"].values():
+                        memory_events.append(episode.id)
+                    memory_events.extend(item.id for item in research_trace["sources"])
+                    memory_events.append(research_trace["rag_context"].id)
+            except Exception:
+                # Research is an enrichment layer; failure must not disable the build pipeline.
+                research_trace = None
+
+        if research_context:
+            context = f"{context}\n\n[DEEP RESEARCH RAG]\n{research_context}".strip()
+
         strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
         strategies = ["minimal_patch", "test_first", "architecture"]
         decision = self.cognitive.decision_cycle(
@@ -401,7 +447,7 @@ class AutonomousBuildOrchestrator:
             context=meta_context,
             history_context=history_context,
             critic_result="PASS",
-            parent_id=task_node_id,
+            parent_id=decision_parent_id,
         )
         decision_cycle_id = decision.decision_id
         if decision.rejected or decision.selected_strategy is None:
@@ -412,6 +458,18 @@ class AutonomousBuildOrchestrator:
                 memory_events,
                 self._cognitive_snapshot(None),
             )
+        if self.memory and task_id is not None:
+            try:
+                task_episode = self.memory.store.get_episode(task_id)
+                cognitive_memory = self.memory.record_cognitive_decision(
+                    task=task_episode,
+                    decision_cycle=decision,
+                    research_trace=research_trace,
+                )
+                memory_events.append(cognitive_memory.id)
+            except Exception:
+                pass
+
         plan = {
             "root_id": decision.root_node_id,
             "branch_ids": list(decision.branch_ids),
