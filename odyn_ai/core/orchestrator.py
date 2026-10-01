@@ -330,6 +330,16 @@ class AutonomousBuildOrchestrator:
                 pass
 
         context = self.memory.recall(instruction, top_k=4) if self.memory else ""
+        history_context = {}
+        if self.memory and task_id is not None:
+            try:
+                task_episode = self.memory.store.get_episode(task_id)
+                history_context = self.memory.history_context(
+                    historical_transaction_at=task_episode.transaction_time_start,
+                    valid_at=task_episode.valid_time_start,
+                )
+            except Exception:
+                history_context = {}
         environmental_stress = (
             self.memory.environmental_stress() if self.memory else 0.0
         )
@@ -364,8 +374,18 @@ class AutonomousBuildOrchestrator:
             strategies,
             lambda _node, action: strategy_scores[action],
             parent_id=task_node_id,
+            history_context=history_context,
         )
         selected_strategy = plan["selected_strategy"]
+        history_instruction = ""
+        if history_context:
+            history_instruction = (
+                "\n[ODYN HISTORY-AWARE CONTEXT]\n"
+                f"Historical strategy statistics: {history_context.get('strategy_stats', {})}\n"
+                f"Successful procedures: {len(history_context.get('successful_procedures', []))}\n"
+                f"Failed procedures: {len(history_context.get('failed_procedures', []))}\n"
+                f"Corrections: {len(history_context.get('corrections', []))}"
+            )
 
         plan_memory_id = self._remember_episode(
             "record_cognitive_plan",
@@ -396,6 +416,7 @@ class AutonomousBuildOrchestrator:
             f"Apply the selected build strategy deliberately. "
             f"Original task: {instruction}"
             f"{evolution_context}"
+            f"{history_instruction}"
         )
         edited = await self._apply(
             platform, selected_instruction, files, memory_context=context, inference_params=inference_policy
