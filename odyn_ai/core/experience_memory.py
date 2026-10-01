@@ -271,6 +271,7 @@ class AgentExperienceMemory:
         *,
         selected: bool,
         cognitive_node_id: str | None = None,
+        decision_cycle_id: str | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "cognitive_strategy",
