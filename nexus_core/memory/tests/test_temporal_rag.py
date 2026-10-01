@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
-
 from nexus_core.memory.bitemporal_store import BitemporalMemoryNode
 from nexus_core.memory.temporal_rag import TemporalRAGRetriever
 
@@ -20,7 +18,7 @@ def test_retriever_requires_both_temporal_coordinates(tmp_path) -> None:
     retriever = TemporalRAGRetriever(BitemporalMemoryNode(str(tmp_path / "m.db")))
 
     try:
-        retriever.retrieve("what did ODYN know?", transaction_at=None, valid_at=None)
+        retriever.retrieve(\n        "what did ODYN know?",\n        transaction_at=None,\n        valid_at=datetime(2026, 9, 1, tzinfo=timezone.utc),\n    )
     except ValueError as exc:
         assert "transaction_at" in str(exc)
     else:
