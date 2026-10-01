@@ -318,27 +318,39 @@ class BitemporalMemoryNode:
             inserted_ids: list[int] = []
 
             with self.conn:
-            for key, value in snapshot:
-                payload = json.dumps(
-                    {"key": key, "value": value},
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-                cursor = self.conn.execute(
-                    """
-                    INSERT INTO episodic_memory (
-                        agent_id, event_type, payload, valid_time_start, valid_time_end,
-                        transaction_time_start, transaction_time_end
-                    ) VALUES (?, ?, ?, ?, ?, ?, NULL)
-                    """,
-                    ("nexus_core", "cognitive_consolidation", payload, tx_start, None, tx_start),
-                )
+                for key, value in snapshot:
+                    payload = json.dumps(
+                        {"key": key, "value": value},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    cursor = self.conn.execute(
+                        """
+                        INSERT INTO episodic_memory (
+                            agent_id, event_type, payload, valid_time_start, valid_time_end,
+                            transaction_time_start, transaction_time_end
+                        ) VALUES (?, ?, ?, ?, ?, ?, NULL)
+                        """,
+                        (
+                            "nexus_core",
+                            "cognitive_consolidation",
+                            payload,
+                            _iso(now),
+                            None,
+                            tx_start,
+                        ),
+                    )
                     inserted_ids.append(int(cursor.lastrowid))
 
-            records = [self._row_to_episode(
-                self.conn.execute("SELECT * FROM episodic_memory WHERE id = ?", (item_id,)).fetchone()
-            ) for item_id in inserted_ids]
+            records = [
+                self._row_to_episode(
+                    self.conn.execute(
+                        "SELECT * FROM episodic_memory WHERE id = ?", (item_id,)
+                    ).fetchone()
+                )
+                for item_id in inserted_ids
+            ]
             self.working_memory.clear()
             return records
 
