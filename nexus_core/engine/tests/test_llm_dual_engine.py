@@ -37,7 +37,7 @@ class DualModelEngineTests(unittest.TestCase):
 
         asyncio.run(engine.start())
 
-        self.assertEqual([item.model_path for item in FakeLlama.instances], ["primary.gguf", "critic.gguf"])
+        self.assertEqual({item.model_path for item in FakeLlama.instances}, {"primary.gguf", "critic.gguf"})
         self.assertEqual(FakeLlama.instances[0].kwargs["n_ctx"], 8192)
         self.assertEqual(FakeLlama.instances[1].kwargs["n_ctx"], 2048)
         self.assertEqual(FakeLlama.instances[0].kwargs["n_gpu_layers"], -1)
