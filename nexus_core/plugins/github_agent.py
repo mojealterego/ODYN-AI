@@ -135,6 +135,9 @@ class GitHubAgentBuilder:
             raise ValueError("GitHub token jest wymagany.")
 
         if github_factory is None:
+            from tools.lazy_deps import ensure
+
+            ensure("github.agent_devel")
             from github import Auth, Github
 
             github_factory = lambda auth: Github(auth=auth)
