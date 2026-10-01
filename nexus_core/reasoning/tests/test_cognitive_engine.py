@@ -171,8 +171,8 @@ class CognitiveEngineTests(unittest.TestCase):
         self.assertEqual(cycle.selected_strategy, "test_first")
         self.assertEqual(
             cycle.phases,
-            ["context", "candidate_strategies", "historical_evidence",
-             "got_evaluation", "adversarial_gate", "strategy_selection"],
+            ("context", "candidate_strategies", "historical_evidence",
+             "got_evaluation", "adversarial_gate", "strategy_selection"),
         )
         self.assertEqual(cycle.status, "selected")
         snapshot = engine.snapshot()
