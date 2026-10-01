@@ -16,7 +16,7 @@ class FakeDDGS:
     async def __aexit__(self, *args):
         return False
 
-    async def text(self, query, max_results=5, **kwargs):
+    def text(self, query, max_results=5, **kwargs):
         for row in self.rows_by_query.get(query, [])[:max_results]:
             yield row
 
@@ -45,7 +45,7 @@ class DeepResearchTests(unittest.TestCase):
             class Capture(FakeDDGS):
                 async def text(self, query, max_results=5, **kwargs):
                     seen.append(query)
-                    async for row in super().text(query, max_results=max_results, **kwargs):
+                    for row in super().text(query, max_results=max_results, **kwargs):
                         yield row
             return Capture({})
 
