@@ -48,6 +48,27 @@ class ProceduralSkill:
     code_reference: str
     fitness_score: float
     last_updated: datetime
+    valid_time_start: datetime
+    valid_time_end: datetime | None
+    transaction_time_start: datetime
+    transaction_time_end: datetime | None
+
+
+@dataclass(frozen=True)
+class MemoryEdge:
+    source_id: int
+    target_id: int
+    relation: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class MemorySnapshot:
+    valid_at: datetime
+    transaction_at: datetime
+    episodic: list[MemoryEpisode]
+    procedural: list[ProceduralSkill]
+    edges: list[MemoryEdge]
 
 
 class BitemporalMemoryNode:
@@ -100,6 +121,22 @@ class BitemporalMemoryNode:
                     fitness_score REAL NOT NULL DEFAULT 0.0,
                     last_updated TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS procedural_memory_versions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    skill_name TEXT NOT NULL,
+                    code_reference TEXT NOT NULL,
+                    fitness_score REAL NOT NULL DEFAULT 0.0,
+                    valid_time_start TEXT NOT NULL,
+                    valid_time_end TEXT,
+                    transaction_time_start TEXT NOT NULL,
+                    transaction_time_end TEXT,
+                    UNIQUE(skill_name, transaction_time_start)
+                );
+                CREATE INDEX IF NOT EXISTS idx_procedural_valid_time
+                    ON procedural_memory_versions(skill_name, valid_time_start, valid_time_end);
+                CREATE INDEX IF NOT EXISTS idx_procedural_transaction_time
+                    ON procedural_memory_versions(skill_name, transaction_time_start, transaction_time_end);
 
                 CREATE TABLE IF NOT EXISTS memory_edges (
                     source_id INTEGER NOT NULL,
@@ -355,15 +392,62 @@ class BitemporalMemoryNode:
             return records
 
     def upsert_procedural_skill(
-        self, skill_name: str, code_reference: str, fitness_score: float, *,
+        self,
+        skill_name: str,
+        code_reference: str,
+        fitness_score: float,
+        *,
         updated_at: datetime | None = None,
+        valid_time: datetime | None = None,
+        valid_time_end: datetime | None = None,
+        transaction_time: datetime | None = None,
     ) -> ProceduralSkill:
         if not skill_name.strip():
             raise ValueError("skill_name cannot be empty")
         if not 0.0 <= fitness_score <= 1.0:
             raise ValueError("fitness_score must be between 0 and 1")
-        updated_at = _utc(updated_at) or self._now()
+
+        valid_start = _utc(valid_time) or _utc(updated_at) or self._now()
+        valid_end = _utc(valid_time_end)
+        tx_start_dt = _utc(transaction_time) or _utc(updated_at) or self._now()
+        if valid_end is not None and valid_end <= valid_start:
+            raise ValueError("valid_time_end must be later than valid_time")
+        tx_start = _iso(tx_start_dt)
+
         with self._lock, self.conn:
+            current = self.conn.execute(
+                """
+                SELECT * FROM procedural_memory_versions
+                WHERE skill_name = ? AND transaction_time_end IS NULL
+                ORDER BY transaction_time_start DESC LIMIT 1
+                """,
+                (skill_name.strip(),),
+            ).fetchone()
+            if current is not None:
+                if tx_start <= current["transaction_time_start"]:
+                    raise ValueError("transaction_time must be later than current version")
+                self.conn.execute(
+                    "UPDATE procedural_memory_versions SET transaction_time_end = ? WHERE id = ?",
+                    (tx_start, current["id"]),
+                )
+
+            self.conn.execute(
+                """
+                INSERT INTO procedural_memory_versions (
+                    skill_name, code_reference, fitness_score,
+                    valid_time_start, valid_time_end,
+                    transaction_time_start, transaction_time_end
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL)
+                """,
+                (
+                    skill_name.strip(),
+                    code_reference,
+                    fitness_score,
+                    _iso(valid_start),
+                    _iso(valid_end),
+                    tx_start,
+                ),
+            )
             self.conn.execute(
                 """
                 INSERT INTO procedural_memory (skill_name, code_reference, fitness_score, last_updated)
@@ -373,24 +457,88 @@ class BitemporalMemoryNode:
                     fitness_score=excluded.fitness_score,
                     last_updated=excluded.last_updated
                 """,
-                (skill_name.strip(), code_reference, fitness_score, _iso(updated_at)),
+                (skill_name.strip(), code_reference, fitness_score, tx_start),
             )
             row = self.conn.execute(
-                "SELECT * FROM procedural_memory WHERE skill_name = ?", (skill_name.strip(),)
+                """
+                SELECT * FROM procedural_memory_versions
+                WHERE skill_name = ? AND transaction_time_start = ?
+                """,
+                (skill_name.strip(), tx_start),
             ).fetchone()
+
+        return self._row_to_procedural(row)
+
+    @staticmethod
+    def _row_to_procedural(row: sqlite3.Row) -> ProceduralSkill:
         return ProceduralSkill(
-            skill_name=row["skill_name"], code_reference=row["code_reference"],
-            fitness_score=float(row["fitness_score"]), last_updated=_parse(row["last_updated"])
+            skill_name=row["skill_name"],
+            code_reference=row["code_reference"],
+            fitness_score=float(row["fitness_score"]),
+            last_updated=_parse(row["transaction_time_start"]),
+            valid_time_start=_parse(row["valid_time_start"]),
+            valid_time_end=_parse(row["valid_time_end"]),
+            transaction_time_start=_parse(row["transaction_time_start"]),
+            transaction_time_end=_parse(row["transaction_time_end"]),
         )
 
-    def link(self, source_id: int, target_id: int, relation: str) -> None:
+    def procedural_query(
+        self,
+        *,
+        valid_at: datetime | None = None,
+        transaction_at: datetime | None = None,
+        skill_name: str | None = None,
+    ) -> list[ProceduralSkill]:
+        if valid_at is None and transaction_at is None:
+            return []
+
+        clauses: list[str] = []
+        params: list[Any] = []
+        if valid_at is not None:
+            value = _iso(valid_at)
+            clauses.append(
+                "valid_time_start <= ? AND (valid_time_end IS NULL OR valid_time_end > ?)"
+            )
+            params.extend([value, value])
+        if transaction_at is not None:
+            value = _iso(transaction_at)
+            clauses.append(
+                "transaction_time_start <= ? AND (transaction_time_end IS NULL OR transaction_time_end > ?)"
+            )
+            params.extend([value, value])
+        if skill_name is not None:
+            clauses.append("skill_name = ?")
+            params.append(skill_name.strip())
+
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM procedural_memory_versions WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY skill_name ASC, transaction_time_start ASC",
+                params,
+            ).fetchall()
+
+        visible: dict[str, ProceduralSkill] = {}
+        for row in rows:
+            skill = self._row_to_procedural(row)
+            visible[skill.skill_name] = skill
+        return list(visible.values())
+
+    def link(
+        self,
+        source_id: int,
+        target_id: int,
+        relation: str,
+        *,
+        created_at: datetime | None = None,
+    ) -> None:
         if not relation.strip():
             raise ValueError("relation cannot be empty")
         with self._lock, self.conn:
             self.conn.execute(
                 "INSERT OR IGNORE INTO memory_edges (source_id, target_id, relation, created_at) "
                 "VALUES (?, ?, ?, ?)",
-                (source_id, target_id, relation.strip(), _iso(self._now())),
+                (source_id, target_id, relation.strip(), _iso(created_at or self._now())),
             )
 
     def related(self, episode_id: int, relation: str | None = None) -> list[MemoryEpisode]:
@@ -407,6 +555,50 @@ class BitemporalMemoryNode:
         with self._lock:
             rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_episode(row) for row in rows]
+
+    def memory_snapshot(
+        self,
+        *,
+        valid_at: datetime,
+        transaction_at: datetime,
+    ) -> MemorySnapshot:
+        """Reconstruct durable CoALA memory at both time coordinates."""
+        valid_at = _utc(valid_at)
+        transaction_at = _utc(transaction_at)
+        episodic = self.query(valid_at=valid_at, transaction_at=transaction_at)
+        procedural = self.procedural_query(
+            valid_at=valid_at,
+            transaction_at=transaction_at,
+        )
+        visible_ids = {episode.id for episode in episodic}
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT source_id, target_id, relation, created_at
+                FROM memory_edges
+                WHERE created_at <= ?
+                ORDER BY created_at ASC, source_id ASC, target_id ASC
+                """,
+                (_iso(transaction_at),),
+            ).fetchall()
+        edges = [
+            MemoryEdge(
+                source_id=int(row["source_id"]),
+                target_id=int(row["target_id"]),
+                relation=row["relation"],
+                created_at=_parse(row["created_at"]),
+            )
+            for row in rows
+            if int(row["source_id"]) in visible_ids
+            and int(row["target_id"]) in visible_ids
+        ]
+        return MemorySnapshot(
+            valid_at=valid_at,
+            transaction_at=transaction_at,
+            episodic=episodic,
+            procedural=procedural,
+            edges=edges,
+        )
 
     def archive_before(self, cutoff: datetime) -> int:
         cutoff_iso = _iso(cutoff)
