@@ -170,6 +170,85 @@ class DualModelEngine:
         normalized = evaluation.casefold()
         return any(marker in normalized for marker in self._rejection_markers)
 
+    async def generate_primary(
+        self,
+        prompt: str,
+        *,
+        max_tokens: int | None = None,
+        temperature: float = 0.65,
+        top_p: float = 0.90,
+        top_k: int = 40,
+    ) -> str:
+        if not prompt.strip():
+            raise ValueError("prompt cannot be empty")
+        await self.start()
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._primary_completion(
+                prompt,
+                max_tokens=max_tokens or self.config.primary_max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+            ),
+        )
+
+    async def evaluate_critic(self, task: str, draft: str) -> str:
+        if not task.strip() or not draft.strip():
+            raise ValueError("task and draft cannot be empty")
+        await self.start()
+        prompt = (
+            "SYSTEM: Jesteś krytykiem ODYN. Zwróć wyłącznie JSON z polami: "
+            "decision, confidence, safety, logic, reason. decision musi być "
+            "accept albo reject.\n\n"
+            f"ZADANIE:\n{task}\n\nODPOWIEDŹ:\n{draft}"
+        )
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._critic_completion(
+                prompt,
+                max_tokens=self.config.critic_max_tokens,
+                temperature=0.0,
+                top_p=1.0,
+                top_k=40,
+            ),
+        )
+
+    async def correct_with_primary(
+        self,
+        task: str,
+        draft: str,
+        critic: Any,
+        *,
+        evidence: str = "",
+    ) -> str:
+        if not task.strip() or not draft.strip():
+            raise ValueError("task and draft cannot be empty")
+        await self.start()
+        reason = getattr(critic, "reason", str(critic))
+        prompt = (
+            "SYSTEM: Popraw odpowiedź na podstawie krytyki. Zwróć tylko "
+            "poprawioną odpowiedź. Nie opisuj procesu korekty.\n\n"
+            f"ZADANIE:\n{task}\n\n"
+            f"POPRZEDNIA ODPOWIEDŹ:\n{draft}\n\n"
+            f"KRYTYKA:\n{reason}\n\n"
+            f"DOWODY TEMPORALNE:\n{evidence or 'brak'}\n\n"
+            "CORRECT"
+        )
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._primary_completion(
+                prompt,
+                max_tokens=self.config.primary_max_tokens,
+                temperature=0.30,
+                top_p=0.90,
+                top_k=40,
+            ),
+        )
+
     async def generate_with_adversarial_gating(
         self,
         prompt: str,
