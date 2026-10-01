@@ -70,6 +70,45 @@ class ExperienceMemoryTests(unittest.TestCase):
             self.assertEqual(context["strategy_stats"]["test_first"]["failures"], 0)
             self.assertEqual(context["historical_snapshot"]["episodic_count"], 1)
 
+    def test_meta_learning_is_context_specific(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            first = memory.start_task("web-1", "refactor frontend UI", "web")
+            memory.record_cognitive_plan(
+                "web-1", "refactor frontend UI",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "refactor", "platform": "web", "architecture": "react"},
+            )
+            memory.record_execution(
+                "web-1", "test",
+                {"ok": True, "exit_code": 0, "diagnostics": []},
+            )
+
+            second = memory.start_task("android-1", "refactor Android UI", "android")
+            memory.record_cognitive_plan(
+                "android-1", "refactor Android UI",
+                ["minimal_patch", "test_first"], "minimal_patch",
+                context={"task_type": "refactor", "platform": "android", "architecture": "compose"},
+            )
+            memory.record_execution(
+                "android-1", "test",
+                {"ok": False, "exit_code": 1, "diagnostics": ["compile failed"]},
+            )
+
+            web = memory.meta_learning_context(
+                {"task_type": "refactor", "platform": "web", "architecture": "react"}
+            )
+            android = memory.meta_learning_context(
+                {"task_type": "refactor", "platform": "android", "architecture": "compose"}
+            )
+
+            self.assertGreater(web["strategy_stats"]["minimal_patch"]["successes"], 0)
+            self.assertEqual(web["strategy_stats"]["minimal_patch"]["failures"], 0)
+            self.assertEqual(android["strategy_stats"]["minimal_patch"]["successes"], 0)
+            self.assertGreater(android["strategy_stats"]["minimal_patch"]["failures"], 0)
+
     def test_records_complete_autonomous_build_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             memory = AgentExperienceMemory(
