@@ -227,8 +227,13 @@ class CognitiveEngine:
             successes = float(stats.get("successes", 0))
             failures = float(stats.get("failures", 0))
             attempts = successes + failures
-            if attempts:
-                historical_bias[strategy] = max(-0.25, min(0.25, (successes - failures) / attempts * 0.25))
+            evidence_count = int(history.get("evidence_count", attempts))
+            if attempts and evidence_count >= 2:
+                confidence = min(1.0, attempts / 5.0)
+                historical_bias[strategy] = max(
+                    -0.25,
+                    min(0.25, ((successes - failures) / attempts) * 0.25 * confidence),
+                )
             else:
                 historical_bias[strategy] = 0.0
 
