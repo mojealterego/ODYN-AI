@@ -188,6 +188,8 @@ class AutonomousBuildOrchestrator:
         result: dict[str, Any],
         *,
         failed_execution_id: int | None = None,
+        decision_cycle_id: str | None = None,
+        decision_memory_id: int | None = None,
     ) -> tuple[dict[str, str], list[dict[str, str]], bool]:
         diagnostics = list(result.get("diagnostics", []))
         failure = (
@@ -219,17 +221,20 @@ class AutonomousBuildOrchestrator:
             decision_cycle_id=decision_cycle_id,
             decision_memory_id=decision_memory_id,
         )
-        decision_cycle_id = decision_id
-        decision_memory_id = self._remember_episode(
+        correction_decision_id = self._remember_episode(
             "record_decision",
             app_id,
             failure,
             edited.get("summary", ""),
             changes,
+            cognitive_strategy=None,
+            decision_cycle_id=decision_cycle_id,
         )
-        self._link_memory(decision_id, correction_id, "corrects")
+        self._link_memory(decision_memory_id, correction_id, "corrects")
+        if decision_memory_id is not None and correction_decision_id is not None:
+            self._link_memory(decision_memory_id, correction_decision_id, "corrects")
         change_ids = self._remember_change_episodes(
-            app_id, changes, decision_id=decision_id
+            app_id, changes, decision_id=correction_decision_id
         )
         for change_id in change_ids:
             self._link_memory(change_id, failed_execution_id, "changed_before")
@@ -294,6 +299,8 @@ class AutonomousBuildOrchestrator:
             stage,
             result_dict,
             failed_execution_id=failed_execution_id,
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
         if not corrected:
             return files, [], result, failed_execution_id
