@@ -216,6 +216,8 @@ class AutonomousBuildOrchestrator:
             diagnostics,
             changes,
             failed_execution_id=failed_execution_id,
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
         decision_id = self._remember_episode(
             "record_decision",
@@ -243,13 +245,17 @@ class AutonomousBuildOrchestrator:
         allow_correction: bool,
         cognitive_task: str | None = None,
         cognitive_parent_id: str | None = None,
+        decision_cycle_id: str | None = None,
+        decision_memory_id: int | None = None,
     ):
         result = await self.execution.execute(
             ExecutionRequest(platform, stage, files, timeout)
         )
         result_dict = self._result_dict(result)
         failed_execution_id = self._remember_episode(
-            "record_execution", app_id, stage, result_dict
+            "record_execution", app_id, stage, result_dict,
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
 
         if result.ok or not allow_correction:
@@ -302,7 +308,9 @@ class AutonomousBuildOrchestrator:
             ExecutionRequest(platform, stage, files, timeout)
         )
         retry_execution_id = self._remember_episode(
-            "record_execution", app_id, f"{stage}_retry", self._result_dict(retry)
+            "record_execution", app_id, f"{stage}_retry", self._result_dict(retry),
+            decision_cycle_id=decision_cycle_id,
+            decision_memory_id=decision_memory_id,
         )
         return files, changes, retry, retry_execution_id
 
@@ -378,14 +386,41 @@ class AutonomousBuildOrchestrator:
         )
         strategy_scores = self._cognitive_strategy_scores(instruction, files, context)
         strategies = ["minimal_patch", "test_first", "architecture"]
-        plan = self.cognitive.plan_build(
+        decision = self.cognitive.decision_cycle(
             instruction,
             strategies,
             lambda _node, action: strategy_scores[action],
-            parent_id=task_node_id,
+            context=meta_context,
             history_context=history_context,
+            critic_result="PASS",
+            parent_id=task_node_id,
         )
-        selected_strategy = plan["selected_strategy"]
+        decision_id = decision.decision_id
+        if decision.rejected or decision.selected_strategy is None:
+            return PipelineResult(
+                app_id, False, changes, {}, None, None,
+                "cognitive_gate",
+                [f"Decision Cycle {decision_id} został odrzucony przez Adversarial Gate."],
+                memory_events,
+                self._cognitive_snapshot(None),
+            )
+        plan = {
+            "root_id": next(
+                node["id"] for node in self.cognitive.snapshot()["nodes"]
+                if node["metadata"].get("decision_id") == decision_id
+                and node["metadata"].get("phase") == "context"
+            ),
+            "branch_ids": [],
+            "selected_id": next(
+                node["id"] for node in self.cognitive.snapshot()["nodes"]
+                if node["metadata"].get("decision_id") == decision_id
+                and node["metadata"].get("phase") == "strategy_selection"
+            ),
+            "selected_strategy": decision.selected_strategy,
+            "history_aware": bool(history_context),
+            "historical_bias": decision.historical_evidence.get("strategy_stats", {}),
+        }
+        selected_strategy = decision.selected_strategy
         history_instruction = ""
         if history_context:
             history_instruction = (
@@ -449,6 +484,7 @@ class AutonomousBuildOrchestrator:
             initial_changes,
             cognitive_strategy=selected_strategy,
             cognitive_node_id=decision_node_id,
+            decision_cycle_id=decision_id,
         )
         if decision_id is not None:
             memory_events.append(decision_id)
@@ -463,6 +499,8 @@ class AutonomousBuildOrchestrator:
             allow_correction=self.max_corrections > 0,
             cognitive_task=instruction,
             cognitive_parent_id=decision_node_id,
+            decision_cycle_id=decision_id,
+            decision_memory_id=decision_id if isinstance(decision_id, int) else None,
         )
         changes.extend(test_changes)
         if test_memory_id is not None:
@@ -503,6 +541,8 @@ class AutonomousBuildOrchestrator:
             "verified",
             build.artifact,
             source_execution_id=build_memory_id,
+            decision_cycle_id=decision_id,
+            decision_memory_id=decision_memory_id,
         )
 
         dgm_result = None
