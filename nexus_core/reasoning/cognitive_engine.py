@@ -32,6 +32,14 @@ class CognitiveEvaluation:
     passed: bool
 
 
+@dataclass(frozen=True)
+class AdversarialGateResult:
+    similarity: float
+    passed: bool
+    rejected: bool
+    reason: str
+
+
 class CognitiveEngine:
     """Graph-of-Thought reasoning, bounded Reflexion and adaptive inference policy."""
 
@@ -84,6 +92,33 @@ class CognitiveEngine:
             raise ValueError("threshold must be between 0 and 1")
         return CognitiveEvaluation(similarity, 1.0 - similarity, similarity >= threshold)
 
+    def adversarial_gate(
+        self,
+        task: str,
+        output: str,
+        *,
+        critic_result: str,
+        state_embedding: Sequence[float],
+        target_embedding: Sequence[float],
+        threshold: float | None = None,
+    ) -> AdversarialGateResult:
+        """Apply deterministic safety/quality gating before accepting a candidate."""
+        evaluation = self.evaluate_embedding(
+            state_embedding, target_embedding, threshold=threshold
+        )
+        critic_upper = critic_result.upper()
+        if any(marker in critic_upper for marker in ("UNSAFE", "REJECT", "INVALID", "FAIL")):
+            return AdversarialGateResult(
+                evaluation.similarity, False, True, "critic_rejected"
+            )
+        if not evaluation.passed:
+            return AdversarialGateResult(
+                evaluation.similarity, False, True, "embedding_below_threshold"
+            )
+        return AdversarialGateResult(
+            evaluation.similarity, True, False, "accepted"
+        )
+
     def add_thought(
         self,
         kind: str,
@@ -110,6 +145,14 @@ class CognitiveEngine:
         return ThoughtNode(
             node_id, data["kind"], data["content"], data.get("score"), dict(data.get("metadata", {}))
         )
+
+    def connect_thought(self, source_id: str, target_id: str, *, relation: str = "derives") -> None:
+        """Connect two thoughts while preserving the Graph-of-Thought DAG invariant."""
+        if source_id not in self.thought_graph or target_id not in self.thought_graph:
+            raise KeyError("Both thought nodes must exist")
+        if source_id == target_id or nx.has_path(self.thought_graph, target_id, source_id):
+            raise ValueError("GoT must remain acyclic")
+        self.thought_graph.add_edge(source_id, target_id, relation=relation)
 
     def branch(self, parent_id: str, alternatives: Sequence[str]) -> list[str]:
         return [self.add_thought("branch", item, parent_id=parent_id) for item in alternatives]
