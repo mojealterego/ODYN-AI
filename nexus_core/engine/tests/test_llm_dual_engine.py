@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from nexus_core.engine.llm_dual_engine import DualModelEngine
+from nexus_core.engine.llm_dual_engine import DualModelConfig, DualModelEngine
 
 
 class FakeLlama:
