@@ -156,6 +156,7 @@ class BitemporalMemoryNode:
                 );
                 """
             )
+            self._migrate_procedural_projection()
 
     def _migrate_legacy_schema(self) -> None:
         """Upgrade the original single transaction-time schema in place.
@@ -185,6 +186,35 @@ class BitemporalMemoryNode:
         if "transaction_time_end" not in columns:
             self.conn.execute(
                 "ALTER TABLE episodic_memory ADD COLUMN transaction_time_end TEXT"
+            )
+
+    def _migrate_procedural_projection(self) -> None:
+        """Backfill legacy current skills into the versioned store."""
+        rows = self.conn.execute(
+            """
+            SELECT p.skill_name, p.code_reference, p.fitness_score, p.last_updated
+            FROM procedural_memory p
+            LEFT JOIN procedural_memory_versions v ON v.skill_name = p.skill_name
+            WHERE v.id IS NULL
+            """
+        ).fetchall()
+        for row in rows:
+            tx = row["last_updated"] or _iso(self._now())
+            self.conn.execute(
+                """
+                INSERT OR IGNORE INTO procedural_memory_versions (
+                    skill_name, code_reference, fitness_score,
+                    valid_time_start, valid_time_end,
+                    transaction_time_start, transaction_time_end
+                ) VALUES (?, ?, ?, ?, NULL, ?, NULL)
+                """,
+                (
+                    row["skill_name"],
+                    row["code_reference"],
+                    float(row["fitness_score"]),
+                    tx,
+                    tx,
+                ),
             )
 
     def _now(self) -> datetime:
