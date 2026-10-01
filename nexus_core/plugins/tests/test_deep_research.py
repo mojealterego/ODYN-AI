@@ -23,7 +23,7 @@ class FakeDDGS:
 
 class DeepResearchTests(unittest.TestCase):
     def test_async_search_normalizes_and_deduplicates_urls(self):
-        async def factory():
+        def factory():
             return FakeDDGS({
                 "odyn": [
                     {"title": "A", "href": "https://example.com/a", "body": "first"},
@@ -41,7 +41,7 @@ class DeepResearchTests(unittest.TestCase):
     def test_pdf_query_is_scoped(self):
         seen = []
 
-        async def factory():
+        def factory():
             class Capture(FakeDDGS):
                 async def text(self, query, max_results=5, **kwargs):
                     seen.append(query)
