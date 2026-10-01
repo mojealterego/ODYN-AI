@@ -60,6 +60,31 @@ class CognitiveEngineTests(unittest.TestCase):
             )
         )
 
+    def test_history_aware_plan_applies_historical_strategy_bias(self) -> None:
+        engine = CognitiveEngine()
+        plan = engine.plan_build(
+            "build app",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 0.80,
+            history_context={
+                "strategy_stats": {
+                    "minimal_patch": {"successes": 0, "failures": 2},
+                    "test_first": {"successes": 2, "failures": 0},
+                },
+                "historical_snapshot": {"transaction_at": "2026-04-01T00:00:00+00:00"},
+            },
+        )
+
+        self.assertEqual(plan["selected_strategy"], "test_first")
+        self.assertTrue(plan["history_aware"])
+        self.assertGreater(plan["historical_bias"]["test_first"], plan["historical_bias"]["minimal_patch"])
+        snapshot = engine.snapshot()
+        cognitive_plan = next(node for node in snapshot["nodes"] if node["kind"] == "cognitive_plan")
+        self.assertEqual(
+            cognitive_plan["metadata"]["historical_snapshot"]["transaction_at"],
+            "2026-04-01T00:00:00+00:00",
+        )
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
