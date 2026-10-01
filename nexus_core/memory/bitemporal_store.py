@@ -650,6 +650,17 @@ class BitemporalMemoryNode:
                 )
         return len(rows)
 
+    def get_archived_payload(self, episode_id: int) -> dict[str, Any]:
+        """Decompress and return an archived episode payload."""
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT payload_gzip FROM memory_archive WHERE episode_id = ?",
+                (episode_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Episode {episode_id} is not archived")
+        return json.loads(gzip.decompress(row["payload_gzip"]).decode("utf-8"))
+
     def archived_count(self) -> int:
         with self._lock:
             row = self.conn.execute("SELECT COUNT(*) AS count FROM memory_archive").fetchone()
