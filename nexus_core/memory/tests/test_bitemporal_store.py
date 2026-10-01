@@ -78,3 +78,53 @@ def test_archive_compresses_payload_without_deleting_source(tmp_path):
     assert archived == 1
     assert store.get_episode(record.id).payload == {"large": "x" * 100}
     assert store.archived_count() == 1
+
+
+def test_migrates_legacy_transaction_time_schema(tmp_path):
+    import sqlite3
+
+    db = tmp_path / "legacy.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE episodic_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT,
+            event_type TEXT,
+            payload TEXT,
+            valid_time_start DATETIME,
+            valid_time_end DATETIME,
+            transaction_time DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO episodic_memory
+        (agent_id, event_type, payload, valid_time_start, transaction_time)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("odyn", "legacy", '{"value":"kept"}', "2026-01-01T00:00:00+00:00", "2026-01-02T00:00:00+00:00"),
+    )
+    conn.commit()
+    conn.close()
+
+    store = BitemporalMemoryNode(str(db))
+    recovered = store.point_in_time_recovery(
+        datetime(2026, 1, 3, tzinfo=timezone.utc)
+    )
+
+    assert [item.payload for item in recovered] == [{"value": "kept"}]
+
+
+def test_working_memory_consolidation_is_atomic(tmp_path):
+    store = BitemporalMemoryNode(str(tmp_path / "memory.db"))
+
+    store.update_working_memory("first", {"value": 1})
+    store.update_working_memory("second", {"value": 2})
+
+    records = store.commit_to_long_term_archive()
+
+    assert {item.payload["key"] for item in records} == {"first", "second"}
+    assert {item.payload["value"] for item in records} == {1, 2}
+    assert store.working_memory == {}
