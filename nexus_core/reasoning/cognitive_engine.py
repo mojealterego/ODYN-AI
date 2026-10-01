@@ -56,7 +56,17 @@ class DecisionCycle:
     status: str
 
 
-    @property\n    def rejected(self) -> bool:\n        """Backward-compatible view of the adversarial gate decision."""\n        return self.gate.rejected\n\n    @property\n    def accepted(self) -> bool:\n        return self.gate.passed and not self.gate.rejected\n\n\nclass CognitiveEngine:
+    @property
+    def rejected(self) -> bool:
+        """Backward-compatible view of the adversarial gate decision."""
+        return self.gate.rejected
+
+    @property
+    def accepted(self) -> bool:
+        return self.gate.passed and not self.gate.rejected
+
+
+class CognitiveEngine:
     """Graph-of-Thought reasoning, bounded Reflexion and adaptive inference policy."""
 
     def __init__(
