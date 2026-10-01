@@ -67,6 +67,7 @@ class DualModelEngine:
         self.last_evaluation = ""
         self.last_rejected = False
         self.last_gate_reason = "not_run"
+        self._start_lock = asyncio.Lock()
 
     @staticmethod
     def _default_llama_factory() -> LlamaFactory:
@@ -83,15 +84,18 @@ class DualModelEngine:
         return self._llama_factory or self._default_llama_factory()
 
     async def start(self) -> None:
-        """Load both GGUF models without blocking the asyncio event loop."""
+        """Load both GGUF models without blocking or duplicating startup."""
         if self.primary is not None and self.critic is not None:
             return
 
-        loop = asyncio.get_running_loop()
-        self.primary, self.critic = await asyncio.gather(
-            loop.run_in_executor(None, self._load_primary),
-            loop.run_in_executor(None, self._load_critic),
-        )
+        async with self._start_lock:
+            if self.primary is not None and self.critic is not None:
+                return
+            loop = asyncio.get_running_loop()
+            self.primary, self.critic = await asyncio.gather(
+                loop.run_in_executor(None, self._load_primary),
+                loop.run_in_executor(None, self._load_critic),
+            )
 
     def _load_primary(self) -> Any:
         return self.llama_factory(
@@ -195,20 +199,12 @@ class DualModelEngine:
         )
 
         gate_prompt = (
-            "SYSTEM: Oceń odpowiedź.
-"
+            "SYSTEM: Oceń odpowiedź.\n"
             "Sprawdź bezpieczeństwo, błędy faktograficzne, błędy logiczne "
             "i zgodność z zadaniem. Jeśli występuje problem krytyczny, użyj "
-            "jednoznacznie słowa ODRZUCONO lub BŁĄD KRYTYCZNY.
-
-"
-            f"ZADANIE:
-{prompt}
-
-"
-            f"ODPOWIEDŹ:
-{draft}
-"
+            "jednoznacznie słowa ODRZUCONO lub BŁĄD KRYTYCZNY.\n\n"
+            f"ZADANIE:\n{prompt}\n\n"
+            f"ODPOWIEDŹ:\n{draft}\n"
         )
         evaluation = await loop.run_in_executor(
             None,
