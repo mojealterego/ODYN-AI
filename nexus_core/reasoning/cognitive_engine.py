@@ -55,17 +55,8 @@ class DecisionCycle:
     phases: tuple[str, ...]
     status: str
 
-    @property
-    def rejected(self) -> bool:
-        """Backward-compatible view of the adversarial gate decision."""
-        return self.gate.rejected
 
-    @property
-    def accepted(self) -> bool:
-        return self.gate.passed and not self.gate.rejected
-
-
-class CognitiveEngine:
+    @property\n    def rejected(self) -> bool:\n        """Backward-compatible view of the adversarial gate decision."""\n        return self.gate.rejected\n\n    @property\n    def accepted(self) -> bool:\n        return self.gate.passed and not self.gate.rejected\n\n\nclass CognitiveEngine:
     """Graph-of-Thought reasoning, bounded Reflexion and adaptive inference policy."""
 
     def __init__(
@@ -133,10 +124,16 @@ class CognitiveEngine:
         )
         critic_upper = critic_result.upper()
         if any(marker in critic_upper for marker in ("UNSAFE", "REJECT", "INVALID", "FAIL")):
-            return AdversarialGateResult(evaluation.similarity, False, True, "critic_rejected")
+            return AdversarialGateResult(
+                evaluation.similarity, False, True, "critic_rejected"
+            )
         if not evaluation.passed:
-            return AdversarialGateResult(evaluation.similarity, False, True, "embedding_below_threshold")
-        return AdversarialGateResult(evaluation.similarity, True, False, "accepted")
+            return AdversarialGateResult(
+                evaluation.similarity, False, True, "embedding_below_threshold"
+            )
+        return AdversarialGateResult(
+            evaluation.similarity, True, False, "accepted"
+        )
 
     def add_thought(
         self,
@@ -166,6 +163,7 @@ class CognitiveEngine:
         )
 
     def connect_thought(self, source_id: str, target_id: str, *, relation: str = "derives") -> None:
+        """Connect two thoughts while preserving the Graph-of-Thought DAG invariant."""
         if source_id not in self.thought_graph or target_id not in self.thought_graph:
             raise KeyError("Both thought nodes must exist")
         if source_id == target_id or nx.has_path(self.thought_graph, target_id, source_id):
@@ -185,6 +183,13 @@ class CognitiveEngine:
         opponent_actions_fn: Callable[[str], Sequence[str]] | None = None,
         rollout_fn: Callable[[str], float] | None = None,
     ) -> str:
+        """Select an action with bounded alpha-beta search over a GoT branch.
+
+        With depth=1 this is the deterministic fitness selector used by the
+        original API. With deeper search, optional opponent branches and
+        rollouts provide a bounded adversarial tree search; it is deliberately
+        deterministic and does not pretend to be a stochastic full MCTS.
+        """
         if current_node not in self.thought_graph:
             raise KeyError(f"Unknown current node: {current_node}")
         if not possible_actions:
@@ -192,19 +197,13 @@ class CognitiveEngine:
         if depth < 1:
             raise ValueError("depth must be >= 1")
 
-        def evaluate(
-            node: str,
-            actions: Sequence[str],
-            remaining: int,
-            alpha: float,
-            beta: float,
-            maximizing: bool,
-        ) -> float:
+        def evaluate(node: str, actions: Sequence[str], remaining: int, alpha: float, beta: float, maximizing: bool) -> float:
             if not actions:
                 return float(rollout_fn(node) if rollout_fn else 0.0)
             if remaining <= 1:
                 values = [float(fitness_fn(node, action)) for action in actions]
                 return max(values) if maximizing else min(values)
+            values: list[float] = []
             if maximizing:
                 value = -float("inf")
                 for action in actions:
@@ -251,7 +250,10 @@ class CognitiveEngine:
                 )
                 replies = list(opponent_actions_fn(action))
                 if replies:
-                    score = evaluate(node_id, replies, depth - 1, -float("inf"), float("inf"), False)
+                    score = evaluate(
+                        node_id, replies, depth - 1,
+                        -float("inf"), float("inf"), False
+                    )
             if score > best_score:
                 best_action, best_score = action, score
 
@@ -275,6 +277,7 @@ class CognitiveEngine:
         parent_id: str | None = None,
         search_depth: int = 1,
     ) -> DecisionCycle:
+        """Run the bounded Decision Cycle 2.0 as one causal reasoning unit."""
         if not strategies:
             raise ValueError("strategies cannot be empty")
         decision_id = f"decision_{self.decision_cycle_count}_{self.thought_graph.number_of_nodes()}"
@@ -283,48 +286,76 @@ class CognitiveEngine:
         target_embedding = target_embedding if target_embedding is not None else [1.0]
 
         phases = (
-            "context", "candidate_strategies", "historical_evidence",
-            "got_evaluation", "adversarial_gate", "strategy_selection",
+            "context",
+            "candidate_strategies",
+            "historical_evidence",
+            "got_evaluation",
+            "adversarial_gate",
+            "strategy_selection",
         )
         root_id = self.add_thought(
-            "decision_cycle", task, parent_id=parent_id,
+            "decision_cycle",
+            task,
+            parent_id=parent_id,
             metadata={"decision_id": decision_id, "phase": "context", "context": dict(context)},
         )
         candidate_id = self.add_thought(
-            "candidate_strategies", ", ".join(strategies), parent_id=root_id,
+            "candidate_strategies",
+            ", ".join(strategies),
+            parent_id=root_id,
             metadata={"decision_id": decision_id, "phase": "candidate_strategies"},
         )
         evidence_id = self.add_thought(
-            "historical_evidence", "contextual strategy evidence", parent_id=candidate_id,
+            "historical_evidence",
+            "contextual strategy evidence",
+            parent_id=candidate_id,
             metadata={
-                "decision_id": decision_id, "phase": "historical_evidence",
+                "decision_id": decision_id,
+                "phase": "historical_evidence",
                 "strategy_stats": history.get("strategy_stats", {}),
                 "evidence_count": history.get("evidence_count", 0),
                 "weighted_evidence": history.get("weighted_evidence", 0.0),
             },
         )
-        base_scores = {strategy: float(fitness_fn(evidence_id, strategy)) for strategy in strategies}
+
+        base_scores = {
+            strategy: float(fitness_fn(evidence_id, strategy))
+            for strategy in strategies
+        }
         plan = self.plan_build(
-            task, strategies, lambda _node, action: base_scores[action],
-            parent_id=evidence_id, history_context=history,
+            task,
+            strategies,
+            lambda _node, action: base_scores[action],
+            parent_id=evidence_id,
+            history_context=history,
         )
         got_scores = {
             strategy: float(base_scores[strategy] + plan["historical_bias"].get(strategy, 0.0))
             for strategy in strategies
         }
         got_id = self.add_thought(
-            "got_evaluation", "strategy fitness evaluated", parent_id=evidence_id,
+            "got_evaluation",
+            "strategy fitness evaluated",
+            parent_id=evidence_id,
             metadata={"decision_id": decision_id, "phase": "got_evaluation", "scores": got_scores},
         )
         gate = self.adversarial_gate(
-            task, task, critic_result=critic_result,
-            state_embedding=state_embedding, target_embedding=target_embedding,
+            task,
+            task,
+            critic_result=critic_result,
+            state_embedding=state_embedding,
+            target_embedding=target_embedding,
         )
         gate_id = self.add_thought(
-            "adversarial_gate", gate.reason, parent_id=got_id,
+            "adversarial_gate",
+            gate.reason,
+            parent_id=got_id,
             metadata={
-                "decision_id": decision_id, "phase": "adversarial_gate",
-                "similarity": gate.similarity, "passed": gate.passed, "rejected": gate.rejected,
+                "decision_id": decision_id,
+                "phase": "adversarial_gate",
+                "similarity": gate.similarity,
+                "passed": gate.passed,
+                "rejected": gate.rejected,
             },
         )
         if not gate.passed:
@@ -335,10 +366,16 @@ class CognitiveEngine:
             )
 
         selected = self.ab_mcts_step(
-            got_id, strategies, lambda _node, action: got_scores[action], depth=search_depth,
+            got_id,
+            strategies,
+            lambda _node, action: got_scores[action],
+            depth=search_depth,
         )
         selection_id = self.add_thought(
-            "strategy_selection", selected, parent_id=gate_id, score=got_scores[selected],
+            "strategy_selection",
+            selected,
+            parent_id=gate_id,
+            score=got_scores[selected],
             metadata={"decision_id": decision_id, "phase": "strategy_selection"},
         )
         self.decision_cycle_count += 1
@@ -348,25 +385,45 @@ class CognitiveEngine:
         )
 
     def record_decision_outcome(
-        self, cycle: DecisionCycle, *, outcome: str, execution_id: int | None = None,
+        self,
+        cycle: DecisionCycle,
+        *,
+        outcome: str,
+        execution_id: int | None = None,
         correction: bool = False,
     ) -> str:
+        """Close a Decision Cycle with an explicit outcome node."""
         if cycle.status != "selected":
             raise ValueError("Only a selected Decision Cycle can be closed")
         if not outcome.strip():
             raise ValueError("outcome cannot be empty")
-        return self.add_thought(
-            "decision_outcome", outcome, parent_id=cycle.selected_node_id,
+        outcome_id = self.add_thought(
+            "decision_outcome",
+            outcome,
+            parent_id=cycle.selected_node_id,
             metadata={
-                "decision_id": cycle.decision_id, "phase": "outcome",
-                "execution_id": execution_id, "correction": correction, "status": "completed",
+                "decision_id": cycle.decision_id,
+                "phase": "outcome",
+                "execution_id": execution_id,
+                "correction": correction,
+                "status": "completed",
             },
         )
+        return outcome_id
 
     def plan_build(
-        self, task: str, strategies: Sequence[str], fitness_fn: Callable[[str, str], float],
-        *, parent_id: str | None = None, history_context: dict[str, Any] | None = None,
+        self,
+        task: str,
+        strategies: Sequence[str],
+        fitness_fn: Callable[[str, str], float],
+        *,
+        parent_id: str | None = None,
+        history_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Create a bounded build strategy graph and select one strategy.
+
+        The graph stores compact decision summaries, not hidden chain-of-thought.
+        """
         if not strategies:
             raise ValueError("strategies cannot be empty")
         history = dict(history_context or {})
@@ -381,15 +438,19 @@ class CognitiveEngine:
             if attempts and evidence_count >= 2:
                 confidence = min(1.0, attempts / 5.0)
                 historical_bias[strategy] = max(
-                    -0.25, min(0.25, ((successes - failures) / attempts) * 0.25 * confidence)
+                    -0.25,
+                    min(0.25, ((successes - failures) / attempts) * 0.25 * confidence),
                 )
             else:
                 historical_bias[strategy] = 0.0
 
         root_id = self.add_thought(
-            "cognitive_plan", task, parent_id=parent_id,
+            "cognitive_plan",
+            task,
+            parent_id=parent_id,
             metadata={
-                "strategy_count": len(strategies), "history_aware": bool(history),
+                "strategy_count": len(strategies),
+                "history_aware": bool(history),
                 "historical_bias": historical_bias,
                 "historical_snapshot": history.get("historical_snapshot"),
             },
@@ -399,10 +460,16 @@ class CognitiveEngine:
             strategy: float(fitness_fn(root_id, strategy)) + historical_bias.get(strategy, 0.0)
             for strategy in strategies
         }
-        selected = self.ab_mcts_step(root_id, strategies, lambda _node, action: branch_scores[action])
+        selected = self.ab_mcts_step(
+            root_id,
+            strategies,
+            lambda _node, action: branch_scores[action],
+        )
         selected_index = list(strategies).index(selected)
         selected_id = self.add_thought(
-            "selected_strategy", selected, parent_id=branch_ids[selected_index],
+            "selected_strategy",
+            selected,
+            parent_id=branch_ids[selected_index],
             score=branch_scores[selected],
             metadata={
                 "alternatives": list(strategies),
@@ -412,27 +479,45 @@ class CognitiveEngine:
         )
         self.decision_cycle_count += 1
         return {
-            "root_id": root_id, "branch_ids": branch_ids, "selected_id": selected_id,
-            "selected_strategy": selected, "history_aware": bool(history),
+            "root_id": root_id,
+            "branch_ids": branch_ids,
+            "selected_id": selected_id,
+            "selected_strategy": selected,
+            "history_aware": bool(history),
             "historical_bias": historical_bias,
         }
 
-    def record_reflexion(self, task: str, failure: str, *, parent_id: str | None = None) -> str:
+    def record_reflexion(
+        self,
+        task: str,
+        failure: str,
+        *,
+        parent_id: str | None = None,
+    ) -> str:
+        """Record a compact failure -> reflection node in the decision graph."""
         if parent_id is None:
             parent_id = self.add_thought("failure", failure, metadata={"task": task})
         reflection_id = self.add_thought(
-            "reflexion", failure, parent_id=parent_id, metadata={"task": task},
+            "reflexion",
+            failure,
+            parent_id=parent_id,
+            metadata={"task": task},
         )
         self.decision_cycle_count += 1
         return reflection_id
 
     def reflexion_loop(
-        self, task: str, initial_output: str, critic_model: CriticModel, *,
+        self,
+        task: str,
+        initial_output: str,
+        critic_model: CriticModel,
+        *,
         max_reflections: int | None = None,
     ) -> str:
         limit = self.max_reflections if max_reflections is None else max_reflections
         if limit < 0:
             raise ValueError("max_reflections cannot be negative")
+
         parent_id = self.add_thought("attempt", initial_output, metadata={"task": task})
         current = initial_output
         for reflection_index in range(limit + 1):
@@ -442,7 +527,10 @@ class CognitiveEngine:
                 metadata={"reflection": reflection_index},
             )
             self.decision_cycle_count += 1
-            rejected = any(marker in critique.upper() for marker in ("FAIL", "REJECT", "UNSAFE", "INVALID"))
+            rejected = any(
+                marker in critique.upper()
+                for marker in ("FAIL", "REJECT", "UNSAFE", "INVALID")
+            )
             if not rejected or reflection_index == limit:
                 return current
             current = critic_model.correct(task, current, critique)
@@ -467,8 +555,11 @@ class CognitiveEngine:
             "decision_cycle_count": self.decision_cycle_count,
             "nodes": [
                 {
-                    "id": node_id, "kind": data["kind"], "content": data["content"],
-                    "score": data.get("score"), "metadata": dict(data.get("metadata", {})),
+                    "id": node_id,
+                    "kind": data["kind"],
+                    "content": data["content"],
+                    "score": data.get("score"),
+                    "metadata": dict(data.get("metadata", {})),
                 }
                 for node_id, data in self.thought_graph.nodes(data=True)
             ],
