@@ -2,11 +2,23 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from datetime import datetime
+from typing import Any, Callable, Protocol, Sequence
 
 from nexus_core.reasoning.cognitive_engine import AdversarialGateResult, CognitiveEngine, DecisionCycle
 
 from .llm_dual_engine import DualModelEngine
+
+
+class TemporalEvidenceRetriever(Protocol):
+    def retrieve(
+        self,
+        query: str,
+        *,
+        valid_at: datetime,
+        transaction_at: datetime,
+        top_k: int = 8,
+    ) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -70,9 +82,11 @@ class CognitiveInferencePipeline:
         dual_engine: DualModelEngine,
         *,
         cognitive_engine: CognitiveEngine | None = None,
+        temporal_retriever: TemporalEvidenceRetriever | None = None,
     ) -> None:
         self.dual = dual_engine
         self.cognitive = cognitive_engine or CognitiveEngine()
+        self.temporal_retriever = temporal_retriever
 
     async def _critic(self, task: str, draft: str) -> CriticResult:
         raw = await self.dual.evaluate_critic(task, draft)
@@ -95,6 +109,8 @@ class CognitiveInferencePipeline:
         strategies: Sequence[str],
         fitness_fn: Callable[[str, str], float],
         temporal_evidence: str = "",
+        temporal_valid_at: datetime | None = None,
+        temporal_transaction_at: datetime | None = None,
         state_embedding: Sequence[float] = (1.0,),
         target_embedding: Sequence[float] = (1.0,),
         max_reflections: int = 1,
@@ -109,6 +125,18 @@ class CognitiveInferencePipeline:
 
         await self.dual.start()
         evidence = temporal_evidence.strip()
+        if self.temporal_retriever is not None:
+            if temporal_valid_at is None or temporal_transaction_at is None:
+                raise ValueError(
+                    "temporal_valid_at and temporal_transaction_at are required "
+                    "when temporal_retriever is configured"
+                )
+            temporal_result = self.temporal_retriever.retrieve(
+                task,
+                valid_at=temporal_valid_at,
+                transaction_at=temporal_transaction_at,
+            )
+            evidence = str(getattr(temporal_result, "rag_context", "")).strip()
         context = evidence if evidence else "[TEMPORAL EVIDENCE]: none"
 
         draft = await self.dual.generate_primary(
