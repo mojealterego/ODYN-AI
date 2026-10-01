@@ -120,6 +120,34 @@ class CognitiveEngineTests(unittest.TestCase):
         )
         self.assertEqual(plan["historical_bias"]["minimal_patch"], 0.0)
 
+
+    def test_adversarial_gate_combines_critic_and_embedding(self) -> None:
+        engine = CognitiveEngine(evaluation_threshold=0.8)
+        result = engine.adversarial_gate(
+            "task", "output", critic_result="PASS",
+            state_embedding=[1, 0], target_embedding=[0.95, 0.1],
+        )
+        self.assertTrue(result.passed)
+        self.assertFalse(result.rejected)
+        self.assertAlmostEqual(result.similarity, engine.jepa_evaluate_embedding([1, 0], [0.95, 0.1]))
+
+    def test_adversarial_gate_rejects_unsafe_critic_even_with_good_embedding(self) -> None:
+        engine = CognitiveEngine(evaluation_threshold=0.8)
+        result = engine.adversarial_gate(
+            "task", "output", critic_result="UNSAFE: reject",
+            state_embedding=[1, 0], target_embedding=[1, 0],
+        )
+        self.assertFalse(result.passed)
+        self.assertTrue(result.rejected)
+        self.assertEqual(result.reason, "critic_rejected")
+
+    def test_graph_rejects_cycle_edges(self) -> None:
+        engine = CognitiveEngine()
+        root = engine.add_thought("root", "task")
+        child = engine.add_thought("child", "step", parent_id=root)
+        with self.assertRaises(ValueError):
+            engine.connect_thought(child, root)
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
