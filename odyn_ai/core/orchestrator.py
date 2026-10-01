@@ -403,7 +403,7 @@ class AutonomousBuildOrchestrator:
             critic_result="PASS",
             parent_id=task_node_id,
         )
-        decision_id = decision.decision_id
+        decision_cycle_id = decision.decision_id
         if decision.rejected or decision.selected_strategy is None:
             return PipelineResult(
                 app_id, False, changes, {}, None, None,
@@ -413,7 +413,7 @@ class AutonomousBuildOrchestrator:
                 self._cognitive_snapshot(None),
             )
         plan = {
-            "root_id": decision.decision_id,
+            "root_id": decision.root_node_id,
             "branch_ids": list(decision.branch_ids),
             "selected_id": decision.selected_node_id,
             "selected_strategy": decision.selected_strategy,
@@ -476,7 +476,7 @@ class AutonomousBuildOrchestrator:
             parent_id=plan["selected_id"],
             metadata={"strategy": selected_strategy},
         )
-        decision_id = self._remember_episode(
+        decision_memory_id = self._remember_episode(
             "record_decision",
             app_id,
             selected_instruction,
