@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from nexus_core.memory import BitemporalMemoryNode, MemoryEpisode
+from nexus_core.memory.temporal_rag import TemporalRAGResult, TemporalRAGRetriever
 
 from odyn_ai.core.rag_memory import RAGMemoryEngine
 
@@ -24,6 +25,26 @@ class AgentExperienceMemory:
         )
         self.rag = rag
         self._last_task_id: int | None = None
+
+    def temporal_retrieve(
+        self,
+        query: str,
+        *,
+        valid_at: datetime,
+        transaction_at: datetime,
+        top_k: int = 8,
+        event_types: tuple[str, ...] | None = None,
+        decision_cycle_id: str | None = None,
+    ) -> TemporalRAGResult:
+        """Retrieve memory constrained by world-time and knowledge-time."""
+        return TemporalRAGRetriever(self.store, rag=self.rag).retrieve(
+            query,
+            valid_at=valid_at,
+            transaction_at=transaction_at,
+            top_k=top_k,
+            event_types=event_types,
+            decision_cycle_id=decision_cycle_id,
+        )
 
     def remember(
         self,
