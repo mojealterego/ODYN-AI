@@ -389,53 +389,142 @@ class AgentExperienceMemory:
         )
         return round(max(0.0, min(1.0, stress)), 4)
 
+    @staticmethod
+    def _context_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
+        """Return deterministic weighted similarity in [0, 1]."""
+        weights = {"task_type": 0.40, "platform": 0.30, "architecture": 0.30}
+        related = {
+            "platform": [{"web", "browser"}, {"android", "mobile"}, {"ios", "mobile"}],
+            "architecture": [
+                {"react", "vue", "frontend"},
+                {"android", "compose"},
+                {"python", "fastapi", "django"},
+            ],
+        }
+        score = 0.0
+        weight_total = 0.0
+        for key, weight in weights.items():
+            left_value = str(left.get(key, "")).strip().lower()
+            right_value = str(right.get(key, "")).strip().lower()
+            if not left_value or not right_value:
+                continue
+            weight_total += weight
+            if left_value == right_value:
+                score += weight
+            elif any(
+                left_value in family and right_value in family
+                for family in related.get(key, [])
+            ):
+                score += weight * 0.75
+        return round(score / weight_total, 4) if weight_total else 0.0
+
+    @staticmethod
+    def _task_window(
+        events: list[MemoryEpisode],
+        plan: MemoryEpisode,
+    ) -> list[MemoryEpisode]:
+        """Return only events belonging to the task that owns the plan."""
+        task_starts = [
+            event for event in events
+            if event.event_type == "task_started"
+            and event.transaction_time_start <= plan.transaction_time_start
+        ]
+        if not task_starts:
+            return []
+        task_start = task_starts[-1]
+        next_task = next(
+            (
+                event for event in events
+                if event.event_type == "task_started"
+                and event.transaction_time_start > task_start.transaction_time_start
+            ),
+            None,
+        )
+        app_id = str(plan.payload.get("app_id", ""))
+        return [
+            event for event in events
+            if event.transaction_time_start > plan.transaction_time_start
+            and (next_task is None or event.transaction_time_start < next_task.transaction_time_start)
+            and (not app_id or str(event.payload.get("app_id", "")) == app_id)
+        ]
+
     def meta_learning_context(
         self,
         context: dict[str, Any],
         *,
         recent_limit: int = 64,
+        min_similarity: float = 0.5,
     ) -> dict[str, Any]:
-        """Estimate strategy outcomes for a specific task/platform context."""
+        """Estimate strategy outcomes using similarity-weighted contextual evidence."""
         if recent_limit < 1:
             raise ValueError("recent_limit must be >= 1")
-        wanted = {str(key): str(value) for key, value in context.items() if value is not None}
+        if not 0.0 <= min_similarity <= 1.0:
+            raise ValueError("min_similarity must be between 0 and 1")
+
+        wanted = {
+            str(key): str(value).strip().lower()
+            for key, value in context.items()
+            if value is not None
+        }
+        events = self.store.query(agent_id="odyn_orchestrator")
         plans = [
-            episode for episode in self.store.query(agent_id="odyn_orchestrator")
+            episode for episode in events
             if episode.event_type == "cognitive_plan"
-            and all(str(episode.payload.get("context", {}).get(key)) == value for key, value in wanted.items())
+            and episode.payload.get("selected_strategy")
         ][-recent_limit:]
 
-        stats: dict[str, dict[str, int]] = {}
+        stats: dict[str, dict[str, float]] = {}
         evidence: list[dict[str, Any]] = []
-        events = self.store.query(agent_id="odyn_orchestrator")
+        ignored_evidence = 0
+
         for plan in plans:
-            strategy = str(plan.payload.get("selected_strategy", ""))
+            source_context = {
+                str(key): str(value).strip().lower()
+                for key, value in plan.payload.get("context", {}).items()
+                if value is not None
+            }
+            similarity = self._context_similarity(wanted, source_context)
+            if similarity < min_similarity:
+                ignored_evidence += 1
+                continue
+
+            strategy = str(plan.payload.get("selected_strategy", "")).strip()
             if not strategy:
                 continue
-            later = [event for event in events if event.transaction_time_start > plan.transaction_time_start]
-            outcome = None
-            for event in later:
-                if event.event_type == "successful_procedure":
-                    outcome = "success"
-                    break
-                if event.event_type.endswith("_result") and event.payload.get("ok") is False:
-                    outcome = "failure"
-                    break
-            if outcome is None:
+
+            window = self._task_window(events, plan)
+            if any(event.event_type == "successful_procedure" for event in window):
+                outcome = "success"
+            elif any(
+                event.event_type.endswith("_result")
+                and event.payload.get("ok") is False
+                for event in window
+            ):
+                outcome = "failure"
+            else:
                 continue
-            item = stats.setdefault(strategy, {"successes": 0, "failures": 0})
-            item["successes" if outcome == "success" else "failures"] += 1
+
+            item = stats.setdefault(strategy, {"successes": 0.0, "failures": 0.0})
+            item["successes" if outcome == "success" else "failures"] += similarity
             evidence.append({
                 "strategy": strategy,
                 "outcome": outcome,
+                "similarity": similarity,
+                "weight": similarity,
                 "transaction_time": plan.transaction_time_start.isoformat(),
+                "context": source_context,
             })
 
+        evidence.sort(key=lambda item: item["transaction_time"])
+        weighted_evidence = sum(item["weight"] for item in evidence)
         return {
             "context": wanted,
             "strategy_stats": stats,
             "evidence": evidence[-recent_limit:],
             "evidence_count": len(evidence),
+            "weighted_evidence": round(weighted_evidence, 4),
+            "ignored_evidence_count": ignored_evidence,
+            "min_similarity": min_similarity,
         }
 
     def history_context(
