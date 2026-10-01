@@ -91,6 +91,7 @@ class AgentExperienceMemory:
         *,
         cognitive_node_id: str | None = None,
         environmental_stress: float | None = None,
+        context: dict[str, Any] | None = None,
     ) -> MemoryEpisode:
         return self.remember_and_index(
             "cognitive_plan",
@@ -101,12 +102,43 @@ class AgentExperienceMemory:
                 "selected_strategy": selected_strategy,
                 "cognitive_node_id": cognitive_node_id,
                 "environmental_stress": environmental_stress,
+                "context": dict(context or {}),
             },
             text=(
                 f"Plan kognitywny dla {app_id}: wybrano {selected_strategy}. "
                 f"Alternatywy: {', '.join(strategies)}."
             ),
         )
+
+    @staticmethod
+    def infer_task_context(task: str, platform: str, files: dict[str, str] | None = None) -> dict[str, Any]:
+        """Derive stable, non-sensitive features used to scope meta-learning."""
+        text = task.lower()
+        files = files or {}
+        paths = " ".join(files).lower()
+        if any(word in text for word in ("bug", "fix", "napraw", "error", "failure", "błąd")):
+            task_type = "bugfix"
+        elif any(word in text for word in ("refactor", "redesign", "architekt", "przebud")):
+            task_type = "refactor"
+        elif any(word in text for word in ("feature", "dodaj", "add", "implement", "wdroż")):
+            task_type = "feature"
+        else:
+            task_type = "general"
+
+        if platform == "android" or "build.gradle" in paths or "androidmanifest" in paths:
+            architecture = "android"
+        elif any(token in paths for token in ("react", "tsx", "vite", "next.config")):
+            architecture = "react"
+        elif "pyproject.toml" in paths or any(token in paths for token in (".py", "fastapi", "django")):
+            architecture = "python"
+        else:
+            architecture = "unknown"
+
+        return {
+            "platform": platform,
+            "task_type": task_type,
+            "architecture": architecture,
+        }
 
     def record_cognitive_strategy(
         self,
@@ -356,6 +388,55 @@ class AgentExperienceMemory:
             - 0.15 * success_rate
         )
         return round(max(0.0, min(1.0, stress)), 4)
+
+    def meta_learning_context(
+        self,
+        context: dict[str, Any],
+        *,
+        recent_limit: int = 64,
+    ) -> dict[str, Any]:
+        """Estimate strategy outcomes for a specific task/platform context."""
+        if recent_limit < 1:
+            raise ValueError("recent_limit must be >= 1")
+        wanted = {str(key): str(value) for key, value in context.items() if value is not None}
+        plans = [
+            episode for episode in self.store.query(agent_id="odyn_orchestrator")
+            if episode.event_type == "cognitive_plan"
+            and all(str(episode.payload.get("context", {}).get(key)) == value for key, value in wanted.items())
+        ][-recent_limit:]
+
+        stats: dict[str, dict[str, int]] = {}
+        evidence: list[dict[str, Any]] = []
+        events = self.store.query(agent_id="odyn_orchestrator")
+        for plan in plans:
+            strategy = str(plan.payload.get("selected_strategy", ""))
+            if not strategy:
+                continue
+            later = [event for event in events if event.transaction_time_start > plan.transaction_time_start]
+            outcome = None
+            for event in later:
+                if event.event_type == "successful_procedure":
+                    outcome = "success"
+                    break
+                if event.event_type.endswith("_result") and event.payload.get("ok") is False:
+                    outcome = "failure"
+                    break
+            if outcome is None:
+                continue
+            item = stats.setdefault(strategy, {"successes": 0, "failures": 0})
+            item["successes" if outcome == "success" else "failures"] += 1
+            evidence.append({
+                "strategy": strategy,
+                "outcome": outcome,
+                "transaction_time": plan.transaction_time_start.isoformat(),
+            })
+
+        return {
+            "context": wanted,
+            "strategy_stats": stats,
+            "evidence": evidence[-recent_limit:],
+            "evidence_count": len(evidence),
+        }
 
     def history_context(
         self,
