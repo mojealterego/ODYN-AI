@@ -85,6 +85,25 @@ class CognitiveEngineTests(unittest.TestCase):
             "2026-04-01T00:00:00+00:00",
         )
 
+    def test_meta_learning_bias_is_contextual_and_bounded(self) -> None:
+        engine = CognitiveEngine()
+        plan = engine.plan_build(
+            "refactor web UI",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 0.80,
+            history_context={
+                "strategy_stats": {
+                    "minimal_patch": {"successes": 4, "failures": 0, "attempts": 4},
+                    "test_first": {"successes": 0, "failures": 4, "attempts": 4},
+                },
+                "context": {"platform": "web", "task_type": "refactor", "architecture": "react"},
+                "evidence_count": 4,
+            },
+        )
+        self.assertEqual(plan["selected_strategy"], "minimal_patch")
+        self.assertLessEqual(plan["historical_bias"]["minimal_patch"], 0.25)
+        self.assertGreater(plan["historical_bias"]["minimal_patch"], 0.0)
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
