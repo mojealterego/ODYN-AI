@@ -109,6 +109,41 @@ class ExperienceMemoryTests(unittest.TestCase):
             self.assertEqual(android["strategy_stats"]["minimal_patch"]["successes"], 0)
             self.assertGreater(android["strategy_stats"]["minimal_patch"]["failures"], 0)
 
+
+    def test_decision_cycle_id_is_persisted_and_links_execution_and_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            plan = memory.record_cognitive_plan(
+                "app-1", "build", ["minimal_patch"], "minimal_patch",
+                context={"task_type": "feature", "platform": "web", "architecture": "react"},
+                decision_cycle_id="decision_42",
+            )
+            decision = memory.record_decision(
+                "app-1", "build", "implemented", [],
+                cognitive_strategy="minimal_patch",
+                decision_cycle_id="decision_42",
+            )
+            execution = memory.record_execution(
+                "app-1", "test", {"ok": True, "exit_code": 0, "diagnostics": []},
+                decision_cycle_id="decision_42",
+                decision_memory_id=decision.id,
+            )
+            success = memory.record_success(
+                "app-1", "web", "verified", "dist",
+                source_execution_id=execution.id,
+                decision_cycle_id="decision_42",
+                decision_memory_id=decision.id,
+            )
+
+            self.assertEqual(plan.payload["decision_cycle_id"], "decision_42")
+            self.assertEqual(decision.payload["decision_cycle_id"], "decision_42")
+            self.assertEqual(execution.payload["decision_cycle_id"], "decision_42")
+            self.assertEqual(success.payload["decision_cycle_id"], "decision_42")
+            self.assertIn(execution.id, [item.id for item in memory.store.related(decision.id, "executed_as")])
+            self.assertIn(success.id, [item.id for item in memory.store.related(decision.id, "verified_by")])
+
     def test_records_complete_autonomous_build_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             memory = AgentExperienceMemory(
