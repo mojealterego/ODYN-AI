@@ -198,6 +198,24 @@ class CognitiveEngineTests(unittest.TestCase):
         self.assertIsNone(cycle.selected_strategy)
         self.assertEqual(cycle.status, "rejected")
 
+
+    def test_decision_cycle_can_be_closed_with_outcome(self) -> None:
+        engine = CognitiveEngine()
+        cycle = engine.decision_cycle(
+            "build app",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 1.0,
+            context={"platform": "web", "task_type": "feature", "architecture": "react"},
+            critic_result="PASS",
+        )
+        outcome_id = engine.record_decision_outcome(
+            cycle, outcome="verified", execution_id=123, correction=True
+        )
+        node = engine.get_thought(outcome_id)
+        self.assertEqual(node.kind, "decision_outcome")
+        self.assertEqual(node.metadata["decision_id"], cycle.decision_id)
+        self.assertTrue(node.metadata["correction"])
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
