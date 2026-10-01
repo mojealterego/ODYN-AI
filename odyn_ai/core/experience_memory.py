@@ -113,6 +113,42 @@ class AgentExperienceMemory:
         )
 
     @staticmethod
+    def record_cognitive_decision(
+        self,
+        *,
+        task: MemoryEpisode,
+        decision_cycle: Any,
+        research_trace: dict[str, Any] | None = None,
+    ) -> MemoryEpisode:
+        """Persist the Decision Cycle outcome after optional research context."""
+        decision_id = str(getattr(decision_cycle, "decision_id", "")).strip()
+        if not decision_id:
+            raise ValueError("decision_cycle must expose decision_id")
+
+        research = (research_trace or {}).get("rag_context")
+        episode = self.remember_and_index(
+            "cognitive_decision",
+            {
+                "task_id": task.id,
+                "decision_cycle_id": decision_id,
+                "selected_strategy": getattr(decision_cycle, "selected_strategy", None),
+                "selected_node_id": getattr(decision_cycle, "selected_node_id", None),
+                "gate": {
+                    "passed": bool(getattr(getattr(decision_cycle, "gate", None), "passed", False)),
+                    "rejected": bool(getattr(getattr(decision_cycle, "gate", None), "rejected", False)),
+                    "reason": str(getattr(getattr(decision_cycle, "gate", None), "reason", "")),
+                },
+                "research_rag_context_id": research.id if research else None,
+            },
+            text=(
+                f"Decyzja kognitywna {decision_id}: "
+                f"{getattr(decision_cycle, 'selected_strategy', None)}."
+            ),
+        )
+        if research is not None:
+            self.link(research.id, episode.id, "cognitive_decision")
+        return episode
+
     def record_research_pipeline(
         self,
         *,
