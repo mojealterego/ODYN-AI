@@ -316,5 +316,40 @@ class ExperienceMemoryTests(unittest.TestCase):
             self.assertEqual(decision.payload["decision_cycle_id"], "decision_42")
 
 
+    def test_research_rag_links_to_cognitive_decision_cycle(self):
+        from nexus_core.plugins.deep_research import ResearchReport, ResearchResult
+        from nexus_core.reasoning.cognitive_engine import CognitiveEngine
+
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            task = memory.start_task("app-1", "zbadaj i wybierz strategię", "web")
+            report = ResearchReport(
+                query="RAG",
+                hops=1,
+                sources=(ResearchResult("A", "https://a.example", "evidence", "RAG", 0),),
+                context="evidence",
+            )
+            cycle = CognitiveEngine().decision_cycle(
+                "zbadaj i wybierz strategię",
+                ["minimal_patch", "test_first"],
+                lambda _, strategy: 1.0 if strategy == "test_first" else 0.5,
+                context={"task_type": "feature", "platform": "web", "architecture": "react"},
+            )
+            trace = memory.record_research_pipeline(
+                task=task, report=report, decision_cycle_id=cycle.decision_id
+            )
+            decision = memory.record_cognitive_decision(
+                task=task, decision_cycle=cycle, research_trace=trace
+            )
+
+            self.assertEqual(decision.payload["decision_cycle_id"], cycle.decision_id)
+            self.assertIn(
+                decision.id,
+                [item.id for item in memory.store.related(trace["rag_context"].id, "cognitive_decision")],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
