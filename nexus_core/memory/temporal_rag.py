@@ -94,11 +94,11 @@ class TemporalRAGRetriever:
                 == decision_cycle_id
             ]
 
+        eligible_episode_ids = tuple(episode.id for episode in episodes)
         items = tuple(
             self._to_item(episode)
             for episode in episodes[-top_k:]
         )
-        eligible_episode_ids = tuple(item.episode_id for item in items)
 
         scoped_evidence: list[dict[str, Any]] = []
         semantic = ""
@@ -145,8 +145,14 @@ class TemporalRAGRetriever:
             outgoing.setdefault(edge.source_id, []).append(edge.target_id)
 
         enriched_cycles = set(cycle_ids)
-        for item in items:
-            for target_id in outgoing.get(item.episode_id, []):
+        evidence_ids = {
+            int(item["episode_id"])
+            for item in scoped_evidence
+            if item.get("episode_id") is not None
+        }
+        evidence_ids.update(item.episode_id for item in items)
+        for episode_id in evidence_ids:
+            for target_id in outgoing.get(episode_id, []):
                 target = visible_by_id.get(target_id)
                 if target is None or target.event_type != "cognitive_decision":
                     continue
