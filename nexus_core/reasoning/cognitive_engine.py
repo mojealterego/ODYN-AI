@@ -49,6 +49,8 @@ class DecisionCycle:
     got_evaluation: dict[str, float]
     gate: AdversarialGateResult
     selected_strategy: str | None
+    selected_node_id: str | None
+    branch_ids: tuple[str, ...]
     phases: tuple[str, ...]
     status: str
 
@@ -359,7 +361,7 @@ class CognitiveEngine:
             self.decision_cycle_count += 1
             return DecisionCycle(
                 decision_id, dict(context), tuple(strategies), history, got_scores,
-                gate, None, phases, "rejected",
+                gate, None, None, (), phases, "rejected",
             )
 
         selected = self.ab_mcts_step(
@@ -378,7 +380,7 @@ class CognitiveEngine:
         self.decision_cycle_count += 1
         return DecisionCycle(
             decision_id, dict(context), tuple(strategies), history, got_scores,
-            gate, selected, phases, "selected",
+            gate, selected, plan["selected_id"], tuple(plan["branch_ids"]), phases, "selected",
         )
 
     def plan_build(
