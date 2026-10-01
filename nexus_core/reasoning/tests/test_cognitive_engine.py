@@ -104,6 +104,22 @@ class CognitiveEngineTests(unittest.TestCase):
         self.assertLessEqual(plan["historical_bias"]["minimal_patch"], 0.25)
         self.assertGreater(plan["historical_bias"]["minimal_patch"], 0.0)
 
+    def test_meta_learning_ignores_single_outlier(self) -> None:
+        engine = CognitiveEngine()
+        plan = engine.plan_build(
+            "task",
+            ["minimal_patch", "test_first"],
+            lambda _, action: 0.80 if action == "test_first" else 0.81,
+            history_context={
+                "strategy_stats": {
+                    "minimal_patch": {"successes": 0, "failures": 1},
+                    "test_first": {"successes": 0, "failures": 0},
+                },
+                "evidence_count": 1,
+            },
+        )
+        self.assertEqual(plan["historical_bias"]["minimal_patch"], 0.0)
+
     def test_reflexion(self) -> None:
         engine = CognitiveEngine(max_reflections=2)
         result = engine.reflexion_loop("task", "bad", FakeCritic())
