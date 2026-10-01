@@ -10,6 +10,14 @@ from .bitemporal_store import BitemporalMemoryNode, MemoryEpisode
 class RAGRetriever(Protocol):
     def retrieve_relevant(self, query: str, top_k: int = 4) -> str: ...
 
+    def retrieve_relevant_scoped(
+        self,
+        query: str,
+        *,
+        episode_ids: tuple[int, ...],
+        top_k: int = 4,
+    ) -> list[dict[str, Any]]: ...
+
 
 @dataclass(frozen=True)
 class TemporalRAGItem:
@@ -31,10 +39,12 @@ class TemporalRAGResult:
     items: tuple[TemporalRAGItem, ...]
     decision_cycle_ids: tuple[str, ...]
     rag_context: str
+    eligible_episode_ids: tuple[int, ...] = ()
+    scoped_evidence: tuple[dict[str, Any], ...] = ()
 
 
 class TemporalRAGRetriever:
-    """Join bitemporal memory, causal edges and semantic RAG recall."""
+    """Temporal filter first, vector retrieval second, causal enrichment last."""
 
     def __init__(
         self,
@@ -71,31 +81,65 @@ class TemporalRAGRetriever:
         )
         if event_types:
             allowed = set(event_types)
-            episodes = [episode for episode in episodes if episode.event_type in allowed]
+            episodes = [
+                episode for episode in episodes
+                if episode.event_type in allowed
+            ]
 
         if decision_cycle_id:
             episodes = [
                 episode
                 for episode in episodes
-                if str(episode.payload.get("decision_cycle_id", "")) == decision_cycle_id
+                if str(episode.payload.get("decision_cycle_id", ""))
+                == decision_cycle_id
             ]
 
-        semantic = self.rag.retrieve_relevant(query, top_k=top_k) if self.rag else ""
         items = tuple(
             self._to_item(episode)
             for episode in episodes[-top_k:]
         )
+        eligible_episode_ids = tuple(item.episode_id for item in items)
+
+        scoped_evidence: list[dict[str, Any]] = []
+        semantic = ""
+        if self.rag and eligible_episode_ids:
+            scoped_method = getattr(
+                self.rag,
+                "retrieve_relevant_scoped",
+                None,
+            )
+            if callable(scoped_method):
+                scoped_evidence = list(
+                    scoped_method(
+                        query,
+                        episode_ids=eligible_episode_ids,
+                        top_k=top_k,
+                    )
+                )
+                scoped_evidence.sort(
+                    key=lambda item: float(item.get("score", 0.0)),
+                    reverse=True,
+                )
+                context = "\n".join(
+                    f"[episode={item.get('episode_id')}] {item.get('text', '')}"
+                    for item in scoped_evidence
+                )
+                semantic = (
+                    f"\n[TEMPORAL-SCOPED RAG]: {context}\n"
+                    if context else ""
+                )
 
         cycle_ids = set()
         for item in items:
             cycle_ids.update(item.decision_cycle_ids)
 
-        # Follow visible causal edges from evidence to cognitive decisions.
         snapshot = self.store.memory_snapshot(
             valid_at=valid_at,
             transaction_at=transaction_at,
         )
-        visible_by_id = {episode.id: episode for episode in snapshot.episodic}
+        visible_by_id = {
+            episode.id: episode for episode in snapshot.episodic
+        }
         outgoing: dict[int, list[int]] = {}
         for edge in snapshot.edges:
             outgoing.setdefault(edge.source_id, []).append(edge.target_id)
@@ -117,6 +161,8 @@ class TemporalRAGRetriever:
             items=items,
             decision_cycle_ids=tuple(sorted(enriched_cycles)),
             rag_context=semantic,
+            eligible_episode_ids=eligible_episode_ids,
+            scoped_evidence=tuple(scoped_evidence),
         )
 
     @staticmethod
