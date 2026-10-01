@@ -252,5 +252,69 @@ class ExperienceMemoryTests(unittest.TestCase):
 
 
 
+    def test_deep_research_is_persisted_as_causal_bitemporal_rag_trace(self):
+        from nexus_core.plugins.deep_research import ResearchReport, ResearchResult
+
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            task = memory.start_task("app-1", "zbadaj architekturę", "web")
+            report = ResearchReport(
+                query="architektura RAG",
+                hops=2,
+                sources=(
+                    ResearchResult("A", "https://a.example", "source A", "architektura RAG", 0),
+                    ResearchResult("B", "https://b.example", "source B", "source A", 1),
+                ),
+                context="RAG CONTEXT: source A; source B",
+            )
+
+            trace = memory.record_research_pipeline(
+                task=task,
+                report=report,
+                decision_cycle_id="decision_42",
+            )
+
+            research = trace["research_decision"]
+            hops = trace["search_hops"]
+            sources = trace["sources"]
+            rag = trace["rag_context"]
+
+            self.assertEqual(research.event_type, "research_decision")
+            self.assertEqual(research.payload["decision_cycle_id"], "decision_42")
+            self.assertEqual(len(hops), 2)
+            self.assertEqual(len(sources), 2)
+            self.assertEqual(rag.payload["source_ids"], [item.id for item in sources])
+
+            self.assertIn(
+                research.id,
+                [item.id for item in memory.store.related(task.id, "research_decision")],
+            )
+            self.assertIn(
+                rag.id,
+                [item.id for item in memory.store.related(research.id, "rag_context")],
+            )
+            self.assertIn(
+                sources[0].id,
+                [item.id for item in memory.store.related(hops[0].id, "source")],
+            )
+            self.assertIn("RAG CONTEXT", memory.recall("RAG CONTEXT"))
+
+    def test_coding_decision_persists_decision_cycle_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = AgentExperienceMemory(
+                store=BitemporalMemoryNode(str(Path(tmp) / "memory.db"))
+            )
+            decision = memory.record_decision(
+                "app-1",
+                "build",
+                "implemented",
+                [],
+                decision_cycle_id="decision_42",
+            )
+            self.assertEqual(decision.payload["decision_cycle_id"], "decision_42")
+
+
 if __name__ == "__main__":
     unittest.main()
