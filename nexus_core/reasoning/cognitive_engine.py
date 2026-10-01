@@ -43,6 +43,7 @@ class AdversarialGateResult:
 @dataclass(frozen=True)
 class DecisionCycle:
     decision_id: str
+    root_node_id: str
     context: dict[str, Any]
     candidate_strategies: tuple[str, ...]
     historical_evidence: dict[str, Any]
@@ -360,7 +361,7 @@ class CognitiveEngine:
         if not gate.passed:
             self.decision_cycle_count += 1
             return DecisionCycle(
-                decision_id, dict(context), tuple(strategies), history, got_scores,
+                decision_id, root_id, dict(context), tuple(strategies), history, got_scores,
                 gate, None, None, (), phases, "rejected",
             )
 
@@ -379,7 +380,7 @@ class CognitiveEngine:
         )
         self.decision_cycle_count += 1
         return DecisionCycle(
-            decision_id, dict(context), tuple(strategies), history, got_scores,
+            decision_id, root_id, dict(context), tuple(strategies), history, got_scores,
             gate, selected, plan["selected_id"], tuple(plan["branch_ids"]), phases, "selected",
         )
 
