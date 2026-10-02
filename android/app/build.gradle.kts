@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.ByteArrayOutputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -178,7 +179,7 @@ val keystoreProperties = Properties().apply {
     }
 }
 val hasReleaseKeystore = keystoreProperties.isNotEmpty()
-val liteRtLmStableVersion = "0.16.1"
+val liteRtLmStableVersion = "0.17.1"
 val liteRtLmVersion = providers.gradleProperty("hermesLiteRtLmVersion")
     .getOrElse(liteRtLmStableVersion)
     .trim()
@@ -401,10 +402,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         aidl = true
         buildConfig = true
@@ -433,6 +430,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 
@@ -712,7 +715,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("org.json:json:20240303")
-    // Release/F-Droid builds use the exact stable default (0.16.1). Developers can compile
+    // Release/F-Droid builds use the exact stable default (0.17.1). Developers can compile
     // an upstream preview version or a locally built LiteRT-LM main-branch AAR
     // without weakening the reproducible release pin.
     if (liteRtLmLocalAar != null) {

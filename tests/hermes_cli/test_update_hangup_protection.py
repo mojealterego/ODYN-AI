@@ -213,17 +213,22 @@ class TestInstallHangupProtection:
         try:
             # On Windows (no SIGHUP) we still wrap stdio and create the log.
             assert state["installed"] is True
-            assert isinstance(sys.stdout, _UpdateOutputStream)
-            assert isinstance(sys.stderr, _UpdateOutputStream)
+            # Modules can be replaced/reloaded by provider tests. Verify the
+            # wrapping and mirroring behavior without relying on class identity.
+            assert sys.stdout is not prev_out
+            assert sys.stderr is not prev_err
             assert state["log_file"] is not None
 
             sys.stdout.write("checking mirror\n")
             sys.stdout.flush()
+            sys.stderr.write("checking stderr mirror\n")
+            sys.stderr.flush()
 
             log_path = tmp_path / "logs" / "update.log"
             assert log_path.exists()
             contents = log_path.read_text(encoding="utf-8")
             assert "checking mirror" in contents
+            assert "checking stderr mirror" in contents
             assert "hermes update started" in contents
         finally:
             _finalize_update_output(state)

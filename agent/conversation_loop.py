@@ -3146,6 +3146,7 @@ def run_conversation(
                             "error": f"Model generated invalid tool call: {invalid_preview}"
                         }
 
+                    # Invalid tool names are returned to the model for correction.
                     assistant_msg = agent._build_assistant_message(assistant_message, finish_reason)
                     messages.append(assistant_msg)
                     for tc in assistant_message.tool_calls:
@@ -3165,12 +3166,13 @@ def run_conversation(
                 
                 # Validate tool call arguments are valid JSON
                 # Handle empty strings as empty objects (common model quirk)
+                from agent.tool_plan_validation import ToolPlanValidationError, parse_tool_plan_arguments
                 invalid_json_args = []
                 for tc in assistant_message.tool_calls:
                     args = tc.function.arguments
                     if isinstance(args, (dict, list)):
                         tc.function.arguments = json.dumps(args)
-                        continue
+                        args = tc.function.arguments
                     if args is not None and not isinstance(args, str):
                         tc.function.arguments = str(args)
                         args = tc.function.arguments
@@ -3179,8 +3181,8 @@ def run_conversation(
                         tc.function.arguments = "{}"
                         continue
                     try:
-                        json.loads(args)
-                    except json.JSONDecodeError as e:
+                        parse_tool_plan_arguments(args)
+                    except ToolPlanValidationError as e:
                         invalid_json_args.append((tc.function.name, str(e)))
                 
                 if invalid_json_args:
@@ -3263,6 +3265,19 @@ def run_conversation(
                 assistant_message.tool_calls = agent._deduplicate_tool_calls(
                     assistant_message.tool_calls
                 )
+
+                from agent.cognitive_gate import review_hermes_turn, record_blocked_turn
+                review = review_hermes_turn(
+                    agent, assistant_message, messages, effective_task_id, finish_reason,
+                )
+                if not review.allows_execution:
+                    record_blocked_turn(agent, assistant_message, messages, finish_reason, review)
+                    if review.escalated:
+                        _turn_exit_reason = "cognitive_gate_escalation"
+                        final_response = "Cognitive review could not accept this candidate. " + review.reason
+                        messages.append({"role": "assistant", "content": final_response})
+                        break
+                    continue
 
                 assistant_msg = agent._build_assistant_message(assistant_message, finish_reason)
                 
@@ -4097,3 +4112,4 @@ def run_conversation(
 
 
 __all__ = ["run_conversation"]
+
