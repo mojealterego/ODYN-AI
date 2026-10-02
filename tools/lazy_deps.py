@@ -166,7 +166,16 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # ─── Tools ─────────────────────────────────────────────────────────────
     # ACP adapter (VS Code / Zed / JetBrains integration)
     "tool.acp": ("agent-client-protocol==0.9.0",),
+    # MCP Gateway / Paula SSE transport
+    "gateway.web": ("fastapi==0.133.1", "uvicorn[standard]==0.41.0", "httpx>=0.28.1,<1"),
+
+    # Long-form media composition (MoviePy + ffmpeg/imageio backend)
+    "media.moviepy": ("moviepy>=2.1,<3",),
+
     # Dashboard (`hermes dashboard`)
+    # GitHub Agent Devel / Scaffold Modules
+    "github.agent_devel": ("PyGithub==2.10.0",),
+
     "tool.dashboard": (
         "fastapi==0.133.1",
         "uvicorn[standard]==0.41.0",

@@ -26,6 +26,8 @@ dependencies = [
   "requests>=2.33.0,<3",  # CVE-2026-25645
   "jinja2>=3.1.5,<4",
   "pydantic>=2.12.5,<3",
+  "numpy>=2.2,<3",
+  "networkx>=3.4,<4",
   # Interactive CLI (prompt_toolkit is used directly by cli.py)
   "prompt_toolkit==3.0.52",
   # Cron scheduler (built-in feature — scheduled cron/interval jobs use croniter).
@@ -188,7 +190,7 @@ hermes_cli = ["web_dist/**/*", "tui_dist/**/*", "scripts/install.sh", "scripts/i
 gateway = ["assets/**/*"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter", "plugins", "plugins.*", "providers", "providers.*", "hermes_android", "hermes_android.*"]
+include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter", "plugins", "plugins.*", "providers", "providers.*", "hermes_android", "hermes_android.*", "nexus_core", "nexus_core.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

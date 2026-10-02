@@ -1,0 +1,38 @@
+name: ODYN AI CI
+
+on:
+  push:
+    branches: [codex/odyn-ai]
+    paths:
+      - "odyn_ai/**"
+      - "nexus_core/**"
+      - ".github/workflows/odyn-ai.yml"
+  pull_request:
+    paths:
+      - "odyn_ai/**"
+      - ".github/workflows/odyn-ai.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip -r odyn_ai/requirements_test.txt
+      - name: Compile ODYN sources
+        run: python -m compileall -q odyn_ai nexus_core
+      - name: Run cognitive orchestration gate
+        run: |
+          python -m unittest odyn_ai.tests.test_memory_lifecycle_integration odyn_ai.tests.test_orchestrator -v
+          python -m unittest discover -s nexus_core/reasoning/tests -v
+          python -m unittest discover -s nexus_core/memory/tests -v
+      - name: Run ODYN and CognitiveEngine unit tests
+        run: |
+          python -m unittest discover -s odyn_ai/tests -v
+          python -m unittest discover -s nexus_core/reasoning/tests -v

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b0e">
+  <meta name="description" content="ODYN AI — lokalna inteligencja, agenci AI oraz tworzenie aplikacji Web i Android.">
+  <title>ODYN AI</title>
+  <link rel="stylesheet" href="/static/nord.css">
+  <style>
+    #voice-btn {
+      min-width: 48px;
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--nord11);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--nord6);
+      cursor: pointer;
+      font-weight: 700;
+      touch-action: manipulation;
+    }
+    #voice-btn:hover,
+    #voice-btn:focus-visible {
+      background: var(--nord11);
+      color: var(--nord0);
+    }
+    #voice-btn.recording {
+      background: var(--nord11);
+      color: var(--nord6);
+      animation: odyn-voice-pulse 1.5s infinite;
+    }
+    #voice-btn:disabled {
+      cursor: not-allowed;
+      opacity: .5;
+    }
+    #voice-status {
+      min-width: 0;
+      color: var(--nord4);
+      font-size: .78rem;
+      align-self: center;
+    }
+    @keyframes odyn-voice-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.04); opacity: .72; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #voice-btn.recording { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand"><span class="brand-main">ODYN AI</span><span class="brand-creator">AM · ANDRZEJ MIKULSKI · MojeAlterego</span></div>
+
+    <div class="eyebrow">KREATOR AGENTÓW</div>
+    <label for="agent-select">Agent</label>
+    <select id="agent-select" aria-label="Wybierz agenta"></select>
+
+    <div class="builder">
+      <div class="eyebrow">KREATOR APLIKACJI</div>
+      <button id="new-agent" type="button">+ Nowy agent</button>
+      <button id="new-app" type="button">+ Nowa aplikacja</button>
+      <button id="new-form" type="button">+ Formularz No Code</button>
+      <button id="open-ide" type="button">ODYN IDE</button>
+      <button id="status-btn" type="button">Status silnika</button>
+    </div>
+
+    <div class="project-panel">
+      <div class="eyebrow">PROJEKT</div>
+      <select id="project-select" aria-label="Wybierz projekt"><option value="">Brak projektu</option></select>
+      <button id="project-open" type="button">Otwórz w IDE</button>
+    </div>
+
+    <div id="status" aria-live="polite">Ładowanie…</div>
+  </aside>
+
+  <main id="main">
+    <header>
+      <div>
+        <div class="eyebrow">Inteligencja lokalna</div>
+        <h1>ODYN AI</h1>
+      </div>
+      <span id="engine-badge">SILNIK</span>
+    </header>
+
+    <section id="chat-history" aria-live="polite">
+      <div class="message assistant">
+        <strong>ODYN AI</strong>
+        <p>System gotowy. Wybierz agenta i rozpocznij rozmowę.</p>
+      </div>
+    </section>
+
+    <section id="no-code-builder" hidden aria-label="Kreator formularzy No Code"><div class="ide-toolbar"><strong>KREATOR FORMULARZA NO CODE</strong><span id="form-project-name">Brak projektu</span><button id="form-create" type="button">Utwórz formularz</button><button id="form-close" type="button">Zamknij</button></div><div class="form-builder-grid"><aside class="form-palette"><div class="eyebrow">POLA</div><button data-field-type="text">Tekst</button><button data-field-type="email">E-mail</button><button data-field-type="number">Liczba</button><button data-field-type="tel">Telefon</button><button data-field-type="date">Data</button><button data-field-type="textarea">Długi tekst</button><button data-field-type="select">Lista wyboru</button><button data-field-type="radio">Wybór</button><button data-field-type="checkbox">Checkbox</button><button data-field-type="file">Plik</button></aside><section class="form-canvas"><div class="eyebrow">FORMULARZ</div><div id="form-canvas-fields"></div></section><aside class="form-inspector"><div class="eyebrow">WŁAŚCIWOŚCI POLA</div><div id="form-inspector-content">Wybierz pole.</div><div class="eyebrow">PODGLĄD</div><div id="form-preview"></div></aside></div></section>
+
+    <section id="ide" hidden aria-label="ODYN IDE">
+      <div class="ide-toolbar">
+        <strong>ODYN IDE</strong>
+        <span id="ide-project-name">Brak projektu</span>
+        <button id="ide-run" type="button">▶ Uruchom</button>
+        <button id="ide-build" type="button">Buduj</button>
+        <button id="ide-test" type="button">Testuj</button>
+        <div class="ide-export">
+          <span class="eyebrow">EKSPORT RAPORTU</span>
+          <input id="export-filename" type="text" value="raport-odyn" maxlength="120" aria-label="Nazwa pliku eksportu">
+          <select id="export-format" aria-label="Format eksportu">
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
+            <option value="xlsx">XLSX</option>
+          </select>
+          <button id="export-report" type="button">Eksportuj</button>
+          <button type="button" class="export-quick" data-export-format="pdf">PDF</button>
+          <button type="button" class="export-quick" data-export-format="docx">DOCX</button>
+          <button type="button" class="export-quick" data-export-format="xlsx">XLSX</button>
+        </div>
+        <button id="ide-close" type="button">Zamknij IDE</button>
+      </div>
+      <div class="ide-workspace">
+        <aside class="ide-explorer">
+          <div class="eyebrow">Eksplorator</div>
+          <div id="file-tree"></div>
+        </aside>
+        <section class="ide-editor">
+          <div class="editor-title" id="editor-path">Wybierz plik</div>
+          <textarea id="code-editor" spellcheck="false" aria-label="Edytor kodu"></textarea>
+          <button id="save-file" type="button">Zapisz plik</button>
+        </section>
+        <aside class="ide-side">
+          <div class="eyebrow">ODYN AGENT KODUJĄCY</div>
+          <textarea id="ai-command" placeholder="Opisz zmianę, którą ma wykonać ODYN…"></textarea>
+          <button id="ai-apply" type="button">Wykonaj</button>
+          <div class="eyebrow">Terminal</div>
+          <pre id="terminal-output">Gotowy.</pre>
+        </aside>
+      </div>
+      <div class="ide-preview">
+        <div class="eyebrow">Podgląd</div>
+        <pre id="preview-output">Wybierz projekt.</pre>
+      </div>
+    </section>
+
+    <form id="chat-form">
+      <label class="sr-only" for="user-input">Polecenie</label>
+      <textarea id="user-input" rows="1" maxlength="20000" placeholder="Napisz polecenie lub użyj głosu…" aria-label="Polecenie do ODYN AI"></textarea>
+      <button id="voice-btn" type="button" aria-label="Włącz dyktowanie" title="Dyktowanie po polsku">🎤 Głos</button>
+      <span id="voice-status" role="status" aria-live="polite">Głos: gotowy</span>
+      <button id="send-btn" type="submit">Wyślij</button>
+    </form>
+  </main>
+
+  <dialog id="builder-dialog" aria-labelledby="dialog-title">
+    <form method="dialog" id="builder-form">
+      <h2 id="dialog-title">Kreator</h2>
+      <div id="dialog-fields"></div>
+      <div class="dialog-actions">
+        <button value="cancel">Anuluj</button>
+        <button id="dialog-submit" value="default">Utwórz</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/voice-autobuild.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

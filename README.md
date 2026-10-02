@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
+  <img src="assets/banner.png" alt="ODYN AI" width="100%">
 </p>
 
-# Hermes Agent ☤
+# ODYN AI 🐦‍⬛
 
 <p align="center">
   <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
@@ -12,7 +12,7 @@
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
 </p>
 
-**The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
+**ODYN AI — rebranded and extended Hermes Agent foundation.** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
 Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [NovitaAI](https://novita.ai) (AI-native cloud for Model API, Agent Sandbox, and GPU Cloud), [NVIDIA NIM](https://build.nvidia.com) (Nemotron), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
 
@@ -25,6 +25,36 @@ Use any model you want — [Nous Portal](https://portal.nousresearch.com), [Open
 <tr><td><b>Runs anywhere, not just your laptop</b></td><td>Seven terminal backends — local, Docker, SSH, Singularity, Modal, Daytona, and Vercel Sandbox. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
 <tr><td><b>Research-ready</b></td><td>Batch trajectory generation, trajectory compression for training the next generation of tool-calling models.</td></tr>
 </table>
+
+---
+
+## ODYN AI — Rebranding i rozwój
+
+**ODYN AI** jest rozwijaną, rebrandowaną wersją istniejącego **Hermes Agent** znajdującego się w tej bazie kodu. Celem projektu nie jest wyrzucenie fundamentu i napisanie kolejnego agenta od zera, lecz **zachowanie jego istniejących możliwości i stopniowe rozszerzanie ich pod marką ODYN AI**.
+
+### Zasada projektu
+
+> **Nie zastępujemy Hermesa. Rozwijamy go jako ODYN AI.**
+
+Oznacza to zachowanie istniejących mechanizmów agenta — terminala, narzędzi, gatewayów, pamięci, skills, automatyzacji, MCP, obsługi modeli, backendów wykonawczych oraz kompatybilności Android/Termux — i dokładanie kolejnych warstw:
+
+- Dual GGUF Engine
+- Cognitive Engine
+- Graph of Thought
+- Reflexion
+- dynamiczne `environmental_stress`
+- dynamiczne parametry inferencji `temperature / top_p`
+- bitemporal memory
+- experience memory
+- RAG
+- Coding Agent
+- Autonomous Build Orchestrator
+- Agents Builder
+- App Builder
+- GitHub integration
+- voice-driven autonomous workflows
+
+Istniejące polecenia, ścieżki, backendy i mechanizmy Hermesa pozostają częścią bazy, dopóki nie zostaną świadomie zastąpione kompatybilną implementacją ODYN AI.
 
 ---
 
