@@ -1,0 +1,735 @@
+{
+  "review_date": "2026-10-02",
+  "fork_base": "e32f42706d547eea8fce3e399b69757bf8f9d9c3",
+  "method": "Static review of pinned repository trees, READMEs, license files, manifests and selected integration code. Upstream services and upstream test suites were not executed.",
+  "repositories": [
+    {
+      "repository": "NousResearch/hermes-agent",
+      "commit": "50a6abca7cff83afb0ebfe930a77c67311aa1044",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 18277,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "93bab974fd07608879e36a2e7ef833ffdd3b7555"
+        },
+        {
+          "path": "hermes_cli/plugin_catalog.py",
+          "blob": "9b296580dbfc83666c56a0eb594d01b06c054fed"
+        },
+        {
+          "path": "hermes_cli/plugins_cmd.py",
+          "blob": "562601931c1095edccc08beee5c1d0dbcf07e835"
+        },
+        {
+          "path": "hermes_cli/plugins_cmd_install.py",
+          "blob": "88ad0d74559b0a19436af3537190662fb3300d2c"
+        },
+        {
+          "path": "hermes_cli/plugins_manifest.py",
+          "blob": "409b309361d9344015cf527bb0e522e7b8fd24b8"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-holographic",
+      "commit": "062762ab1e67dd2eeb5500dfd38785b93cb9b0e8",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 21,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "7e023e5fdad5dfebc8aa8751dd8164e17c05a41c"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "63f678673507bc3652c8fd69d0e36b2080b65338"
+        },
+        {
+          "path": "plugin.yaml",
+          "blob": "8a4ee6707048d27f5560e17e234b8bbccc19a95e"
+        },
+        {
+          "path": "retrieval.py",
+          "blob": "1383e942bcb2405dfa81bd54d9c301b44a7a5803"
+        },
+        {
+          "path": "store.py",
+          "blob": "a913cf2d394a1f452674a64b60de0589e6e423d6"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-byterover",
+      "commit": "1dadb1865441c5a67e94eed3ad420112dc12fdef",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 14,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "fd08860acc8444627b3dedc9cade95f84d713712"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "3cfdcd2125af8de7bddf5059b7c8eb2460d8199f"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-retaindb",
+      "commit": "67059eaf3c6c5696ad1cb44cd0f67c844257ae6f",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 13,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "7bf044a5e09d902e7d908c25147a972911547b59"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "aca802326369ddd32b62d6dff4f83908e9e1834b"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-nvidia",
+      "commit": "e35b7429532c3e3fb7b4d9fea9c18e2c14740afa",
+      "readme": "README.md",
+      "license": null,
+      "license_file_present": false,
+      "archived": false,
+      "tree_entries": 28,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "32ef1a809f6d0c8e1f3c27d6687446d2d413b23d"
+        },
+        {
+          "path": "nvidia-app/plugin.json",
+          "blob": "e9e39697cf0da06fa1b8a312ae3c78de94748e02"
+        },
+        {
+          "path": "nvidia-broadcast/plugin.json",
+          "blob": "a975f509286590935f0338069ec5d5c8adfbe3fe"
+        }
+      ],
+      "license_path": null
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-blender",
+      "commit": "8aab816ce6577eb792a256b51777cbb4cd6523f0",
+      "readme": "README.md",
+      "license": "NOASSERTION",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 11,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "2cd2f3857455522eb996b444136d220d4cd04e3d"
+        },
+        {
+          "path": "mcp.json",
+          "blob": "456a8d3fa36a7f1c54a38a97f0703f37d3358f00"
+        },
+        {
+          "path": "plugin.json",
+          "blob": "b7a380d2c4089ca99ab4c7eafaee97ea52b27435"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-claude-subscription-directsdk",
+      "commit": "ef73726cfaf2fa0ee041e55572f406e2c24fed83",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 31,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "3137e5935a5e7d3bb3dfaf6303b56b354a01cf56"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "18836231596fb251577f3c4760250bed4ba45499"
+        },
+        {
+          "path": "admission.py",
+          "blob": "10e16e62c3e00bc8cc47f07c964123ad1b07b005"
+        },
+        {
+          "path": "plugin.yaml",
+          "blob": "d25ef4edd154b2539d9d151b4b6553ad78249066"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/misaki",
+      "commit": "f03fd2be7346952a83d3d4845c217fc7667f322d",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 74,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "211a322d65c83bacbb167402b7f21d59af9027bb"
+        },
+        {
+          "path": "misaki/espeak.py",
+          "blob": "e5d880c617752cfac03031d20f8f7bd6b3c5a91a"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "8e90b14ade63fbcc3c7b0eeb00ec5e5cd7f3e078"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-supermemory",
+      "commit": "d798057e93c85198121cfd6ebf70a529559d38e6",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 7,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "2dec58811051262f41b4490fd5577d160ae717ab"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "5f763782deab5e35a1c55bec7e1b42a5371dffb2"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-openviking",
+      "commit": "5dca75f4d3dcef9467ce2ff32e170d84c679de5f",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 8,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "8e8b0d3d969a9367d002c6a0dc00b37631da712b"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "ad8a96256100c13f49122b0e118ceb2b2c12fed5"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-mem0",
+      "commit": "3fc36950b2b7c19cdd81c6de99f10d2cbed850af",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 11,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "d4c770e6841845969c546e2e459f1260dca67c41"
+        },
+        {
+          "path": "_backend.py",
+          "blob": "b6d86500aece08bd4f82e0274ebe94d56bf36a8d"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "884d8037157be754a606c79d8431d5d25e96c04e"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-honcho",
+      "commit": "32dfd0ba62ae0e8dad82d55fc81515e8c4a181a9",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 22,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "eabccda9bf9ca9c02f2e770adc17bbbded23af40"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "a6442a05a94f11669272ef3978fe8b1f1a819b20"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-hindsight",
+      "commit": "7385025e90e98b0a4f8042f40ec956b71cb18287",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 12,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "c4d17a6a6f29aa97174dfb671b91d68107bf1c17"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "d29826c3f55573e483f2f64c2a18dbc21cd26b1d"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/Gym",
+      "commit": "2d538be189de0e21c21b85af05acf7646b1b092f",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 4201,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "cd289d31e50d7a5c960dbc2d5b20165fc219d227"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "59dbecd09441307fabb3124c6459fb7aca0e990c"
+        },
+        {
+          "path": "responses_api_agents/hermes_agent/README.md",
+          "blob": "951b3bfa72a96a65006e5e5d80e0b06bc6f1eaf8"
+        },
+        {
+          "path": "responses_api_agents/hermes_agent/app.py",
+          "blob": "b828a52de4fe1dffedba5fa3c4616ebb8a6b1bf5"
+        },
+        {
+          "path": "responses_api_agents/hermes_agent/requirements.txt",
+          "blob": "1e76577ad70ce48410c5c42e207037ad155c1783"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-memory-wiki",
+      "commit": "9bc3913b8474eaf4d7eec32e97af4d77957c36df",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 19,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "7053c814e0cd7d8971662ba02dd57cd681957a9d"
+        },
+        {
+          "path": "dashboard/memory_wiki_core.py",
+          "blob": "56c48442f8a9607b557385510658809be4aa1ade"
+        },
+        {
+          "path": "dashboard/plugin_api.py",
+          "blob": "90efa475e85696a8bd4750ad59386bf4af5f3437"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-snyk",
+      "commit": "2a41a07f81e45125bf82a19af1b13396ace4b81f",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 10,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "5cd142e64e1f96da97bd3d44d1bb91c428372271"
+        },
+        {
+          "path": "mcp.json",
+          "blob": "2b9e73b53f01cb2a635d6910c99925fb3a8d5532"
+        },
+        {
+          "path": "plugin.json",
+          "blob": "04e2c83c95630a5925666e499d5eae2c7e1c93ea"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-touchdesigner",
+      "commit": "88a7a7884e5eda33cfe4b1dd5e69df7cb15d5898",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 31,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "fd5257e1e843355c1cfa1cf81785275073c2eacc"
+        },
+        {
+          "path": "mcp.json",
+          "blob": "f37a84891541579965907aed31602f41e61402d9"
+        },
+        {
+          "path": "plugin.json",
+          "blob": "4bd9302327b209524ce28deb9e9c6f93b35142d8"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-desktop-accent-picker",
+      "commit": "78ef873cddcac876c8a1d12e8a8653befa0646ab",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 8,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "7badc780c42849919946b0012d2d231ceff47e2b"
+        },
+        {
+          "path": "src/plugin.tsx",
+          "blob": "7539c2238e54942e20adb469f5889815077a17e3"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/Automodel",
+      "commit": "922e6b0b34e3f22c6e959405d93a6aff530fc8ab",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 3384,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "a1934395b4daa751f72f3c8be7a4a6f0faa991df"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "bf37890b424e6d1ea7fb4ae2a38b5d625a07e20f"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-backsearch",
+      "commit": "477d81446c856a39021c069a88a047e9c89fbba3",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 9,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "6a73286fc441e803a1735dc1de2661739e23aa69"
+        },
+        {
+          "path": "backsearch_tools.py",
+          "blob": "de34220232ef73fc140adc0fd46acaec8608b569"
+        },
+        {
+          "path": "plugin.yaml",
+          "blob": "c2316dacfd79dadba8956877b2aaa246b8ad6d89"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-plugin-sprites",
+      "commit": "a4881e07385beff6b440b5338dec7a415d5f1be5",
+      "readme": "README.md",
+      "license": null,
+      "license_file_present": false,
+      "archived": false,
+      "tree_entries": 9,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "c3d3e81f8fdeab1db0aa965ae90a82bc1ffcb8cf"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "72661f952f5342de7000228c4ee048a9aa888bfe"
+        },
+        {
+          "path": "sprites_environment.py",
+          "blob": "9995c6e332c87ec293f7fe3c61455110cddaf988"
+        }
+      ],
+      "license_path": null
+    },
+    {
+      "repository": "NousResearch/Hermes-Bot-Mode",
+      "commit": "80fee22582b871b9765a65e2992b8b5a8211c9f8",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": true,
+      "tree_entries": 50,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "c27b42741032f3f385fb4df6e512526cd008e0fa"
+        },
+        {
+          "path": "plugin.js",
+          "blob": "c514f97ffa6e77013f55c11fc6ea2e8ae0da0dbf"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-telegram-business",
+      "commit": "98c60afc00d36c885bb040ebe973b1aa908886c0",
+      "readme": "README.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 12,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "54974bce2ab1c0b95e2e7104d9720fb6b610c100"
+        },
+        {
+          "path": "__init__.py",
+          "blob": "65c4539bb8ed787b4c6c82144f828b6c03e428d1"
+        },
+        {
+          "path": "manager.py",
+          "blob": "2881b974da44dae31d25824b3eac1198ba176c82"
+        },
+        {
+          "path": "state.py",
+          "blob": "005051938234322cebd8b8f79300688239d25f27"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/image-size",
+      "commit": "e6dbb45e44b82eedbb81d150a31e4850dcb500d7",
+      "readme": "Readme.md",
+      "license": "MIT",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 165,
+      "reviewed_files": [
+        {
+          "path": "Readme.md",
+          "blob": "2733ae47760d8f729aa55c55e408ae0611483832"
+        },
+        {
+          "path": "lib/index.ts",
+          "blob": "4eab7c2987afca4add15f6863136d0b7690aa0b2"
+        },
+        {
+          "path": "lib/lookup.ts",
+          "blob": "af65fd7fe118ee10f45fba14ad9040c7bf3c0e70"
+        },
+        {
+          "path": "package.json",
+          "blob": "67014ed2fc4c033e7daa40d76e19907ec5f2ba2f"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/NemoClaw",
+      "commit": "59107b0e7b1f2f2a5ece0a7d9fb853e83d36d6c4",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 1686,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "223bdbd4bcd18f8ba8d22c9fe6723e4f682938a5"
+        },
+        {
+          "path": "agents/hermes/host/managed-tool-gateway-matrix.json",
+          "blob": "f0f16d8801f139cafc8749dbe71899a2280df5fd"
+        },
+        {
+          "path": "agents/hermes/manifest.yaml",
+          "blob": "aa3dc7f71815e6e80835b72a16ce117f7d7cbca0"
+        },
+        {
+          "path": "agents/hermes/plugin/__init__.py",
+          "blob": "c246fc52c3a3e9053cc7180c0ff38d8d8389de42"
+        },
+        {
+          "path": "package.json",
+          "blob": "676878c8932b0693be376f3615e548aaf3a2df9c"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-toolperf-evals",
+      "commit": "4e13ec24fafe94f48c9d96f4bdadb6b5577ebc02",
+      "readme": "README.md",
+      "license": null,
+      "license_file_present": false,
+      "archived": false,
+      "tree_entries": 29,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "bcb195c9647848899439b9c39bc2cc5a12bac1cd"
+        },
+        {
+          "path": "abeval/README.md",
+          "blob": "0f8525eaacf40cb7da6420362705eaa0c3443059"
+        },
+        {
+          "path": "abeval/ab_eval.py",
+          "blob": "176685ecd316f213342509696e61227a36db5c4c"
+        },
+        {
+          "path": "analysis/CANDIDATES.md",
+          "blob": "82e9adf2ed9e9a3bfb834c9219b92f0b24abe872"
+        },
+        {
+          "path": "results/2026-08-06_rerun/README.md",
+          "blob": "b5ca6a161d122ec0f510c7b3c5748ae30e834301"
+        }
+      ],
+      "license_path": null
+    },
+    {
+      "repository": "NousResearch/RL",
+      "commit": "3069f2817e3000918f2665441287b3d1b7c39938",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 976,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "f90091e5afee63785dd9b237b93406f6cfef8c50"
+        },
+        {
+          "path": "nemo_rl/algorithms/grpo.py",
+          "blob": "02e43ae65930b549acfe7fa3602504de68cf3441"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "25113e0fc880e38ef4b9b3d3676ecf71adbfaeba"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/hermes-e2e-evidence",
+      "commit": "65d9ce29294458f59265288ad5e4faf84a9c46d6",
+      "readme": "README.md",
+      "license": null,
+      "license_file_present": false,
+      "archived": false,
+      "tree_entries": 1,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "2e3f88dd73aa31dc0398f0d19e61d64d06e12d34"
+        }
+      ],
+      "license_path": null
+    },
+    {
+      "repository": "NousResearch/vllm",
+      "commit": "81ef3e6a0f7651a97e480d6e340ef809160c801a",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 6876,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "42777436c63dd58fd5d66040261d6ea8e2477c40"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "04f1df204ba85a8fd6e1dc95752e93974f3f185c"
+        },
+        {
+          "path": "vllm/tool_parsers/hermes_tool_parser.py",
+          "blob": "3fd819297aab88411ce4b8aeac8c8bdd56e89aa1"
+        }
+      ],
+      "license_path": "LICENSE"
+    },
+    {
+      "repository": "NousResearch/harbor-fork",
+      "commit": "60d4374d38c669162d18eb6deb0c6a982469f3c2",
+      "readme": "README.md",
+      "license": "Apache-2.0",
+      "license_file_present": true,
+      "archived": false,
+      "tree_entries": 3989,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob": "289663ffaf5d67325078cd833abb53c365e0494c"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob": "d78bb4b36a2ad8bb3d3a6760518b8550af2462a1"
+        },
+        {
+          "path": "src/harbor/agents/installed/hermes.py",
+          "blob": "5f16cbd5416602aeb6a0153f9f3c7f9253f0bc26"
+        }
+      ],
+      "license_path": "LICENSE"
+    }
+  ]
+}

@@ -156,18 +156,41 @@ def _repo_name_from_url(url: str) -> str:
 
 
 def _read_manifest(plugin_dir: Path) -> dict:
-    """Read plugin.yaml and return the parsed dict, or empty dict."""
+    """Read the native YAML manifest and return its mapping, or empty dict."""
     manifest_file = plugin_dir / "plugin.yaml"
     if not manifest_file.exists():
-        return {}
+        manifest_file = plugin_dir / "plugin.yml"
+        if not manifest_file.exists():
+            return {}
     try:
         import yaml
 
         with open(manifest_file, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            manifest = yaml.safe_load(f) or {}
+        if not isinstance(manifest, dict):
+            raise ValueError("Plugin manifest must be a YAML mapping")
+        return manifest
     except Exception as e:
-        logger.warning("Failed to read plugin.yaml in %s: %s", plugin_dir, e)
+        logger.warning("Failed to read %s in %s: %s", manifest_file.name, plugin_dir, e)
         return {}
+
+
+def _validate_plugin_runtime(plugin_dir: Path) -> None:
+    """Reject unsupported runtimes before replacing an existing installation."""
+    if any((plugin_dir / filename).is_file() for filename in ("plugin.yaml", "plugin.yml", "__init__.py")):
+        return
+    if (plugin_dir / "plugin.json").is_file():
+        raise PluginOperationError(
+            "This repository uses the portable plugin.json/MCP format, which "
+            "this Hermes build does not support. It requires the portable "
+            "plugin loader and application discovery from a compatible Hermes release."
+        )
+    if (plugin_dir / "plugin.js").is_file():
+        raise PluginOperationError(
+            "This is a Hermes Desktop JavaScript plugin. Install it through "
+            "the Desktop application's plugin manager; the Python backend "
+            "cannot load it."
+        )
 
 
 def _copy_example_files(plugin_dir: Path, console) -> None:
@@ -384,6 +407,7 @@ def _install_plugin_core(identifier: str, *, force: bool) -> tuple[Path, dict, s
             err = (result.stderr or result.stdout or "").strip()
             raise PluginOperationError(f"Git clone failed:\n{err}")
 
+        _validate_plugin_runtime(tmp_target)
         manifest = _read_manifest(tmp_target)
         plugin_name = manifest.get("name") or _repo_name_from_url(git_url)
 
