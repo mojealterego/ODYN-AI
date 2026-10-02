@@ -329,15 +329,27 @@ class SessionDB:
     # Attempt a PASSIVE WAL checkpoint every N successful writes.
     _CHECKPOINT_EVERY_N_WRITES = 50
 
-    def __init__(self, db_path: Path = None):
+    def __init__(self, db_path: Path = None, *, read_only: bool = False):
+        """Open session storage, or an existing database without migrations/writes."""
+        if not isinstance(read_only, bool):
+            raise TypeError("read_only must be a boolean")
+        self._read_only = read_only
         self.db_path = db_path or DEFAULT_DB_PATH
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not read_only:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.Lock()
         self._write_count = 0
         try:
+            connection_target = str(self.db_path)
+            connection_options = {}
+            if read_only:
+                # as_uri escapes spaces, Unicode, '%' and '#' in database paths.
+                # Do not use immutable=1: an active gateway can append to WAL.
+                connection_target = Path(self.db_path).resolve().as_uri() + "?mode=ro"
+                connection_options["uri"] = True
             self._conn = sqlite3.connect(
-                str(self.db_path),
+                connection_target,
                 check_same_thread=False,
                 # Short timeout — application-level retry with random jitter
                 # handles contention instead of sitting in SQLite's internal
@@ -348,12 +360,17 @@ class SessionDB:
                 # explicit BEGIN IMMEDIATE.  None = we manage transactions
                 # ourselves.
                 isolation_level=None,
+                **connection_options,
             )
             self._conn.row_factory = sqlite3.Row
-            apply_wal_with_fallback(self._conn, db_label="state.db")
+            if read_only:
+                self._conn.execute("PRAGMA query_only=ON")
+            else:
+                apply_wal_with_fallback(self._conn, db_label="state.db")
             self._conn.execute("PRAGMA foreign_keys=ON")
 
-            self._init_schema()
+            if not read_only:
+                self._init_schema()
         except Exception as exc:
             # Capture the cause so /resume and friends can surface WHY the
             # session DB is unavailable instead of a bare "Session database
@@ -367,7 +384,8 @@ class SessionDB:
             # cause that another thread's /resume is about to format.
             # Tests that need to reset the state can call
             # ``hermes_state._set_last_init_error(None)`` explicitly.
-            _set_last_init_error(f"{type(exc).__name__}: {exc}")
+            if not read_only:
+                _set_last_init_error(f"{type(exc).__name__}: {exc}")
             raise
 
     # ── Core write helper ──
@@ -387,6 +405,8 @@ class SessionDB:
 
         Returns whatever *fn* returns.
         """
+        if self._read_only:
+            raise sqlite3.OperationalError("attempt to write a readonly database")
         last_err: Optional[Exception] = None
         for attempt in range(self._WRITE_MAX_RETRIES):
             try:
@@ -432,6 +452,8 @@ class SessionDB:
         from growing unbounded when many processes hold persistent
         connections.
         """
+        if self._read_only:
+            return
         try:
             with self._lock:
                 result = self._conn.execute(
@@ -454,7 +476,8 @@ class SessionDB:
         with self._lock:
             if self._conn:
                 try:
-                    self._conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    if not self._read_only:
+                        self._conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
                 except Exception:
                     pass
                 self._conn.close()

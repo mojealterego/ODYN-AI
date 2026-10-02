@@ -20,15 +20,21 @@ from __future__ import annotations
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Dict, List
 
 from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
+from utils import is_truthy_value
 from .store import MemoryStore
 from .retrieval import FactRetriever
 from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
+
+# Resolve when the active profile opens the database, so clones and renames
+# do not retain the previous profile's concrete default path.
+_DEFAULT_DB_PATH = "$HERMES_HOME/memory_store.db"
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +136,12 @@ class HolographicMemoryProvider(MemoryProvider):
 
     def save_config(self, values, hermes_home):
         """Write config to config.yaml under plugins.hermes-memory-store."""
-        from pathlib import Path
+        from hermes_cli.shared_utils import atomic_yaml_write
+
+        values = dict(values)
+        db_path = values.get("db_path")
+        if isinstance(db_path, str) and Path(db_path).expanduser() == Path(hermes_home) / "memory_store.db":
+            values["db_path"] = _DEFAULT_DB_PATH
         config_path = Path(hermes_home) / "config.yaml"
         try:
             import yaml
@@ -140,16 +151,13 @@ class HolographicMemoryProvider(MemoryProvider):
                     existing = yaml.safe_load(f) or {}
             existing.setdefault("plugins", {})
             existing["plugins"]["hermes-memory-store"] = values
-            with open(config_path, "w", encoding="utf-8") as f:
-                yaml.dump(existing, f, default_flow_style=False)
+            atomic_yaml_write(config_path, existing)
         except Exception:
             pass
 
     def get_config_schema(self):
-        from hermes_constants import display_hermes_home
-        _default_db = f"{display_hermes_home()}/memory_store.db"
         return [
-            {"key": "db_path", "description": "SQLite database path", "default": _default_db},
+            {"key": "db_path", "description": "SQLite database path", "default": _DEFAULT_DB_PATH},
             {"key": "auto_extract", "description": "Auto-extract facts at session end", "default": "false", "choices": ["true", "false"]},
             {"key": "default_trust", "description": "Default trust score for new facts", "default": "0.5"},
             {"key": "hrr_dim", "description": "HRR vector dimensions", "default": "1024"},
@@ -235,7 +243,7 @@ class HolographicMemoryProvider(MemoryProvider):
         return tool_error(f"Unknown tool: {tool_name}")
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        if not self._config.get("auto_extract", False):
+        if not is_truthy_value(self._config.get("auto_extract", False)):
             return
         if not self._store or not messages:
             return
@@ -251,6 +259,11 @@ class HolographicMemoryProvider(MemoryProvider):
                 logger.debug("Holographic memory_write mirror failed: %s", e)
 
     def shutdown(self) -> None:
+        if self._store is not None:
+            try:
+                self._store.close()
+            except Exception as e:
+                logger.debug("Holographic shutdown close() failed: %s", e)
         self._store = None
         self._retriever = None
 
