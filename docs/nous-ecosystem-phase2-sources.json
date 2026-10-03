@@ -1,0 +1,2210 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-03",
+  "target_repository": "mojealterego/ODYN-AI",
+  "target_branch": "codex/termux-five-goals",
+  "target_base_commit": "1e25cd6c20a2f8328183754bd03ef9326bf77b8d",
+  "method": "Static review of pinned Git refs, recursive tree, root README/licenses/manifests and selected integration code. Not a full security audit; external services, upstream tests and model benchmarks were not all executed.",
+  "duplicate_input_urls": [
+    "NousResearch/nomos",
+    "NousResearch/cline"
+  ],
+  "owner_catalog": {
+    "observed_accessible_repositories": 504,
+    "public_repositories": 501,
+    "scope": "Inventory only; not a code audit of all owner repositories. Private repository identities omitted."
+  },
+  "repositories": [
+    {
+      "repository": "NousResearch/speculators",
+      "commit": "dd6d7f93fd08d7b456f3b6313feb02fc4dd08d38",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 336,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "588f025f11004307a3bca0a699011ce2a3fbe413"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "e7ec54071a83b79278d0278fa3549bdcad0d4110"
+        },
+        {
+          "path": "docs/user_guide/tutorials/serve_vllm.md",
+          "blob_sha": "b6e4ceba6d2e9d62f8ce85bf532100128b22be5e"
+        }
+      ],
+      "opportunity": "Draft modele i testy speculative decoding dla vLLM.",
+      "decision": "P1: zdalny serwer + dobór draft/verifier i pomiar akceptacji, TTFT, tok/s, RAM; nie mechanizm dwóch dowolnych GGUF w APK."
+    },
+    {
+      "repository": "NousResearch/atropos",
+      "commit": "296a0bc55760e43b9c0743c052f8d6c2732606d1",
+      "default_branch": "main",
+      "archived": true,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 867,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5700b997827973cb0eb6d84a2782bb08a5872434"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "f8c0a7b9c8df6a716a5db670bc9c82e4aa8d8b27"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "6f23666c327c58f55a5d2dac479f8f7614649f17"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "85f519285c5fe6c5682c19d2a00cfeb0490f3db0"
+        }
+      ],
+      "opportunity": "Środowiska RL i zbieranie trajektorii.",
+      "decision": "P3: archiwalne źródło metod; osobny runner treningowy, nie zależność agenta."
+    },
+    {
+      "repository": "NousResearch/wandb-rs",
+      "commit": "c5f552464f13d56a5abd73c2dfb88b193e991d4e",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 43,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "f70f86b6f2247fda00a2a4518bb543268dfc09e0"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "5016e4604fbf82e2732a7a7adea57a114da0add7"
+        }
+      ],
+      "opportunity": "Logowanie eksperymentów w Rust; finish opróżnia kolejkę.",
+      "decision": "P3: tylko przyszły komponent Rust; nie dodawać Rust dla istniejących logów Pythona."
+    },
+    {
+      "repository": "NousResearch/hermes-agent-self-evolution",
+      "commit": "0a929e3aa20e15cf04dc7c28492a7d41a5139125",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 44,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "c59f9a6a57e36edbc2aae6b76aeee2e4878e63a8"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "dae7f461bd5a0d2eb30bad1fa1aac612d5ecedb4"
+        },
+        {
+          "path": "evolution/core/constraints.py",
+          "blob_sha": "d6b13459d4da382e87b1dc7e8c79d7d80a9233ef"
+        },
+        {
+          "path": "evolution/core/dataset_builder.py",
+          "blob_sha": "3a430ce13d550f14ae2cf7efa8e89b5efbe625b7"
+        }
+      ],
+      "opportunity": "DSPy/GEPA do ewolucji umiejętności; dalsze fazy są planami.",
+      "decision": "P1: osobne środowisko, zbiory walidacyjne, limit kosztu, draft PR; kod testuje przez bezpośredni pytest i limit 300 s, co nie odpowiada naszemu wrapperowi ani pełnemu CI."
+    },
+    {
+      "repository": "NousResearch/pokemon-agent",
+      "commit": "f8a03e4a8bc58f1d9dda6d677a7436cc832a57a9",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 40,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5700b997827973cb0eb6d84a2782bb08a5872434"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "36af25f972a4a61df5f6d8e16264b202bef2ec53"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "625df51b71e49dcf94b289935b4424c171749f08"
+        }
+      ],
+      "opportunity": "Headless emulator, stan gry z RAM, screenshot i HTTP API.",
+      "decision": "P2: opcjonalne środowisko benchmarkowe na hoście; PyBoy/PyGBA i własny ROM. Nie dodawać emulatora do bazowego APK."
+    },
+    {
+      "repository": "NousResearch/neural-steering",
+      "commit": "0083b8530a14f353d19737b944be8d93b2b130a5",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 22,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "b77bf2ab726c6e7cb5a81a9d3b7dc38266ebfd3d"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "a899e1e06a8f899a2d310922a1069433e0a5e1cc"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "949b96e8eb81de0d050464bf2a056f53365843a1"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "ca1271ee2a9897c169b839d9f7728c9e25087580"
+        }
+      ],
+      "opportunity": "Przypisywanie zachowań neuronom i sterowanie aktywacjami.",
+      "decision": "P3: eksperyment na modelu Transformers/CUDA; README wymaga GPU z 16+ GB VRAM. Nie działa automatycznie przez API lub na dowolnym GGUF."
+    },
+    {
+      "repository": "NousResearch/Nemotron",
+      "commit": "02d6bd036ec364c34dc9f0145413c7fe72a890e6",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 723,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "ebe41cedf088ff68054396d4365b9bdeb78fe764"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "d11b14ad4937b550d7f5effd6c01e4e92007d267"
+        }
+      ],
+      "opportunity": "Przepisy danych, treningu, wdrożenia i agentów.",
+      "decision": "P1/P3: kwalifikować konkretny model lub endpoint; osobno sprawdzić licencję wag. Root LICENSE Apache-2.0 i deklaracja MIT w pyproject są niespójne."
+    },
+    {
+      "repository": "NousResearch/Megatron-LM",
+      "commit": "873678adafa71702ef7e7a405a7f4a3377dd2727",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 3303,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "4570d9283c47535b6d6c569339db35daa75ffdff"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "9a62f9bb750542134004dc9cf1cdbbbf8f233500"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "9f376260c0dee4f2ff9e7d7696c4f7b4ced0a029"
+        }
+      ],
+      "opportunity": "Równoległy trening dużych modeli i Megatron Core.",
+      "decision": "P3: zewnętrzny klaster; root LICENSE zawiera warunki BSD i wyjątki, a metadane deklarują Apache. Nie przenosić całego drzewa do Hermesa."
+    },
+    {
+      "repository": "NousResearch/Megatron-Bridge",
+      "commit": "e1a207ac757e5d0ed94d8ffbe1cbd28e81d8c084",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 2170,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "fb84cd79735c2f36b2d59f45ed5c4acbf119ce77"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "57f5616ecf5263e107a9f0b825bf2fd83048fd7b"
+        }
+      ],
+      "opportunity": "Konwersja HF↔Megatron i przepisy treningowe.",
+      "decision": "P3: pipeline konwersji checkpointów przed dystrybucją modelu; nie runtime GGUF."
+    },
+    {
+      "repository": "NousResearch/hermes-compression-eval",
+      "commit": "b65773b401874863b3dab94d6b0bd3d19fd95688",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 23,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "358be2ceece5c2bbb844affbcd1bf189e78f492d"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "b3a056d97b57673e23a9e97c4200780d6483d6f6"
+        },
+        {
+          "path": "compressor_driver.py",
+          "blob_sha": "b53814dc6adc61a61a75afb23539e67ddaed2960"
+        },
+        {
+          "path": "tests/test_compression_eval.py",
+          "blob_sha": "ca34e340d5c09b850e405af9dbaf43379df503cf"
+        }
+      ],
+      "opportunity": "Ocena zachowania informacji po prawdziwej kompresji.",
+      "decision": "WDROŻONO poprawki ujawnione przeglądem ścieżki kompresji; P1: niezależne probe-evale z limitem kosztu. Brak wyniku LLM-as-judge dla tego wdrożenia."
+    },
+    {
+      "repository": "NousResearch/agent-governance-toolkit",
+      "commit": "d93e32c526ef1a7282cfb3508665e8293cf05800",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 4461,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "22aed37e650bbf933b6983cda9c2c5db65dcdd04"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "31a2ffeb8f12ca34ed4abcf873949b17d064f8aa"
+        },
+        {
+          "path": "agent-governance-python/agent-os/modules/control-plane/src/agent_control_plane/policy_engine.py",
+          "blob_sha": "57fba6b4f4e56fa22bbacf5443b5548200e44b5a"
+        }
+      ],
+      "opportunity": "Deterministyczne polityki, tożsamość, audyt i SRE.",
+      "decision": "WDROŻONO ogólne fail_closed dla pre_tool_call; P1: opcjonalny adapter polityk. Nie instalowano całego AGT i nie uzyskano certyfikacji OWASP ani izolacji OS."
+    },
+    {
+      "repository": "NousResearch/hermes-example-plugins",
+      "commit": "38fe0fb53eff98d477f807432e965429e665ca33",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 26,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5700b997827973cb0eb6d84a2782bb08a5872434"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "2d22f050204893fa5ffeb9387fc86f1827715685"
+        },
+        {
+          "path": "plugin-llm-example/__init__.py",
+          "blob_sha": "7786dd0cbb835a6570dd8c758004e2d0a416266d"
+        },
+        {
+          "path": "plugin-llm-async-example/__init__.py",
+          "blob_sha": "ccf0c29538fb8019d92eff333ffb69a2d9882b35"
+        }
+      ],
+      "opportunity": "Wzorce ctx.llm, structured output, async i dashboard.",
+      "decision": "P1: sprawdzić kontrakty na własnym host API i instalować wybrany podkatalog; UI później. Kod async równolegli forward+klasyfikację, a back-translation zależy od forward i jest sekwencyjne."
+    },
+    {
+      "repository": "NousResearch/kanban-video-pipeline",
+      "commit": "a464bdda58d9d7784225d972668129323de519a3",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 29,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "d1e576968c3aa716a90e7280e69cf540fe07c700"
+        },
+        {
+          "path": "setup.sh",
+          "blob_sha": "9ff4996819a6f5afbfe29ce1e810b4e739bd6a60"
+        }
+      ],
+      "opportunity": "Trwały DAG zadań i role twórczej produkcji wideo.",
+      "decision": "P2: nowy workflow na istniejącym Kanbanie; setup.sh modyfikuje profile i konfigurację, wymaga adaptacji i izolowanego workspace. Nie uruchomiono tego skryptu."
+    },
+    {
+      "repository": "NousResearch/tinker-nemogym",
+      "commit": "ebd1c3ce642500b0d505978924ae37ac95960e38",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 141,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5700b997827973cb0eb6d84a2782bb08a5872434"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "fe9eaa9fa3a2d8531f884a54a9ca51e822dee7cb"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "6d6f666087c80164fb8b431cf0fdfbf1066c0ed1"
+        }
+      ],
+      "opportunity": "NeMo-Gym połączony z zarządzanym treningiem LoRA Tinker.",
+      "decision": "P3: klucz i koszt usługi, osobny trainer; telefon może sterować jobem, nie trenować lokalnie tą biblioteką."
+    },
+    {
+      "repository": "NousResearch/OpenShell",
+      "commit": "40e9bf6feb7202625580e50863ad7abf456f97af",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 741,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "b51aee3c2521d583ccdd064d001dba23737c74d5"
+        },
+        {
+          "path": "LICENSE",
+          "blob_sha": "f76e7a1eb75b21354f10e48a5f4eedb3bb5de40d"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "aaa851452f01edfdeaec758cb87802925ec6d7d6"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "71ceed34fd57b4ca9a9161c6a9aa7f1d9d5b2766"
+        }
+      ],
+      "opportunity": "Kontenerowe sandboxy, deklaratywne reguły sieci i filesystem.",
+      "decision": "P1: opcjonalny zdalny backend po kwalifikacji; alpha, wymagany Docker. Nie sandbox dla całego procesu Hermesa przez samo podłączenie terminala."
+    },
+    {
+      "repository": "NousResearch/wterm",
+      "commit": "615efcde2fb8e1415e7b8f0d8ddc107600c0f48b",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 279,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "9b73ea8111a4d1f17e4afffb93e867401c7be597"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "b149fbdaf446db433a866c55a1151de4f09745a4"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "ec19925eec72776864c5fd5fe5920f220ad1c975"
+        }
+      ],
+      "opportunity": "Terminal DOM z rdzeniem Zig/WASM.",
+      "decision": "P2/UI: test zgodności ANSI/PTY, klawiatury mobilnej i accessibility przed zmianą terminala; obecny xterm/Ink pozostaje."
+    },
+    {
+      "repository": "NousResearch/autoreason",
+      "commit": "538f8817550e7c76c92355a967c5363d55ef9659",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 10671,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "f013fbb0614fbd44d1e2c138f1b6cd32ea1407f2"
+        }
+      ],
+      "opportunity": "Porównanie incumbent, revision i synthesis przez niezależnych sędziów.",
+      "decision": "P1: budżetowana opcjonalna strategia krytyka ze stopem i zachowaniem wersji bazowej; wyniki README nie są wynikami naszego agenta."
+    },
+    {
+      "repository": "NousResearch/OpenShell-Community",
+      "commit": "36c558e929359830bf272868f42de7bf47bd2716",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 132,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "0a3f705806bf29ff9db3252d5da4d371fde38c20"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "53eca443329052b6783bc66b7dcf46e21cae53f6"
+        }
+      ],
+      "opportunity": "Obrazy, launchables i integracje ekosystemu OpenShell.",
+      "decision": "P2: kwalifikować pojedyncze obrazy i polityki na zdalnym hoście; nie drugi zamienny core."
+    },
+    {
+      "repository": "NousResearch/ink",
+      "commit": "c668595f1f43d2c549df54433d02bc6c8714edb4",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "license"
+      ],
+      "tree_entries": 288,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "license",
+          "blob_sha": "fcb8fa9e131348df733a6ce59aa0d5a9c7b6f331"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "30bd92d4516f74e1a7aa116987ecbe537d1d2c6f"
+        },
+        {
+          "path": "readme.md",
+          "blob_sha": "1ccde74c34e3cfc75cf7c5ddb35a66f88bce5256"
+        }
+      ],
+      "opportunity": "Renderer React dla CLI, już używany w architekturze TUI.",
+      "decision": "P2/UI: selektywne poprawki i testy zgodności; podany fork deklaruje Ink 7 i Node >=22, nie automatyczny upgrade całej aplikacji."
+    },
+    {
+      "repository": "NousResearch/hermes-paperclip-adapter",
+      "commit": "937ea71a34f5efcaa3834b11fdd08cfc1c99cb2c",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 24,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5700b997827973cb0eb6d84a2782bb08a5872434"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "af06e3a560c6325ecdcd591f8f41cb8c32baa90f"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "6212ee5d33a3359db6c58add0645ee3597de09e6"
+        },
+        {
+          "path": "src/server/execute.ts",
+          "blob_sha": "e92576b79a0bf3d277ae1a403c164264a88fd704"
+        }
+      ],
+      "opportunity": "Zarządzane zadania, resume i strukturalne transkrypty w Paperclip.",
+      "decision": "P2: opcjonalny adapter na serwerze Paperclip; kod wymienia --yolo, więc przed użyciem wymaga ustalenia zatwierdzeń, profilu, timeoutów i whitelist narzędzi."
+    },
+    {
+      "repository": "NousResearch/torchtitan",
+      "commit": "efa84766c8471da45f614db3dc557d02ce4df055",
+      "default_branch": "dev-updated-again",
+      "archived": false,
+      "github_license": "BSD-3-Clause",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 590,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "6d1df98ff6031178472ac043e5b4e11ea39568b2"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "0fa3ae04663a84b841d8eb78b701410a355866fc"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "f26314671c14abb74fcd30fc47f0fb98943b590c"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "72b541c1ebfb66b23c531bb7cbdb75396eef9592"
+        }
+      ],
+      "opportunity": "PyTorch native trening z wielowymiarową równoległością.",
+      "decision": "P3: zewnętrzny trening i walidacja modeli; nie zależność aplikacji mobilnej."
+    },
+    {
+      "repository": "NousResearch/yhack",
+      "commit": "8a1c0e38a34a66d5953503c674a32a697a64297a",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 1,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "index.html",
+          "blob_sha": "5226f287d8a0c93bcbb22a08d6942d5a95d7304e"
+        }
+      ],
+      "opportunity": "Jednoplikowa strona dystrybucji kredytów API wydarzenia.",
+      "decision": "REF: brak biblioteki runtime do integracji; nie przenosić eventowego przepływu kredytów do produktu."
+    },
+    {
+      "repository": "NousResearch/tinker-atropos",
+      "commit": "ac3a1650e33ab5bfeee2df32f511120a259d667f",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 31,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "058c9f2dbaa20e3e0a23d888665ca30ee147b79c"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "5cf5c172980d7072122c2a4580f6e42e3aa27427"
+        }
+      ],
+      "opportunity": "Połączenie środowisk Atropos z API Tinker.",
+      "decision": "P3: alternatywny zewnętrzny trainer; uwzględnić archiwizację Atropos i koszty, nie dublować tinker-nemogym bez benchmarku."
+    },
+    {
+      "repository": "NousResearch/autonovel",
+      "commit": "d165f267a0ffd34f3b0a70a8a72ac38cb8e4a542",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 60,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "a04848c74a646101e90ba0e855220649d0fffb29"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "813bd367a40e4617286a5161ce77f1e8d66f4d75"
+        },
+        {
+          "path": "run_pipeline.py",
+          "blob_sha": "7c969773cb78976a3ffe31cb03dbc5d1584ac1af"
+        }
+      ],
+      "opportunity": "Etapowa produkcja książki, wersjonowanie, ocena i plateau stop.",
+      "decision": "P2: opcjonalny workflow pisarski z trwałym stanem i limitami; nie wykonywać na ślepo subprocessów i publikacji. Bez jawnego LICENSE w root nie kopiowano implementacji."
+    },
+    {
+      "repository": "NousResearch/solana-flake",
+      "commit": "c1e48211971952ef6b3975c6d8fdc1f79ed7418a",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 10,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "22f0d280e4dd75ee603c755a28c7332edee6bca1"
+        }
+      ],
+      "opportunity": "Nix toolchain Solana CLI, rustc i Anchor.",
+      "decision": "REF: nie poprawia głównego runtime Hermesa; tylko przyszłe, osobno zamówione narzędzia blockchain."
+    },
+    {
+      "repository": "NousResearch/iroh-fake-store",
+      "commit": "b06cf0135dd65de3336815eaf4dc4a6ba552b3b1",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 9,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "5bde95386f7d12a488ba664d33b140ab7f27ac4c"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "edb874dd1d59dc3d61d11d1cf78bc901a64d9225"
+        }
+      ],
+      "opportunity": "Deterministyczny store generujący duże bloby do testów.",
+      "decision": "P3: narzędzie testów przyszłego transferu P2P; wymaga zgodnych wersji iroh-blobs 0.98/iroh 0.96, nie magazyn rzeczywistych modeli."
+    },
+    {
+      "repository": "NousResearch/tch-rs",
+      "commit": "39346539c614a7f0bef9f3678354eefdf06daaf5",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ],
+      "tree_entries": 252,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "5178c8edcd96aebaa1bcf83fd1d437dbadf9aef9"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "a553932c2efe124406edf9ec772808e1ae97d878"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "blob_sha": "31aa79387f27e730e33d871925e152e35e428031"
+        }
+      ],
+      "opportunity": "Rust bindings do libtorch.",
+      "decision": "P3: ewentualny osobny worker Rust; README wymaga libtorch 2.7.0. Nie zamiennik lekkiego runtime Android."
+    },
+    {
+      "repository": "NousResearch/torchtitan_tests",
+      "commit": "3513c4305b1729ea7fa73f6a56aa1a74a9c42834",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 61,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "ci/README.md",
+          "blob_sha": "949e1d476fc59c57c609f9d54bae0edd6631be81"
+        }
+      ],
+      "opportunity": "CI/benchmarki Slurm dla torchtitan.",
+      "decision": "P3: inspiracja powtarzalną kwalifikacją GPU; runner opisuje joby 8 GPU, nie Android CI."
+    },
+    {
+      "repository": "NousResearch/pico",
+      "commit": "281b3f208cc3e8769b5d43cf520ccc04dc8b71cb",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 351,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "f5786a844188f97f08debddf2819d3d6cd4f5686"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "de1ceae668800000bd3276c6aa02e25e9bed6e0a"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "26230a94cee5c47d1ecc32aefbed1f2cb9da2270"
+        }
+      ],
+      "opportunity": "Pomiary komunikacji zbiorowej MPI/NCCL, dane środowiska i wykresy.",
+      "decision": "P3: osobny benchmark klastra; MPI/C++ wymagane, CUDA opcjonalna. Root MIT i osobne BSD-4 dla schedgen."
+    },
+    {
+      "repository": "NousResearch/LeastLoadedEP",
+      "commit": "411138bc1afae4e7c568c92cb9c55926701794a9",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE.txt"
+      ],
+      "tree_entries": 23,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.txt",
+          "blob_sha": "3ec50bb7c7e163982237699723a47ee18cc1ceee"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "42750d756042796e6820edd4345c382450d0877d"
+        }
+      ],
+      "opportunity": "Równoważenie obciążenia ekspertów MoE przez rerouting parametrów/tokenów.",
+      "decision": "P3: integracja po stronie wielo-GPU training/inference; brak przełożenia na tok/s S24 przez dodanie pakietu do klienta."
+    },
+    {
+      "repository": "NousResearch/nccl-tests",
+      "commit": "ae98985f5599617be94042f4aa3637d10014ce89",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "BSD-3-Clause",
+      "root_license_paths": [
+        "LICENSE.txt"
+      ],
+      "tree_entries": 35,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.txt",
+          "blob_sha": "4573c07c449eecabd7ca5c5cc2fcf1291998a146"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "a9071c4b537f2df038694b166995a5eb73cb6284"
+        }
+      ],
+      "opportunity": "Poprawność i wydajność operacji NCCL.",
+      "decision": "P3: zewnętrzny etap infrastruktury GPU/CUDA/NCCL, MPI dla wielu procesów."
+    },
+    {
+      "repository": "NousResearch/lm-evaluation-harness-pretraining",
+      "commit": "249f53ecc866cb9b931429d5c14261eea9e8706a",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE.md"
+      ],
+      "tree_entries": 16506,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.md",
+          "blob_sha": "12e6063183935e876e232db276568baf4954b492"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "ca077ce4d132e0a40ecf738235c38421b3d65400"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "ec9f87d947d3de1b08491146cad450c3c1f4473e"
+        }
+      ],
+      "opportunity": "Nowszy fork evali modeli z konfiguracją i backendami.",
+      "decision": "P1: niezależny zestaw jakości modeli; wybrać i przypiąć jeden harness, a nie instalować wszystkie trzy podobne eval-frameworki."
+    },
+    {
+      "repository": "NousResearch/Hermes-Function-Calling",
+      "commit": "ea3c4723e4cefdac760d483ccac6c8a428c95ab8",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 44,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "13d69902fbeaae23a982dbdec8f526a2e6ce6fb6"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "42aa8a1ae92369e6b504f93402f43a97abae087a"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "406a736ba98f506143ba46d4dfa2eb9213922fc3"
+        },
+        {
+          "path": "functioncall.py",
+          "blob_sha": "7d0d54495e2c822f18239eb8f2becc122fefdbb5"
+        }
+      ],
+      "opportunity": "Przykłady formatowania i walidacji Hermes Pro tool calls.",
+      "decision": "P1: zbiory regresji parsera i JSON schemas; nie drugi dispatcher Transformers/flash-attn obok natywnej pętli."
+    },
+    {
+      "repository": "NousResearch/nomos",
+      "commit": "f7008a065072d11088878e2f499776a5ae4b5c95",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 142,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "75410e73319c72cd3e991a501c5455eb78f38375"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "03fa4d27f3c4e814eb919be69b0631405f0c473f"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "48850890b76cf8347b666e7a84f7218321b15bc5"
+        },
+        {
+          "path": "solve_agent.py",
+          "blob_sha": "953b974d300a80135a41b1b73fc31ad4eaaa1dfb"
+        }
+      ],
+      "opportunity": "Wieloetapowe rozwiązywanie matematyki, ocena i turniej odpowiedzi.",
+      "decision": "P2: opcjonalny workflow matematyczny z budżetem i niezależną weryfikacją; ocena LLM nie jest formalnym dowodem."
+    },
+    {
+      "repository": "NousResearch/smc-inference-server",
+      "commit": "4c5fade5ef89965079c5866ff302893227491e3d",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 28,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "429fb25b7615c923a6e3abe990c342805d84c6f1"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "0582420b718635426cb4e5d82e2dbd2ca0a8769d"
+        }
+      ],
+      "opportunity": "Sequential Monte Carlo steering przez llamppl/vLLM.",
+      "decision": "P3: zdalny eksperymentalny serwer GPU/Docker; sprawdzić format API i sampler przed podłączeniem."
+    },
+    {
+      "repository": "NousResearch/cline",
+      "commit": "9e3de8051edf1348f8d6e454d4f0cf3e727ddfa6",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 1900,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5fb83b31e24f857194e923538a892f4788aa1077"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "919988b75250211efb7646a161eb8b6cf1b5d505"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "483094d250f59b3ac66d7b5355648cfe00701cab"
+        }
+      ],
+      "opportunity": "Agent programistyczny VS Code, MCP i zatwierdzenia.",
+      "decision": "P2: wzorce checkpointów/diffów i integracja IDE przez istniejący ACP; nie przenosić całego VS Code extension runtime do APK."
+    },
+    {
+      "repository": "NousResearch/DeepEP",
+      "commit": "77a80e884389466a7089db6f5448659c9196d003",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 47,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5c48bdc9f6ef95f725096ff5434012da927b516f"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "c83961f2c96cb87f459bd69ccf8929360ff70ae7"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "f4968d3c76d18e300f368fb6f5692572c75294e5"
+        }
+      ],
+      "opportunity": "All-to-all komunikacja GPU dla MoE/EP.",
+      "decision": "P3: zdalne GPU/NVLink/RDMA; kernel nie optymalizuje mobilnego klienta lub każdego modelu dense."
+    },
+    {
+      "repository": "NousResearch/openai-evals",
+      "commit": "4bfc1f58a821685acb40bb28ba54131740535046",
+      "default_branch": "nous",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [
+        "LICENSE.md"
+      ],
+      "tree_entries": 2390,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.md",
+          "blob_sha": "405cc0eb38b5f0fafdf33bacacc3b16c14e3d2b4"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "b6d57c76ee5b1361834b415ffbb63bb9c5f3ff68"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "15149c3b2e223e51fb3f845f8eefa369e098d2d0"
+        }
+      ],
+      "opportunity": "Rejestr i framework evali LLM/systemów.",
+      "decision": "P1: osobne, przypięte środowisko z fixture i limitami API; nie wynik jakości tylko dlatego, że testy Python są zielone."
+    },
+    {
+      "repository": "NousResearch/llm-abliteration",
+      "commit": "f1148c90753cb5ea4cb6763a73f15c5635957f6a",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "GPL-3.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 22,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "f83ce76de4966190781d396a5da2b4dbf890479c"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "8eb85fbbd981eb387a078dd6fa931d59f5e45c2e"
+        }
+      ],
+      "opportunity": "Eksperymentalna modyfikacja kierunków aktywacji/wag Transformers.",
+      "decision": "P3: odrębna praca nad wagami, benchmark jakości i licencja GPL-3.0; nie automatyczne usuwanie odmów dla każdego providera."
+    },
+    {
+      "repository": "NousResearch/harbor",
+      "commit": "783b9670dfe5573930c590a3b4971371a31af4b4",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 378,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "f9a719236d08af7fedc507bf0d274c9916dbe742"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "28305c3ae310b6406c766b01a2679ed37b471868"
+        }
+      ],
+      "opportunity": "Izolowane benchmarki i rollouts agentów.",
+      "decision": "P1: zewnętrzne Python >=3.12 i Docker/cloud. Ten pinned fork nie zawiera adaptera Hermes; nie zakładać zgodności z wcześniej analizowanym harbor-fork."
+    },
+    {
+      "repository": "NousResearch/lighteval",
+      "commit": "444642b1a340a9c60ae8aaec2ab768244f216a00",
+      "default_branch": "nous",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 316,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5e9693e35ec7ea0f8a759594f4f76752c2eaa9dd"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "44af6a8a5dbf0d7c26121788e4fcc766b281980c"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "f8d7f8d56165f85c475c6aab9f43b6a543773f90"
+        }
+      ],
+      "opportunity": "Ocena modeli na wielu backendach.",
+      "decision": "P1: niezależny runner i pin konfiguracji/modelu; API/generacja/loglikelihood mają różne wymagania."
+    },
+    {
+      "repository": "NousResearch/scaling-transformer",
+      "commit": "478cdd2a2a78038c99adbf161c2de2b9fc5993ef",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 28,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "6bd9e3eec444ca6116f74b1fcd6c471099abcb36"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "25905e72e4298dac880d922987cc23eba3441b21"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "141a67045945005d88540e9e395d33d41a364079"
+        },
+        {
+          "path": "src/scaling_transformer/core/hardware.py",
+          "blob_sha": "ad3dc66984b69d6bb21793776e38749416dc782c"
+        }
+      ],
+      "opportunity": "Analiza roofline i modeli przepustowości GPU/TPU.",
+      "decision": "P3: planowanie serwera; źródło hardware.py zawiera modele H100/A100/TPU, nie silnik inference Android."
+    },
+    {
+      "repository": "NousResearch/Liger-Kernel",
+      "commit": "99a90f7cc42a0606c1680cca3999cb498ab75723",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "BSD-2-Clause",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 343,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "d2fcc2b1c4384d0bcd1424b7f83db8e48fa753f6"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "93ec85b22d00e33a62f105cd1b38d4f2fe6aed09"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "4ef695b4ffe9ce341f076eb88d3e3cb772d574df"
+        }
+      ],
+      "opportunity": "Triton kernels do treningu LLM.",
+      "decision": "P3: osobny trainer GPU, selektywnie kwalifikować obsługiwany model; nie wprowadzać Triton do bazowego APK."
+    },
+    {
+      "repository": "NousResearch/DisTrO",
+      "commit": "24f10628c28692c01e7d282823fd158140b4bcee",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 2,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "56d6d59c303d8ee946242625b997b1bd231cbe82"
+        }
+      ],
+      "opportunity": "Repo publikacji i linków do rozproszonego treningu.",
+      "decision": "REF/P3: pinned drzewo zawiera README i raport PDF, nie implementację optymalizatora; właściwy kod jest wskazany poza repo."
+    },
+    {
+      "repository": "NousResearch/iroh-blobs",
+      "commit": "46454523802b4486f052421600c9e551bfb4f59c",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ],
+      "tree_entries": 116,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "764970a8e166a02d22f31d461cafa506b7d9fa53"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "2f374e8fbf407f955267616fab1af11396abd1c9"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "blob_sha": "e2db9284926852ff674979ca3aba5634c8a627d3"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "blob_sha": "2d5f18dd41d651dc325cf4d6349130670109cc50"
+        }
+      ],
+      "opportunity": "Transfer content-addressed BLAKE3 ze wznawianiem zakresów.",
+      "decision": "P2: przyszła dystrybucja modeli/artefaktów P2P; aktualny README ostrzega o nieprodukcyjnej wersji. Konieczne podpisy manifestów, limity i wersje protokołu."
+    },
+    {
+      "repository": "NousResearch/huskyholdem-bench",
+      "commit": "eb149674a41e94459e00630aeb0d3c18e86c0613",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 714,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "8c4022eee8f51b033f29684b0912dd3511c8cece"
+        }
+      ],
+      "opportunity": "Generowanie i testowanie botów pokerowych w izolowanych kontenerach.",
+      "decision": "P3: benchmark strategii i iteracyjnego kodowania, nie moduł finansowy czy zarabianie w Hermesie."
+    },
+    {
+      "repository": "NousResearch/creative-writing-bench",
+      "commit": "e7ab00917c96aeae577e3eeea15eba882be9d5e0",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 369,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "3b2a5a7860a87d6fef18743f60efc453b49793a1"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "5e00fa334c60b2c08f6f5e23f01628b86c110ae3"
+        }
+      ],
+      "opportunity": "Rubryki, porównania parami i ranking kreatywnego pisania.",
+      "decision": "P1/P2: opcjonalny eval jakości narracji; oddzielić ocenę sędziego od poprawności faktów i testować bias długości/języka."
+    },
+    {
+      "repository": "NousResearch/eqbench3",
+      "commit": "3c21bcc514bd43f93a00a5cf9c630aa3eb73a380",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 377,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "2124bf8da0d50abc1eb52ab616595794426524e2"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "100cda4288cf47c86bce0c39087ae3f0d8ff9548"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "13f201f106810f81e1c54b2101cb96f76de4003e"
+        }
+      ],
+      "opportunity": "Wieloturowe scenariusze EQ i pomocniczy sędzia.",
+      "decision": "P1/P2: eval empatii/dynamiki rozmowy; nie potwierdzenie kompetencji klinicznych ani polskiej lokalizacji."
+    },
+    {
+      "repository": "NousResearch/lm-eval-harness",
+      "commit": "44840ee3d3b62fc04a3c25ddd3aa90750f4dc096",
+      "default_branch": "nous",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE.md"
+      ],
+      "tree_entries": 8454,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.md",
+          "blob_sha": "12e6063183935e876e232db276568baf4954b492"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "f16f6d9aeeba0cbc383a21b62b192baa1af86102"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "4ad86de320286f7c75cfdd45560bcd1621e21bb6"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "d6e1198b1ab1f5a7f19c6f1fc2ba7338438cf718"
+        }
+      ],
+      "opportunity": "Fork klasycznego harnessu modeli z API backends.",
+      "decision": "P1: alternatywa dla nowszego lm-evaluation-harness-pretraining; przypiąć zadania, tokenizację i sposób usuwania reasoning."
+    },
+    {
+      "repository": "NousResearch/iroh",
+      "commit": "d915bfdff45235f90e06e7a8502bebebd6621857",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ],
+      "tree_entries": 223,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "593f1d0ec7345578341c2d1c06819182ddd46980"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "0e04b6bab50bf5ba5e6a3c94dc7a19a455c8d2c9"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "blob_sha": "e2db9284926852ff674979ca3aba5634c8a627d3"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "blob_sha": "2d5f18dd41d651dc325cf4d6349130670109cc50"
+        }
+      ],
+      "opportunity": "QUIC, tożsamość public-key, hole punching i relay.",
+      "decision": "P2: przyszły kanał urządzenie↔worker; wymaga mobilnych testów reconnect, zużycia energii i zarządzania kluczami."
+    },
+    {
+      "repository": "NousResearch/longform-writing-bench",
+      "commit": "d1c625505b1cf8baf32a49c8e21a9cf93a254044",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 409,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "138ace200d848d9001a01ba902272c418beae0f7"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "ea1d55bb4ff187fd57579cb2851aa0d2ccb69439"
+        }
+      ],
+      "opportunity": "Planowanie, draft, krytyka i spójność wielorozdziałowej narracji.",
+      "decision": "P1/P2: eval zachowania faktów i postaci w długiej pracy; koszty generacji/sędziego i licencję sprawdzić przed kopiowaniem datasetów."
+    },
+    {
+      "repository": "NousResearch/litellm",
+      "commit": "1e6c1f84c782f63fea90f6fbc0781d552ec01de2",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 3603,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "3bfef5bae9b48c334acf426d5b7f21bc1913aab9"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "01a60310522b0eea774ec36f26665e0e099c8504"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "640f15dc28c606447a7b7c14c6bfab73ec86abda"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "bd5a1797c39eb310a5bb56128db2b2a1b8348eb7"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "3e8f4361c72463cd9539c5ad6baea89ff6bab43c"
+        }
+      ],
+      "opportunity": "Proxy/API ujednolicające providerów.",
+      "decision": "P2: ewentualny zdalny proxy przez istniejący OpenAI-compatible endpoint, nie nowa domyślna zależność. MIT poza enterprise; enterprise ma odrębne warunki."
+    },
+    {
+      "repository": "NousResearch/TextArena",
+      "commit": "2f20590f0993255221975cffa1890dcc550bf6a5",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 373,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "2d0ad644caabbddcf4a5119ebe58162b23d77093"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "57f3f6156798441686da027ec0ba199a6581a198"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "d0d144b6ccf1f49ec92f984973bc7f7f228eff7c"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "1619c585cb90d0c5e8c9b06e0a85ffb379c0725d"
+        }
+      ],
+      "opportunity": "Gry tekstowe w interfejsie Gym-style.",
+      "decision": "P2: opcjonalny runner zdolności planowania i stosowania zasad; nie importować wszystkich gier do runtime."
+    },
+    {
+      "repository": "NousResearch/logfire-rust",
+      "commit": "497574bff53f27db42ee4e581fea2658561c7833",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 35,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "a1040e2f565c5d7e5decbe7c8e22fd3e8b347323"
+        },
+        {
+          "path": "LICENSE",
+          "blob_sha": "87e548a71b88be93caf4b107f8512f2155d04210"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "167757aa936b66c894a4236423a0b220c7df72d3"
+        }
+      ],
+      "opportunity": "Rust SDK do spanów i telemetryki Logfire.",
+      "decision": "P3: tylko przyszłe komponenty Rust; Pythona obserwować istniejącymi hookami, bez podwójnego eksportu prywatnej treści."
+    },
+    {
+      "repository": "NousResearch/kaida",
+      "commit": "d881d44490fa947e487efd18ed368136042dc41f",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 64,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "3099fd84cefc54228922c51ec8317a309832d391"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "3031007dea482ad2b376e7980c757c66e1895f29"
+        }
+      ],
+      "opportunity": "Prototyp Kotlin LLM API i typowane DAG/pipelines z Flow.",
+      "decision": "P2: wzorce typed state/cancellation na Android; kwalifikować klienta i obsługę streamów, nie kopiować prototypu jako nowego silnika."
+    },
+    {
+      "repository": "NousResearch/iroh-gossip",
+      "commit": "8e68fe0716fff25e962c5475a9840e14532aed7a",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ],
+      "tree_entries": 48,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "e8b9757b8175cee3287ea01e6b09bd8e50ed676b"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "3881704396b8f3faa4ab2810f4fc2be5d87eebcd"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "blob_sha": "e2db9284926852ff674979ca3aba5634c8a627d3"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "blob_sha": "2d5f18dd41d651dc325cf4d6349130670109cc50"
+        }
+      ],
+      "opportunity": "Broadcast po tematach i state-machine protokołu gossip.",
+      "decision": "P2: późniejszy control plane wielu workerów; nie baza spójnego stanu zadań ani gwarancja dokładnie-jednokrotnego wykonania."
+    },
+    {
+      "repository": "NousResearch/yellowstone-grpc",
+      "commit": "25645e8614cb11ae1f0709ee7a1e9fe3f7ecba44",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "AGPL-3.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 123,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "f7b573cb128adf5e3fa35c8e656d3dcd25c4fdee"
+        },
+        {
+          "path": "LICENSE",
+          "blob_sha": "6bb5339778ba01632d750030cba42b79b48181fa"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "07e42de87cd5bcc7db66e401eae0c45e91bc25a2"
+        }
+      ],
+      "opportunity": "Solana Geyser streaming transakcji i bloków.",
+      "decision": "REF: odrębna domena blockchain, AGPL-3.0; nie dodawać serwisu do bazowego agenta."
+    },
+    {
+      "repository": "NousResearch/storywriter-frontend",
+      "commit": "81ab1a36ebcfc6babb92f979b21ccb497d3e7d0d",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 42,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "3099fd84cefc54228922c51ec8317a309832d391"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "6b255e9f137c621bd719c4dc674e87f7ec232c98"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "c38ed2b28bc17d831740d0414a2c96558f590b6b"
+        }
+      ],
+      "opportunity": "NextJS klient eksperymentu Storywriter.",
+      "decision": "P2/UI: referencja panelu narracji, odłożona razem z UI; nie nowy równoległy chat."
+    },
+    {
+      "repository": "NousResearch/storywriter",
+      "commit": "7458f144c57c8ffb8c95cbe32ce580713efecbef",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 97,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "3099fd84cefc54228922c51ec8317a309832d391"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "1bcb4d95c18efed9902b3db085dc2cb9f4eb3099"
+        }
+      ],
+      "opportunity": "Kaida backend generatora opowieści.",
+      "decision": "P2: opcjonalny workflow narracyjny; JVM/Gradle i klucze Anthropic/Fireworks w przykładzie, nie wymagania bazowego Hermesa."
+    },
+    {
+      "repository": "NousResearch/kaida-gencritique",
+      "commit": "98d7e9b4e32172cfba350cef8fd465f681ff0003",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 40,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "179b3dac8e0521a93e6ea198df045608edd198b1"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "202ff96d1494b084a9a81b80e1145e4f1be97f10"
+        }
+      ],
+      "opportunity": "Niezależne modele generujące i oceniające treść.",
+      "decision": "P1/P2: metodologia oddzielania generatora i krytyka; sample to generowanie zaklęć, nie dowód jakości naszego CognitiveEngine."
+    },
+    {
+      "repository": "NousResearch/nanotron",
+      "commit": "2cde8f63519f15aa449803441ec70225644bd25d",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 268,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "c8837564efa1bb406f926f88991667a79871f1e1"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "390c32c402b4a325920a3a8b0d7b0734ec9832e1"
+        }
+      ],
+      "opportunity": "Minimalistyczny trening 3D-parallel.",
+      "decision": "P3: osobna infrastruktura GPU i produkcja modeli."
+    },
+    {
+      "repository": "NousResearch/datatrove",
+      "commit": "22606036e92c8d83268f313f462ee98eceb3fa0b",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 178,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "9d859a43045aaf7faa10111c140a4e21d9fc7bdf"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "918d95a47190e0a44ab79d246fbf4c617cde4895"
+        }
+      ],
+      "opportunity": "Bloki filtrowania, deduplikacji i przygotowania danych.",
+      "decision": "P2: offline data pipeline przed RAG/finetuningiem; nie zastępuje retrieval/memory managera w runtime."
+    },
+    {
+      "repository": "NousResearch/nousflash-agents",
+      "commit": "3ea552f8edbbd2d2d04239db1869538974bf167b",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 47,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "fb4ece994023c6a882a436dc2a448084bbda1851"
+        }
+      ],
+      "opportunity": "Prototyp agentów społecznościowych i działania portfela.",
+      "decision": "REF/P2: wzorce durable scheduling po audycie; nie uruchamiać automatycznych publikacji czy transakcji. Brak LICENSE w root."
+    },
+    {
+      "repository": "NousResearch/hf-hub",
+      "commit": "a66bdcf2f2664a55ab3a1415184c7aebd8ac4ed5",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 17,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "71aefc371d5b1a971afafaa0294417b871252d13"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "3172115b500079c1fec82991800f26367cba86c9"
+        }
+      ],
+      "opportunity": "Rust klient współdzielący cache Hugging Face.",
+      "decision": "P2/P3: inspiracja kontraktem integralności cache; brak powodu wprowadzania Rust, jeśli pobieranie modeli już jest w Pythonie/Kotlinie."
+    },
+    {
+      "repository": "NousResearch/forge-api-demo",
+      "commit": "99852c17bff8bc4a2bb7a051b50f90a2d07614eb",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 8,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "13d69902fbeaae23a982dbdec8f526a2e6ce6fb6"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "ad0b99d7664b8379d413a6dff17fce282bc62657"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "b5bdfa67b0a6074850b73224a5a7364c5fddbdb0"
+        }
+      ],
+      "opportunity": "Asynchroniczne zlecanie reasoning i polling wyniku.",
+      "decision": "P2: opcjonalny provider po sprawdzeniu aktualnego API, idempotencji, limitów i anulowania; nie uruchomiono płatnych zapytań."
+    },
+    {
+      "repository": "NousResearch/forge-feedback",
+      "commit": "a40ace83208a696d2f77c8ae6b1da108b97298ca",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 1,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "4c63274b1c063b1a1c0be81a2b21893d3c73b0fa"
+        }
+      ],
+      "opportunity": "Repo zgłoszeń dla Forge Beta API.",
+      "decision": "REF: pinned drzewo zawiera tylko README; brak runtime do integracji."
+    },
+    {
+      "repository": "NousResearch/Open-Reasoning-Tasks",
+      "commit": "35df7000b8f636178e303add868415b30f92cad0",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 305,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "fd8348b08677a69a018f07185dfc66c7332eec69"
+        },
+        {
+          "path": "package.json",
+          "blob_sha": "7a9e8555a31fd1bb4f944edde9ec5ef82ed93e0e"
+        }
+      ],
+      "opportunity": "Katalog typów zadań rozumowania.",
+      "decision": "P1: projekt własnych fixture i evali; zadania nie są same w sobie formalną weryfikacją wyników."
+    },
+    {
+      "repository": "NousResearch/curve25519-dalek",
+      "commit": "0964f800ab2114a862543ca000291a6e3531c203",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [],
+      "tree_entries": 159,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "a891c6705d3ead6ce1feaf3b4ebe82fbd2a8d4aa"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "aced373913ee531bc4b36df466a1d68b802385cd"
+        }
+      ],
+      "opportunity": "Biblioteki Rust kryptografii Curve25519/Ristretto.",
+      "decision": "P3: używać utrzymanej biblioteki przy konkretnym protokole; nie zastępować standardowego TLS ani projektować własnej kryptografii."
+    },
+    {
+      "repository": "NousResearch/infini-attention",
+      "commit": "9387ae1cf7d5ffc1984c1da547e70fd5f74575df",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 11,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "modeling_llama.py",
+          "blob_sha": "f3e9c3bf072d5a45d5183765047fe35537139fd9"
+        }
+      ],
+      "opportunity": "Eksperymentalnie zmieniony model Llama i skrypty treningowe.",
+      "decision": "P3: oddzielny eksperyment Transformers; brak ogólnego runtime adaptera. Nie deklarować nieskończonego kontekstu GGUF przez import tego pliku."
+    },
+    {
+      "repository": "NousResearch/finetuning-subnet",
+      "commit": "e2f5eb6373a417fc7c03e38adbc6cf145670ab58",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 87,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "756237558f4bd8e63e06336932361fd8f36dbe64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "4b0543f5bedc7ca333ed61f97953879968cf0a8d"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "b8cbd5dd66f4ad95a03493896d2aafb7196f253a"
+        }
+      ],
+      "opportunity": "Bittensor sieć miner/validator do oceniania finetuningów.",
+      "decision": "REF/P3: odrębny system treningu i blockchain; nie core pamięci lub wykonywania narzędzi."
+    },
+    {
+      "repository": "NousResearch/nous-llama.cpp",
+      "commit": "621e86b331f8b0e71f79fd82a4ae1cd54c3e4396",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 591,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "76f67efdc6470081b512a8db5bf2b1d4962d9c3c"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "e3ec0817ae0e552ad017f475077b24d9f3ff3bd9"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "d36f745201ef0dd98e4e4cff9ee5cfebb15dcd8a"
+        }
+      ],
+      "opportunity": "Starszy fork C/C++ inference i formatów modeli.",
+      "decision": "REF: identyczny commit co drugi Nous llama.cpp; nie zastępować kwalifikowanego Android backendu tym historycznym źródłem."
+    },
+    {
+      "repository": "NousResearch/axolotl-func-calling",
+      "commit": "a3595793712000921a94440e8272723a733d6f57",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 300,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "3c9f03000720a16fbf17d793716d6ca4c4732cc5"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "a5986fa4ffb7d4948badb7cb5b7d69a291f0c3d0"
+        }
+      ],
+      "opportunity": "Konfiguracje finetuningu, LoRA/QLoRA i dane tool calling.",
+      "decision": "P3: zewnętrzny trening modelu narzędziowego; wynik wymaga nowych evali parsera i jakości przed deploymentem."
+    },
+    {
+      "repository": "NousResearch/llama.cpp",
+      "commit": "621e86b331f8b0e71f79fd82a4ae1cd54c3e4396",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 591,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "76f67efdc6470081b512a8db5bf2b1d4962d9c3c"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "e3ec0817ae0e552ad017f475077b24d9f3ff3bd9"
+        },
+        {
+          "path": "requirements.txt",
+          "blob_sha": "d36f745201ef0dd98e4e4cff9ee5cfebb15dcd8a"
+        }
+      ],
+      "opportunity": "Ten sam pinned fork co nous-llama.cpp.",
+      "decision": "REF: analizować razem, nie jako dwie implementacje; GGUF/model support musi odpowiadać konkretnemu współczesnemu backendowi."
+    },
+    {
+      "repository": "NousResearch/funcchain",
+      "commit": "4ba7c6b9cd8961b916ff875a950015f89bff82a3",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 172,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "5c66c320ba6db5e2232b79bcd33e62234c2a26d1"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "bd59dd46c07ec3cf5de66dee98bfd1faf4180584"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "f4ebd82e0730dd72c85bff969286cec3f0d460b9"
+        }
+      ],
+      "opportunity": "Typowane structured output, schema i łańcuchy LLM.",
+      "decision": "P1/P2: wykorzystać wzorce walidacji przez istniejące ctx.llm/critic; nie dodawać drugiej warstwy LangChain w core."
+    },
+    {
+      "repository": "NousResearch/ollama",
+      "commit": "69f392c9b7ea7c5cc3d46c29774e37fdef51abd8",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 268,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "8e3dc978a7ca8c53f56bbedc5b558116140fc02e"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "2b91beea5d5374966ec3161f6693f0c5ca2bc08c"
+        }
+      ],
+      "opportunity": "Historyczny fork serwera lokalnych modeli.",
+      "decision": "P1: istniejący OpenAI-compatible/custom endpoint może łączyć się z kwalifikowanym serwerem; nie aktualizować ani instalować tego starego forka automatycznie."
+    },
+    {
+      "repository": "NousResearch/Obsidian",
+      "commit": "06124f2a8f04f9a026265bbca931dfdf9eef249e",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 185,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "70803e201a3206aa07147f36fdd32b52b882d33b"
+        },
+        {
+          "path": "pyproject.toml",
+          "blob_sha": "25c7bf00d69883a18c1e1d298a09bde7b1076e1b"
+        }
+      ],
+      "opportunity": "Eksperymentalny multimodal LLaVA-style model, nie aplikacja notatek.",
+      "decision": "P3: kwalifikować model i projector oraz jego licencję/wymagania; nie instalować historycznej Gradio/Transformers architektury jako pamięci."
+    },
+    {
+      "repository": "NousResearch/StripedHyenaTrainer",
+      "commit": "288a526b8e265d4dfc58f6585fb127ba95c763b0",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 6,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "761ca850a8fc9411d82cdd7987a97b9d8825cbf1"
+        }
+      ],
+      "opportunity": "Tokenizacja i finetuning modelu StripedHyena.",
+      "decision": "P3: osobny trainer Accelerate/DeepSpeed; kompatybilność eksportu i mobilnej inference wymaga osobnego testu."
+    },
+    {
+      "repository": "NousResearch/jedi",
+      "commit": "f8e502f90c92e8831676ff5519934f29b636fc0b",
+      "default_branch": "master",
+      "archived": false,
+      "github_license": "NOASSERTION",
+      "root_license_paths": [
+        "LICENSE.txt"
+      ],
+      "tree_entries": 484,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "LICENSE.txt",
+          "blob_sha": "94f954567b1c4a33c601b6bf3688ec08b695cbc0"
+        },
+        {
+          "path": "README.rst",
+          "blob_sha": "24b22ba2f8430febc3a067879d3df1d344c391c6"
+        }
+      ],
+      "opportunity": "Statyczna analiza, uzupełnianie i refaktoryzacja Pythona.",
+      "decision": "P2: opcjonalny worker analizy kodu albo MCP; nie daje sam w sobie bezpiecznego execution ani pełnej semantyki projektu."
+    },
+    {
+      "repository": "NousResearch/llm-chain",
+      "commit": "d1c2abfecefa352cac2604d2a7aa2a84f074f641",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "MIT",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 259,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "blob_sha": "9b3a1cc1f01b8f8ca5d6f09ecba4ad24d8a9436a"
+        },
+        {
+          "path": "LICENSE",
+          "blob_sha": "c02915d2b9c47d81c7d4ae9e7d1116f0b5351c31"
+        },
+        {
+          "path": "crates/llm-chain/README.md",
+          "blob_sha": "af0dad49489267522f44b590266c5d9912d517da"
+        },
+        {
+          "path": "crates/llm-chain/Cargo.toml",
+          "blob_sha": "957bed0773663fb2a6a2a839e280f7e44a1dd154"
+        }
+      ],
+      "opportunity": "Rust biblioteki template, chains, driverów i vector-store.",
+      "decision": "P3: wzorce typed pipeline; nie pisać od nowa natywnego agenta w Rust ani instalować drugiego memory managera."
+    },
+    {
+      "repository": "NousResearch/local_generative_agents",
+      "commit": "d66508143a2e0bed9b8e32b7a9a2ab6435b7e2d1",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": "Apache-2.0",
+      "root_license_paths": [
+        "LICENSE"
+      ],
+      "tree_entries": 44150,
+      "tree_truncated": true,
+      "reviewed_files": [
+        {
+          "path": "LICENSE",
+          "blob_sha": "e0d8210e8009de93c35050c71db7af0d88c37660"
+        },
+        {
+          "path": "README.md",
+          "blob_sha": "2ee1ba3877bd8ba572024a2ea9fc96fd4a525a18"
+        }
+      ],
+      "opportunity": "Badawcza symulacja agentów z pamięcią, refleksją i planowaniem.",
+      "decision": "P2/P3: opcjonalne środowisko testowe agentów; recursive tree było ucięte, więc przegląd nie obejmuje całego drzewa. Nie deklarować jego pamięci jako gotowej integracji."
+    },
+    {
+      "repository": "mojealterego/Knowledge-projects",
+      "commit": "c26a21dd469d495ccc028d64276fbd04627c4850",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 592,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "03721d2abe3870137714947e935eb77eea888d5e"
+        },
+        {
+          "path": "docs/knowledge-base/repository-operational-assurance-and-contract-verification.md",
+          "blob_sha": "553c635a8609f61c5cb82315e7e3ec2541707612"
+        },
+        {
+          "path": "docs/knowledge-base/sovereign-local-first-ai-masterplan-and-hybrid-edge-runtime-2026-09-09.md",
+          "blob_sha": "82199a7243d8bf111fe45d0ca5beb8774fede2e7"
+        }
+      ],
+      "opportunity": "Katalog źródeł i proponowanych architektur assurance/local-first.",
+      "decision": "P1: wymagania, kontrakty i porządek wdrożeń; przeczytane dokumenty jawnie rozróżniają SOURCE_DERIVED/INFERRED/PROPOSED od runtime."
+    },
+    {
+      "repository": "mojealterego/PLANY-I-POST-PY--W-REPOZYTORIACH",
+      "commit": "6e36e6b6fb36ca173c091f905ebb972cdfb9924d",
+      "default_branch": "main",
+      "archived": false,
+      "github_license": null,
+      "root_license_paths": [],
+      "tree_entries": 365,
+      "tree_truncated": false,
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "blob_sha": "286082c6c8514e89073534bbc588c8d242c9744d"
+        },
+        {
+          "path": "plan pracy/hermes-agent.md",
+          "blob_sha": "d3eb3bfc5f67b00e05b270aced1d8a8d2a88cf94"
+        },
+        {
+          "path": "plan pracy/hermes-mobile.md",
+          "blob_sha": "e8147ee31c8c4a8b056dc8fac73448e2e6d0e03a"
+        }
+      ],
+      "opportunity": "Historyczny rejestr audytów, z planami Hermes/Android.",
+      "decision": "P1: zmapować otwarte kryteria do bieżącego kodu; nie uznać dawnego statusu audytu za produkcyjną kwalifikację obecnego commita."
+    }
+  ]
+}
+

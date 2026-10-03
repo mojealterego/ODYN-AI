@@ -863,15 +863,16 @@ class ContextCompressor(ContextEngine):
                         if isinstance(tc, dict):
                             fn = tc.get("function", {})
                             name = fn.get("name", "?")
-                            args = redact_sensitive_text(fn.get("arguments", ""))
-                            # Truncate long arguments but keep enough for context
-                            if len(args) > self._TOOL_ARGS_MAX:
-                                args = args[:self._TOOL_ARGS_HEAD] + "..."
-                            tc_parts.append(f"  {name}({args})")
+                            raw_args = fn.get("arguments", "")
                         else:
                             fn = getattr(tc, "function", None)
                             name = getattr(fn, "name", "?") if fn else "?"
-                            tc_parts.append(f"  {name}(...)")
+                            raw_args = getattr(fn, "arguments", "") if fn else ""
+                        args = redact_sensitive_text(raw_args or "")
+                        # Apply the same detail budget to dict and SDK calls.
+                        if len(args) > self._TOOL_ARGS_MAX:
+                            args = args[:self._TOOL_ARGS_HEAD] + "..."
+                        tc_parts.append(f"  {name}({args})")
                     content += "\n[Tool calls:\n" + "\n".join(tc_parts) + "\n]"
                 parts.append(f"[ASSISTANT]: {content}")
                 continue
@@ -1033,7 +1034,7 @@ Write only the summary body. Do not include any preamble or prefix."""
 You are updating a context compaction summary. A previous compaction produced the summary below. New conversation turns have occurred since then and need to be incorporated.
 
 PREVIOUS SUMMARY:
-{self._previous_summary}
+{redact_sensitive_text(self._previous_summary)}
 
 NEW SESSION SNAPSHOT TO INCORPORATE:
 {session_snapshot}
@@ -1057,6 +1058,7 @@ Use this exact structure:
         # Inject focus topic guidance when the user provides one via /compress <focus>.
         # This goes at the end of the prompt so it takes precedence.
         if focus_topic:
+            focus_topic = redact_sensitive_text(focus_topic)
             prompt += f"""
 
 FOCUS TOPIC: "{focus_topic}"
@@ -1083,6 +1085,12 @@ The user has requested that this compaction PRIORITISE preserving all informatio
             # Handle cases where content is not a string (e.g., dict from llama.cpp)
             if not isinstance(content, str):
                 content = str(content) if content else ""
+            content = self._strip_summary_prefix(content)
+            if not content.strip():
+                # A prefix alone is not a summary. Route an empty response
+                # through the existing bounded retry/failure path before
+                # overwriting the previous checkpoint or dropping turns.
+                raise ValueError("Compression model returned an empty summary")
             # Redact the summary output as well — the summarizer LLM may
             # ignore prompt instructions and echo back secrets verbatim.
             summary = redact_sensitive_text(content.strip())
