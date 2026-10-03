@@ -160,7 +160,7 @@ class TestNonStringContent:
         assert isinstance(summary, str)
         assert summary.startswith(SUMMARY_PREFIX)
 
-    def test_none_content_coerced_to_empty(self):
+    def test_none_content_is_summary_failure(self):
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = None
@@ -175,9 +175,10 @@ class TestNonStringContent:
 
         with patch("agent.context_compressor.call_llm", return_value=mock_response):
             summary = c._generate_summary(messages)
-        # None content → empty string → standardized compaction handoff prefix added
-        assert summary is not None
-        assert summary == SUMMARY_PREFIX
+        # A prefix with no body cannot preserve the compressed turns.
+        assert summary is None
+        assert c._previous_summary is None
+        assert c._last_summary_error == "Compression model returned an empty summary"
 
     def test_summary_call_does_not_force_temperature(self):
         mock_response = MagicMock()

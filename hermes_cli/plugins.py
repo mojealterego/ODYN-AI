@@ -34,6 +34,8 @@ so plugin-defined tools appear alongside the built-in tools.
 from __future__ import annotations
 
 import asyncio
+import copy
+import functools
 import importlib
 import importlib.metadata
 import importlib.util
@@ -698,12 +700,54 @@ class PluginContext:
 
     # -- hook registration --------------------------------------------------
 
-    def register_hook(self, hook_name: str, callback: Callable) -> None:
+    def register_hook(
+        self, hook_name: str, callback: Callable, *, fail_closed: bool = False,
+    ) -> None:
         """Register a lifecycle hook callback.
 
         Unknown hook names produce a warning but are still stored so
         forward-compatible plugins don't break.
+
+        ``fail_closed=True`` opts a synchronous ``pre_tool_call`` policy
+        into enforcement: only an explicit ``{"action": "allow"}`` permits
+        execution. A block decision needs a non-empty message. Exceptions
+        and malformed decisions block without exposing exception details.
+        Policy callbacks receive a deep copy of arguments so reviewing a
+        call cannot accidentally change the call that will be executed.
+        Observer hooks keep their existing non-blocking error behavior.
         """
+        if type(fail_closed) is not bool:
+            raise TypeError("fail_closed must be a boolean")
+        if fail_closed:
+            if hook_name != "pre_tool_call" or inspect.iscoroutinefunction(callback):
+                raise ValueError("fail_closed requires a synchronous pre_tool_call hook")
+            if not callable(callback):
+                raise TypeError("Policy callback must be callable")
+            policy_callback = callback
+            plugin_name = self.manifest.key or self.manifest.name
+
+            @functools.wraps(policy_callback)
+            def enforce_policy(**kwargs: Any) -> dict:
+                denied = {
+                    "action": "block",
+                    "message": f"Policy hook '{plugin_name}' failed; tool execution blocked.",
+                }
+                try:
+                    decision = policy_callback(**copy.deepcopy(kwargs))
+                    if inspect.iscoroutine(decision):
+                        decision.close()
+                    if isinstance(decision, dict):
+                        if decision.get("action") == "allow":
+                            return {"action": "allow"}
+                        message = decision.get("message")
+                        if (decision.get("action") == "block"
+                                and isinstance(message, str) and message.strip()):
+                            return {"action": "block", "message": message}
+                except Exception as exc:
+                    logger.warning("Policy hook '%s' failed (%s)", plugin_name, type(exc).__name__)
+                return denied
+
+            callback = enforce_policy
         if hook_name not in VALID_HOOKS:
             logger.warning(
                 "Plugin '%s' registered unknown hook '%s' "
