@@ -11,6 +11,7 @@ from __future__ import annotations
 import concurrent.futures
 import contextlib
 import json
+import math
 from pathlib import Path
 import logging
 import os
@@ -166,16 +167,39 @@ class _BatchAbandoned(BaseException):
     so ``except Exception`` handlers in the middleware chain can't swallow it."""
 
 
+def _reject_non_finite_json_constant(value: str) -> None:
+    """Reject JavaScript-style non-finite constants accepted by Python's JSON decoder."""
+    raise ValueError(f"non-finite JSON number: {value}")
+
+
+def _parse_finite_json_float(value: str) -> float:
+    """Parse a JSON float while rejecting overflow to +/- infinity."""
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("JSON number exceeds the finite floating-point range")
+    return parsed
+
+
 def _parse_tool_arguments(raw_arguments: Any) -> tuple[dict, Optional[str]]:
     """Parse model-emitted arguments without repairing or coercing them."""
     try:
-        arguments = json.loads(raw_arguments)
-    except (json.JSONDecodeError, TypeError):
+        arguments = json.loads(
+            raw_arguments,
+            parse_constant=_reject_non_finite_json_constant,
+            parse_float=_parse_finite_json_float,
+        )
+    except (json.JSONDecodeError, TypeError, ValueError):
         arguments = None
     if isinstance(arguments, dict):
         return arguments, None
     return {}, json.dumps(
-        {"error": "Invalid tool arguments", "message": "Tool arguments must be a valid JSON object; tool was not executed."},
+        {
+            "error": "Invalid tool arguments",
+            "message": (
+                "Tool arguments must be a valid JSON object with finite numeric values; "
+                "tool was not executed."
+            ),
+        },
         ensure_ascii=False,
     )
 
