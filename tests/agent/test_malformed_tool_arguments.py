@@ -50,6 +50,46 @@ def _tool_call(call_id: str, arguments: str):
 @pytest.mark.parametrize(
     "bad_arguments",
     [
+        pytest.param('{"query": NaN}', id="nan"),
+        pytest.param('{"query": Infinity}', id="positive-infinity"),
+        pytest.param('{"query": -Infinity}', id="negative-infinity"),
+        pytest.param('{"query": 1e999}', id="overflow-to-infinity"),
+    ],
+)
+def test_non_finite_numeric_arguments_are_rejected_before_dispatch(
+    dispatch_mode: str,
+    bad_arguments: str,
+):
+    agent = _make_agent()
+    assistant_message = SimpleNamespace(
+        content="",
+        tool_calls=[_tool_call("call-bad-number", bad_arguments)],
+    )
+    messages = []
+
+    with (
+        patch("model_tools.handle_function_call", return_value="SHOULD_NOT_RUN") as sequential_dispatch,
+        patch.object(agent, "_invoke_tool", return_value="SHOULD_NOT_RUN") as concurrent_dispatch,
+        patch(
+            "agent.tool_executor.maybe_persist_tool_result",
+            side_effect=lambda **kwargs: kwargs["content"],
+        ),
+    ):
+        execute = getattr(agent, f"_execute_tool_calls_{dispatch_mode}")
+        execute(assistant_message, messages, "task-1")
+
+    sequential_dispatch.assert_not_called()
+    concurrent_dispatch.assert_not_called()
+    assert len(messages) == 1
+    assert messages[0]["tool_call_id"] == "call-bad-number"
+    assert '"error": "Invalid tool arguments"' in messages[0]["content"]
+    assert "finite" in messages[0]["content"].lower()
+
+
+@pytest.mark.parametrize("dispatch_mode", ["sequential", "concurrent"])
+@pytest.mark.parametrize(
+    "bad_arguments",
+    [
         pytest.param("not-json", id="malformed-json"),
         pytest.param('"scalar"', id="scalar"),
         pytest.param("[]", id="list"),
