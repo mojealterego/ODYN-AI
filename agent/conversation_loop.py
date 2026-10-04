@@ -1671,6 +1671,8 @@ def _run_conversation_turn(
             _cr = _run_phase(run_candidate_review, agent, s)
             if _cr.action == "return":
                 return _cr.result
+            if _cr.action == "continue":
+                continue
             _v = _run_phase(
                 run_tool_round if s.assistant_message.tool_calls else finish_text_response, agent, s
             )
