@@ -7,6 +7,12 @@ from .contracts import (
     ReviewContext,
     ReviewDecision,
 )
+from .review_cycle import (
+    ReviewCycleOutcome,
+    ReviewCycleState,
+    advance_review_cycle,
+    build_review_feedback,
+)
 
 __all__ = [
     "CandidateReviewer",
@@ -14,5 +20,8 @@ __all__ = [
     "ReviewAction",
     "ReviewContext",
     "ReviewDecision",
+    "ReviewCycleOutcome",
+    "ReviewCycleState",
+    "advance_review_cycle",
+    "build_review_feedback",
 ]
-\nfrom .review_cycle import (\n    ReviewCycleOutcome,\n    ReviewCycleState,\n    advance_review_cycle,\n    build_review_feedback,\n)\n
