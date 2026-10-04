@@ -55,6 +55,7 @@ from agent.turn_preflight_gate import run_preflight_gate
 from agent.turn_request_assembly import assemble_api_request
 from agent.turn_response_check import check_api_response
 from agent.turn_response_intake import normalize_model_response
+from agent.turn_candidate_review import run_candidate_review
 from agent.turn_tool_round import run_tool_round
 from hermes_logging import set_session_context
 from tools.skill_provenance import set_current_write_origin
@@ -1667,6 +1668,9 @@ def _run_conversation_turn(
                 return _ri.result
             if _ri.action == "continue":
                 continue
+            _cr = _run_phase(run_candidate_review, agent, s)
+            if _cr.action == "return":
+                return _cr.result
             _v = _run_phase(
                 run_tool_round if s.assistant_message.tool_calls else finish_text_response, agent, s
             )
