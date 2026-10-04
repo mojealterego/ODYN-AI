@@ -16,6 +16,7 @@ from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
 from agent.codex_responses_adapter import _summarize_user_message_for_log
+from agent.cognition.review_cycle import ReviewCycleState
 from agent.fast_mode import begin_turn as begin_fast_mode_turn
 from agent.message_metadata import append_message, without_persistence_fields
 from agent.message_sanitization import _repair_tool_call_arguments, _sanitize_surrogates
@@ -1412,6 +1413,9 @@ class _LoopState:
     # a consecutive-ineffective-attempt backstop, rearmed only after a provider response
     # reports a prompt below threshold.
     max_compression_attempts: Any
+    # Bounded, request-local candidate regeneration state. Reset after ACCEPT.
+    review_cycle: ReviewCycleState = field(default_factory=ReviewCycleState)
+    review_feedback: Optional[str] = None
     api_call_count: int = 0
     final_response: Any = None
     interrupted: bool = False
@@ -1671,6 +1675,8 @@ def _run_conversation_turn(
             _cr = _run_phase(run_candidate_review, agent, s)
             if _cr.action == "return":
                 return _cr.result
+            if _cr.action == "continue":
+                continue
             _v = _run_phase(
                 run_tool_round if s.assistant_message.tool_calls else finish_text_response, agent, s
             )
