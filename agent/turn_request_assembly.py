@@ -185,7 +185,7 @@ def assemble_api_request(
         drop_nudge_marker=_CODEX_INCOMPLETE_NUDGE if _cross_protocol else None,
     )
 
-    # Normalize whitespace and tool-call JSON for bit-perfect prefixes across turns
+    # Candidate-review feedback is request-local and user-privileged; it is never persisted.\n    _inject_review_feedback(api_messages, review_feedback)\n\n    # Normalize whitespace and tool-call JSON for bit-perfect prefixes across turns
     # (KV-cache reuse on local servers, better cloud cache hits); API copy only.
     for am in api_messages:
         if isinstance(am.get("content"), str):
