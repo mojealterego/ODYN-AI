@@ -320,7 +320,7 @@ def _trajectory_normalize_msg(msg: Dict[str, Any]) -> Dict[str, Any]:
 # External retrieval surfaces can contain attacker-controlled instructions.
 # Keep the trust boundary in the tool message itself so every provider/model
 # receives the same provenance signal without mutating the system prompt.
-_UNTRUSTED_TOOL_NAMES = frozenset({"web_extract", "web_search"})
+_UNTRUSTED_TOOL_NAMES = frozenset({"session_search", "web_extract", "web_search"})
 _UNTRUSTED_TOOL_PREFIXES = ("browser_", "mcp_")
 _UNTRUSTED_WRAP_MIN_CHARS = 32
 _UNTRUSTED_DELIMITER_RE = re.compile(r"untrusted_tool_result", re.IGNORECASE)
