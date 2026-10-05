@@ -64,6 +64,23 @@ class CriticResult:
         return max((i.severity for i in self.issues), key=order.get, default="low")
 
 
+@dataclass(frozen=True)
+class CapabilityAuthorization:
+    """Critic classification derived only from trusted operator control."""
+
+    valid: bool
+    allowed_capabilities: tuple[str, ...] = ()
+    denied_capabilities: tuple[str, ...] = ()
+    confidence: float = 0.0
+    rationale: str = ""
+    critic_model_id: str = "unknown"
+    error: str | None = None
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("authorization confidence must be between 0 and 1")
+
+
 class DecisionAction(str, Enum):
     ACCEPT = "accept"
     CORRECT = "correct"
