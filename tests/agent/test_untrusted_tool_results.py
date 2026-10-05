@@ -37,6 +37,16 @@ class UntrustedToolResultBoundaryTests(unittest.TestCase):
 
         self.assertIn('<untrusted_tool_result source="session_search">', message["content"])
 
+    def test_provider_side_elision_is_marked_incomplete_inside_trust_boundary(self):
+        payload = ("x" * 1100) + '\n{"has_more": true}'
+        message = make_tool_result_message("mcp_catalog", payload, "call-elided")
+
+        self.assertIn("data shown is INCOMPLETE", message["content"])
+        self.assertLess(
+            message["content"].index("data shown is INCOMPLETE"),
+            message["content"].index("</untrusted_tool_result>"),
+        )
+
     def test_local_read_result_keeps_existing_wire_shape(self):
         payload = "Local README content that should remain byte-for-byte unchanged."
         message = make_tool_result_message("read_file", payload, "call-3")
