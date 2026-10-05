@@ -1,0 +1,92 @@
+name: ODYN vNext Phase 1 Gate
+
+on:
+  push:
+    branches:
+      - integration/odyn-vnext
+
+permissions:
+  contents: read
+
+concurrency:
+  group: odyn-vnext-phase1
+  cancel-in-progress: true
+
+jobs:
+  upstream-python-parity:
+    name: Upstream Python parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+      - name: Install ripgrep
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+      - name: Set up locked Hermes test environment
+        uses: ./.github/actions/setup-pm
+        with:
+          extras: '["all", "anthropic", "bedrock", "mistral", "fal", "modal", "daytona", "parallel-web"]'
+          test-environment: 'true'
+          prune-python-cache: true
+      - name: Run upstream unit suite
+        env:
+          HERMES_TEST_WORKERS: "4"
+          HERMES_TEST_FILE_TIMEOUT: "900"
+          OPENROUTER_API_KEY: ""
+          OPENAI_API_KEY: ""
+          NOUS_API_KEY: ""
+        run: scripts/run_tests.sh
+
+  odyn-cognition:
+    name: ODYN cognition and trust boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+      - name: Set up locked Hermes test environment
+        uses: ./.github/actions/setup-pm
+        with:
+          extras: '["all"]'
+          test-environment: 'true'
+          prune-python-cache: true
+      - name: Run ODYN cognition regression suite
+        env:
+          OPENROUTER_API_KEY: ""
+          OPENAI_API_KEY: ""
+          NOUS_API_KEY: ""
+        run: |
+          "$HERMES_PYTHON" -m pytest -q             odyn_ai/tests/test_cognitive_core.py             odyn_ai/tests/test_cognitive_extensions.py             odyn_ai/tests/test_cognitive_integration.py             odyn_ai/tests/test_hermes_gate.py             tests/agent/cognition             tests/agent/test_untrusted_tool_results.py
+
+  upstream-blocking-checks:
+    name: Upstream blocking checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up locked Hermes environment
+        uses: ./.github/actions/setup-pm
+        with:
+          cache-python: true
+          prune-python-cache: true
+      - name: Run blocking repository checks
+        run: "$HERMES_PYTHON" scripts/check
+
+  phase1-gate:
+    name: Phase 1 complete
+    if: always()
+    needs:
+      - upstream-python-parity
+      - odyn-cognition
+      - upstream-blocking-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Phase 1 lane
+        env:
+          PYTHON: ${{ needs.upstream-python-parity.result }}
+          COGNITION: ${{ needs.odyn-cognition.result }}
+          CHECKS: ${{ needs.upstream-blocking-checks.result }}
+        run: |
+          test "$PYTHON" = success
+          test "$COGNITION" = success
+          test "$CHECKS" = success
