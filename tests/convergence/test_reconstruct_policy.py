@@ -24,6 +24,11 @@ from scripts.convergence.reconstruct_policy import (
         ("agent/tool_dispatch_helpers.py", MigrationClass.PORT),
         ("run_agent.py", MigrationClass.PORT),
         ("android/app/src/main/java/com/mobilefork/hermesagent/MainActivity.kt", MigrationClass.PORT),
+        ("hermes_android/runtime_identity.py", MigrationClass.PORT),
+        ("tests/hermes_android/test_runtime_env.py", MigrationClass.PORT),
+        ("scripts/prepare_android_native_libs.py", MigrationClass.PORT),
+        ("constraints-android.txt", MigrationClass.PORT),
+        ("tools/android_device_tool.py", MigrationClass.PORT),
         ("tests/agent/cognition/test_review_cycle.py", MigrationClass.PORT),
         ("tests/agent/test_untrusted_tool_results.py", MigrationClass.PORT),
         ("docs/legacy/old-ui.md", MigrationClass.ARCHIVE),
@@ -46,6 +51,8 @@ def test_classification_preserves_odyn_owned_surfaces(path: str, expected: Migra
         "agent/tool_dispatch_helpers.py",
         "run_agent.py",
         "android/app/src/main/AndroidManifest.xml",
+        "hermes_android/runtime_identity.py",
+        "scripts/check_android_litertlm_version.py",
     ],
 )
 def test_critical_conflicts_never_silently_discard_odyn(path: str) -> None:
