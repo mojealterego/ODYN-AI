@@ -1,7 +1,7 @@
 """ODYN Cognitive Core."""
 
 from .types import (
-    CognitiveRequest, Decision, DecisionAction, DecisionCycle, DecisionStatus,
+    CapabilityAuthorization, CognitiveRequest, Decision, DecisionAction, DecisionCycle, DecisionStatus,
     CriticIssue, CriticResult, GateDecision, InferenceResult,
 )
 from .dual_model_engine import DualModelEngine, DualModelOutput, InferenceBackend
@@ -19,7 +19,7 @@ __all__ = [
     "HermesToolExecutor", "hermes_dispatcher",
     "ReflexionEngine", "ReflexionResult", "EvidenceItem",
     "InMemoryTemporalRAG", "TemporalRAG",
-    "CognitiveRequest", "Decision", "DecisionAction", "DecisionCycle",
+    "CapabilityAuthorization", "CognitiveRequest", "Decision", "DecisionAction", "DecisionCycle",
     "DecisionStatus", "CriticIssue", "CriticResult", "GateDecision",
     "InferenceResult",
 ]
