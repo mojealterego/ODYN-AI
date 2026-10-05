@@ -22,3 +22,5 @@ This file is machine-checked by `scripts/convergence/bootstrap_vnext.sh`.
 7. No self-evolution path may directly push to the production/default branch.
 
 The bootstrap job generates the exhaustive path manifests and records every reconstruction conflict under `docs/convergence/`.
+
+- Mobile support plane: `android/`, `hermes_android/`, Android constraints/scripts/tests and device tooling are mandatory PORT surfaces.
