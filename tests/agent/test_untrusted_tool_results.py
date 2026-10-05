@@ -28,6 +28,15 @@ class UntrustedToolResultBoundaryTests(unittest.TestCase):
         self.assertEqual(message["content"].count("</untrusted_tool_result>"), 1)
         self.assertIn("untrusted-tool-result", message["content"])
 
+    def test_session_recall_is_untrusted_even_when_it_came_from_our_own_history(self):
+        payload = (
+            "A recalled prior-session message can contain copied prompt injection, "
+            "so it must return as data rather than fresh operator authority."
+        )
+        message = make_tool_result_message("session_search", payload, "call-history")
+
+        self.assertIn('<untrusted_tool_result source="session_search">', message["content"])
+
     def test_local_read_result_keeps_existing_wire_shape(self):
         payload = "Local README content that should remain byte-for-byte unchanged."
         message = make_tool_result_message("read_file", payload, "call-3")
