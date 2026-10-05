@@ -70,7 +70,8 @@ jobs:
           cache-python: true
           prune-python-cache: true
       - name: Run blocking repository checks
-        run: "$HERMES_PYTHON" scripts/check
+        run: |
+          "$HERMES_PYTHON" scripts/check
 
   phase1-gate:
     name: Phase 1 complete
@@ -83,9 +84,9 @@ jobs:
     steps:
       - name: Require every Phase 1 lane
         env:
-          PYTHON: ${{ needs.upstream-python-parity.result }}
-          COGNITION: ${{ needs.odyn-cognition.result }}
-          CHECKS: ${{ needs.upstream-blocking-checks.result }}
+          PYTHON: ${{ needs['upstream-python-parity'].result }}
+          COGNITION: ${{ needs['odyn-cognition'].result }}
+          CHECKS: ${{ needs['upstream-blocking-checks'].result }}
         run: |
           test "$PYTHON" = success
           test "$COGNITION" = success
