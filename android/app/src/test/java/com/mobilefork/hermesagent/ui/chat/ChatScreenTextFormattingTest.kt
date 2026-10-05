@@ -1,0 +1,164 @@
+package com.mobilefork.hermesagent.ui.chat
+
+import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChatScreenTextFormattingTest {
+    @Test
+    fun chatDisplayTextCleansMarkdownTablesAndEmphasis() {
+        val rendered = sanitizeChatDisplayText(
+            """
+            **Hermes self-test**
+            | Tool | Result | Detail |
+            | --- | --- | --- |
+            | terminal_tool | ready | bridge returned output |
+            """.trimIndent(),
+        )
+
+        assertTrue(rendered.contains("Hermes self-test"))
+        assertTrue(rendered.contains("Tool  Result  Detail"))
+        assertTrue(rendered.contains("terminal_tool  ready  bridge returned output"))
+        assertFalse(rendered.contains("**Hermes self-test**"))
+        assertFalse(rendered.contains("| --- | --- | --- |"))
+    }
+
+    @Test
+    fun chatDisplayTextCleansCollapsedInlineDiagnosticTable() {
+        val rendered = sanitizeChatDisplayText(
+            "**Full feature test results** | Tool | Status | Detail || --- | --- | --- || **Terminal** | X error | `env_var_enabled` not defined || **Android UI** | needs service | `HermesAccessibilityUiBridge` gated",
+        )
+
+        assertTrue(rendered.contains("Full feature test results  Tool  Status  Detail"))
+        assertTrue(rendered.contains("Terminal  X error  env_var_enabled not defined"))
+        assertTrue(rendered.contains("Android UI  needs service  HermesAccessibilityUiBridge gated"))
+        assertFalse(rendered.contains("**"))
+        assertFalse(rendered.contains("`"))
+        assertFalse(rendered.contains("| --- |"))
+    }
+
+    @Test
+    fun chatDisplayTextCleansTranslatedChineseFileDiagnostics() {
+        val rendered = sanitizeChatDisplayText(
+            "**看不到1.txt文件。 **经过搜索，目前环境中没有找到任何`.txt`文件。具体情况： | 位置 | 结果 || ----- | ----- || 当前目录 `/` | 无文件 || 用户家目录 | 无文件 || 全局搜索 `*.txt` | 0个结果 || Android共享文件夹 | 访问错误 **建议： **-请告诉我1.txt的**完整路径**，我直接尝试读取。",
+        )
+
+        assertTrue(rendered.contains("看不到1.txt文件。 经过搜索"))
+        assertTrue(rendered.contains("当前目录 /  无文件"))
+        assertTrue(rendered.contains("Android共享文件夹  访问错误 建议： -请告诉我1.txt的完整路径"))
+        assertFalse(rendered.contains("**"))
+        assertFalse(rendered.contains("`"))
+        assertFalse(rendered.contains("||"))
+        assertFalse(rendered.contains("-----"))
+    }
+
+    @Test
+    fun chatDisplayTextCleansInlineLatexWrappers() {
+        val rendered = sanitizeChatDisplayText("""Area is \(a^2 + b^2\), display \[E = mc^2\], and ${'$'}${'$'}x = y + z${'$'}${'$'}.""")
+
+        assertTrue(rendered.contains("a^2 + b^2"))
+        assertTrue(rendered.contains("E = mc^2"))
+        assertTrue(rendered.contains("x = y + z"))
+        assertFalse(rendered.contains("\\("))
+        assertFalse(rendered.contains("\\["))
+        assertFalse(rendered.contains("$$"))
+    }
+
+    @Test
+    fun chatDisplayTextFormatsXmlToolCalls() {
+        val rendered = sanitizeChatDisplayText(
+            """<terminal_tool>{"command":"pwd"}</terminal_tool>""",
+        )
+
+        assertTrue(rendered.contains("Tool call: terminal_tool"))
+        assertTrue(rendered.contains("""Arguments: {"command":"pwd"}"""))
+        assertFalse(rendered.contains("<terminal_tool>"))
+    }
+
+    @Test
+    fun chatDisplayTextFormatsLinuxSandboxAndMcpToolCalls() {
+        val rendered = sanitizeChatDisplayText(
+            """
+            <linux_sandbox_tool>{"action":"deploy","distro_id":"alpine-3-21"}</linux_sandbox_tool>
+            <mcp_run_in_proot>{"command":"uname -a"}</mcp_run_in_proot>
+            <mcp_send_terminal_input>{"command":"echo ok"}</mcp_send_terminal_input>
+            """.trimIndent(),
+        )
+
+        assertTrue(rendered.contains("Tool call: linux_sandbox_tool"))
+        assertTrue(rendered.contains("""Arguments: {"action":"deploy","distro_id":"alpine-3-21"}"""))
+        assertTrue(rendered.contains("Tool call: mcp_run_in_proot"))
+        assertTrue(rendered.contains("""Arguments: {"command":"uname -a"}"""))
+        assertTrue(rendered.contains("Tool call: mcp_send_terminal_input"))
+        assertFalse(rendered.contains("<linux_sandbox_tool>"))
+        assertFalse(rendered.contains("<mcp_run_in_proot>"))
+    }
+
+    @Test
+    fun chatDisplayTextFormatsMemoryToolAliases() {
+        val rendered = sanitizeChatDisplayText(
+            """
+            <memory_search>{"query":"sandbox notes"}</memory_search>
+            <memory_add>{"content":"alpine deploy ok"}</memory_add>
+            <memory_delete>{"id":"mem-1"}</memory_delete>
+            <memory_list>{}</memory_list>
+            """.trimIndent(),
+        )
+
+        assertTrue(rendered.contains("Tool call: memory_search"))
+        assertTrue(rendered.contains("Tool call: memory_add"))
+        assertTrue(rendered.contains("Tool call: memory_delete"))
+        assertTrue(rendered.contains("Tool call: memory_list"))
+        assertFalse(rendered.contains("<memory_search>"))
+        assertFalse(rendered.contains("<memory_add>"))
+    }
+
+    @Test
+    fun chatDisplayTextRemovesMarkdownCodeFenceMarkers() {
+        val rendered = sanitizeChatDisplayText(
+            """
+            ```json
+            {"ok":true}
+            ```
+            """.trimIndent(),
+        )
+
+        assertTrue(rendered.contains("""{"ok":true}"""))
+        assertFalse(rendered.contains("```"))
+    }
+
+    @Test
+    fun chatDisplayTextPreservesParagraphBreaksAndIntentionalLineBreaks() {
+        val rendered = sanitizeChatDisplayText(
+            "First paragraph.\n\nSecond paragraph.\nSecond line.",
+        )
+
+        assertTrue(rendered.contains("First paragraph.\n\nSecond paragraph."))
+        assertTrue(rendered.endsWith("Second paragraph.\nSecond line."))
+    }
+
+    @Test
+    fun composerStatusCollapsesWhenKeyboardIsVisible() {
+        assertTrue(shouldShowComposerStatus(tinyRuntimeViewport = false, imeVisible = false))
+        assertFalse(shouldShowComposerStatus(tinyRuntimeViewport = true, imeVisible = false))
+        assertFalse(shouldShowComposerStatus(tinyRuntimeViewport = false, imeVisible = true))
+    }
+
+    @Test
+    fun generationElapsedFormattingIsStableAndNeverNegative() {
+        assertEquals("0s", formatGenerationElapsed(-1L))
+        assertEquals("9s", formatGenerationElapsed(9L))
+        assertEquals("1m 00s", formatGenerationElapsed(60L))
+        assertEquals("6m 16s", formatGenerationElapsed(376L))
+    }
+
+    @Test
+    fun pageActionsCollapseOnlyBelowUltraNarrowThreshold() {
+        assertFalse(shouldShowChatHeaderPageActions(200.dp))
+        assertFalse(shouldShowChatHeaderPageActions(219.dp))
+        assertTrue(shouldShowChatHeaderPageActions(220.dp))
+        assertTrue(shouldShowChatHeaderPageActions(360.dp))
+    }
+}

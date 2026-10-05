@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.HermesAgent" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/hermes_background</item>
+        <item name="android:statusBarColor">@color/hermes_background</item>
+        <item name="android:navigationBarColor">@color/hermes_surface_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <!-- The Activity installs the saved palette before drawing; suppress the legacy preview. -->
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+</resources>

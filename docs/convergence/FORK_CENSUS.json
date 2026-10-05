@@ -1,0 +1,608 @@
+{
+  "observed_forks_count": 53943,
+  "sample": [
+    {
+      "default_branch": "codex/termux-five-goals",
+      "full_name": "adybag14-cyber/hermes-agent",
+      "stars": 221,
+      "updated_at": "2026-10-04T22:04:27Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "AtomicBot-ai/atomic-hermes",
+      "stars": 180,
+      "updated_at": "2026-09-25T13:01:57Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Eynzof/Hermes-CN-Core",
+      "stars": 87,
+      "updated_at": "2026-09-27T11:29:16Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "evencj11/hermes-agent-desktop-intel-mac-rebuild",
+      "stars": 67,
+      "updated_at": "2026-10-01T21:45:32Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "sudoingX/hermes-agent",
+      "stars": 61,
+      "updated_at": "2026-09-15T07:06:03Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "raullenchai/hermes-agent",
+      "stars": 44,
+      "updated_at": "2026-06-22T19:19:57Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "affaan-m/hermes-agent",
+      "stars": 35,
+      "updated_at": "2026-10-04T23:23:14Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "umanitek/agent-blackbox",
+      "stars": 26,
+      "updated_at": "2026-09-29T20:24:42Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "zapabob/hermes-agent-windows",
+      "stars": 22,
+      "updated_at": "2026-10-04T22:58:21Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "outsourc-e/hermes-agent",
+      "stars": 21,
+      "updated_at": "2026-09-25T13:01:47Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "hermemes/hermes-agent",
+      "stars": 18,
+      "updated_at": "2026-08-14T10:34:50Z"
+    },
+    {
+      "default_branch": "mobile-gateway",
+      "full_name": "TheTom/hermes-go",
+      "stars": 15,
+      "updated_at": "2026-10-01T14:49:38Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "FearW/hermes-agent",
+      "stars": 12,
+      "updated_at": "2026-09-30T00:14:38Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "fathah/hermes-agent",
+      "stars": 12,
+      "updated_at": "2026-08-23T08:27:50Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ahlfs/hermes-agent",
+      "stars": 12,
+      "updated_at": "2026-09-30T04:06:01Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "plastic-labs/hermes-agent",
+      "stars": 11,
+      "updated_at": "2026-09-25T13:01:45Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "waefrebeorn/slermes",
+      "stars": 10,
+      "updated_at": "2026-09-15T07:32:05Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "NVIDIA-AI-Blueprints/hermes-agent",
+      "stars": 9,
+      "updated_at": "2026-09-11T04:19:58Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ayazelrico/Milyonus-Agent-include-of-Hermes",
+      "stars": 9,
+      "updated_at": "2026-08-29T12:22:52Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "gary-the-ai/hermes-web-console-gui",
+      "stars": 8,
+      "updated_at": "2026-05-01T16:51:28Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "harshaxyZ/zoro_",
+      "stars": 8,
+      "updated_at": "2026-09-29T10:53:33Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "claude-code-best/hermes-agent",
+      "stars": 7,
+      "updated_at": "2026-09-22T09:50:42Z"
+    },
+    {
+      "default_branch": "inkbox",
+      "full_name": "inkbox-ai/hermes-agent",
+      "stars": 7,
+      "updated_at": "2026-07-07T16:30:24Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Yeachan-Heo/hermes-agent",
+      "stars": 6,
+      "updated_at": "2026-08-05T13:46:30Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "novique-ai/retinue",
+      "stars": 6,
+      "updated_at": "2026-10-04T21:35:20Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "zerople/hermes-agent",
+      "stars": 6,
+      "updated_at": "2026-07-15T07:58:00Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "EKKOLearnAI/hermes-agent",
+      "stars": 6,
+      "updated_at": "2026-09-16T14:35:33Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "rdnot/hermes-agent-medical-research",
+      "stars": 5,
+      "updated_at": "2026-10-05T02:55:51Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "UfukNode/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-07-04T02:00:50Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "agent-bob-the-builder/hermes-agent-ferris-fork",
+      "stars": 5,
+      "updated_at": "2026-04-28T21:41:39Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "avenoxai/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-09-26T19:32:27Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ljbudgie/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-04-18T20:01:03Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "alt-glitch/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-10-04T11:51:15Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "davila7/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-09-24T02:28:06Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "BRAEL87/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-07-13T03:25:31Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "seojcarlos/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-05-14T07:16:30Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "EmelyanenkoK/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-08-11T01:49:01Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "gumclaw/hermes-agent",
+      "stars": 5,
+      "updated_at": "2026-07-29T23:19:39Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "xyshanren/hermes-agent-cn",
+      "stars": 5,
+      "updated_at": "2026-06-17T06:25:56Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "RUFFY-369/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-07-16T13:22:20Z"
+    },
+    {
+      "default_branch": "pi2-lite",
+      "full_name": "matttest0080-prog/hermes-agent-iot",
+      "stars": 4,
+      "updated_at": "2026-09-24T05:49:32Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "numman-ali/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-08-05T01:05:00Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "farion1231/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-06-30T01:53:05Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "asimons81/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-08-04T10:51:32Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "OnFinality9/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-09-04T13:51:11Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "SHL0MS/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-08-05T11:56:37Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "kevincodex1/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-10-02T14:33:08Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "tobi/hermes-agent",
+      "stars": 4,
+      "updated_at": "2026-09-18T07:06:28Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "huklaa/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-09-15T11:17:23Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "SrivarsanK/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-09-09T14:05:11Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "jessepollak/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-09-30T07:55:30Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "worlldz/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-08-28T00:04:38Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "JimLiu/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-06-06T15:09:54Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "devotionn/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-05-29T15:00:17Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "neilbtc2020/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-04-10T03:34:17Z"
+    },
+    {
+      "default_branch": "prod",
+      "full_name": "Git-on-my-level/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-10-04T13:31:40Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "xinbenlv/zn-hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-08-25T04:47:17Z"
+    },
+    {
+      "default_branch": "integration",
+      "full_name": "jooray/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-10-04T22:41:21Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ericosiu/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-08-25T02:57:38Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Sugumaran-Balasubramaniyan/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-06-18T09:38:26Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "RetainDB/hermes",
+      "stars": 3,
+      "updated_at": "2026-09-09T15:27:56Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "hrabanazviking/hermes-agent-RuneForgeAI-hack",
+      "stars": 3,
+      "updated_at": "2026-09-26T01:09:09Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "howardpen9/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-06-12T00:47:00Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "captain-tobby/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-08-30T04:13:45Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "phaneron23/hermes-agent-mobile",
+      "stars": 3,
+      "updated_at": "2026-08-30T22:44:57Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "open-software-network/os-hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-07-06T22:31:44Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "trycua/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-09-20T08:47:11Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "LucDinhLe/hermes-agent-vietnamese",
+      "stars": 3,
+      "updated_at": "2026-09-25T01:43:18Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "tmimmanuel/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-07-06T23:35:17Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "realfishsam/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-08-13T17:30:02Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "0ai-Cyberviser/hermes-agent",
+      "stars": 3,
+      "updated_at": "2026-05-25T00:34:39Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "sbbu/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-08-30T23:58:28Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "yixuanzi/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-16T15:09:18Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "madanVedansh21/Imperavis",
+      "stars": 2,
+      "updated_at": "2026-08-15T18:46:04Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "sambai-dev/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-05T15:21:01Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "comeonzhj/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-06-02T12:52:03Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "guillaumemeyer/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-08-31T19:57:20Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "nicolasembleton/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-14T08:58:07Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "rohitg00/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-06-19T01:20:30Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "MalikJPalamar/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-05-20T03:25:56Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "executiveusa/pauli-hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-26T08:20:19Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "sputnicyoji/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-05-26T13:03:09Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "johnny5OO/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-05-10T19:55:00Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "561487/hermes-agent-4.15",
+      "stars": 2,
+      "updated_at": "2026-07-30T06:59:48Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "YuanbaoTeam/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-07-09T02:40:15Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "thewilloftheshadow/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-05-02T04:43:04Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "isair/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-26T23:06:46Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "guicybercode/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-09-20T15:43:22Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Vasilije1990/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-06-24T07:00:55Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Coalllball/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-07-07T16:38:46Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "wangedoo518/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-06-23T02:32:36Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "VKirill/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-08-25T05:40:10Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "luoxuejian000/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-05-12T11:45:38Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ArtemisAI/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-04-19T20:43:36Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "vinilana/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-06-08T07:58:34Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "chrisryugj/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-08-21T22:21:39Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "allmoney/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-07-08T12:51:13Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "magnus919/hermes-agent-1",
+      "stars": 2,
+      "updated_at": "2026-10-04T02:29:57Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "Dhravya/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-07-25T08:19:33Z"
+    },
+    {
+      "default_branch": "main",
+      "full_name": "ProgramCaiCai/hermes-agent",
+      "stars": 2,
+      "updated_at": "2026-07-12T12:22:42Z"
+    }
+  ],
+  "sample_count": 100,
+  "sample_strategy": "top 100 forks by stargazers; exhaustive miner is a separate paginated job",
+  "schema_version": 1
+}

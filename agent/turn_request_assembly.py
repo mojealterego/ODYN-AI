@@ -83,6 +83,34 @@ def _append_moa_context(agent: Any, api_messages: Any, moa_config: Any, original
         logger.warning("MoA context aggregation failed: %s", _moa_exc)
 
 
+def _inject_review_feedback(api_messages: Any, review_feedback: Any) -> None:
+    """Inject reviewer feedback into the API copy only, at user privilege.
+
+    The canonical transcript is never mutated. If the request already ends in a
+    user row, extend that request-local row to preserve role alternation.
+    Otherwise append a fresh user row after completed tool/assistant context.
+    """
+    if not isinstance(review_feedback, str) or not review_feedback.strip():
+        return
+    feedback = review_feedback.strip()
+    if api_messages and api_messages[-1].get("role") == "user":
+        message = api_messages[-1]
+        content = message.get("content")
+        if isinstance(content, str):
+            message["content"] = content + "\n\n" + feedback
+        elif isinstance(content, list):
+            message["content"] = [
+                *content,
+                {"type": "text", "text": "\n\n" + feedback},
+            ]
+        elif content is None:
+            message["content"] = feedback
+        else:
+            message["content"] = f"{content}\n\n{feedback}"
+        return
+    api_messages.append({"role": "user", "content": feedback})
+
+
 def _prepare_moa_request(agent: Any, api_messages: Any, pending_moa_prepared_request: Any) -> tuple:
     """Persistent-MoA request: rebase the pending prepared request onto the new messages
     when the client supports it, else prepare a fresh one. Returns
@@ -107,6 +135,7 @@ def assemble_api_request(
     agent: Any, *, messages: Any, current_turn_user_idx: Any, _ext_prefetch_cache: Any,
     _plugin_user_context: Any, moa_config: Any, active_system_prompt: Any,
     original_user_message: Any, pending_moa_prepared_request: Any, request_logger: Any,
+    review_feedback: Any,
 ) -> AssembledRequest:
     """Assemble the request in the original order. ORDER IS LOAD-BEARING: cache breakpoints
     are injected only after whitespace normalization, the orphan sweep, thinking-only drop /
@@ -184,6 +213,9 @@ def assemble_api_request(
         api_messages, drop_codex_reasoning_items=_cross_protocol,
         drop_nudge_marker=_CODEX_INCOMPLETE_NUDGE if _cross_protocol else None,
     )
+
+    # Candidate-review feedback is request-local and user-privileged; it is never persisted.
+    _inject_review_feedback(api_messages, review_feedback)
 
     # Normalize whitespace and tool-call JSON for bit-perfect prefixes across turns
     # (KV-cache reuse on local servers, better cloud cache hits); API copy only.

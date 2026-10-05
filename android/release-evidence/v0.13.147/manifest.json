@@ -1,0 +1,324 @@
+{
+  "contract": {
+    "avd_metrics_are_validation_signals_not_end_user_benchmarks": true,
+    "dropped_frames_are_budgeted_with_app_deadline_misses": true,
+    "frame_timing_positive_overrun_is_nongating_avd_buffer_queue_diagnostic": true,
+    "languages": [
+      "en",
+      "zh",
+      "es",
+      "de",
+      "pt",
+      "fr"
+    ],
+    "maximum_frame_duration_cpu_p95_ms": 50.0,
+    "maximum_frame_duration_cpu_p99_ms": 100.0,
+    "maximum_perfetto_app_deadline_missed_or_dropped_percent": 10.0,
+    "minimum_frame_timing_samples_per_profile": 100,
+    "minimum_macrobenchmark_iterations_per_profile": 5,
+    "minimum_perfetto_surface_frame_timeline_tokens_per_profile": 100,
+    "only_suppressed_macrobenchmark_error": "EMULATOR",
+    "profiles": [
+      "phone-compact",
+      "tablet"
+    ],
+    "requested_macrobenchmark_compilation_mode": "Full",
+    "required_androidx_reporting_package_compilation_mode": "run-from-apk",
+    "required_measured_target_compiler_filter": "speed",
+    "requires_androidx_macrobenchmark_raw_json": true,
+    "requires_hardware_accelerated_avd": true,
+    "requires_host_raw_transcript": true,
+    "requires_nondebuggable_profileable_target": true,
+    "requires_one_perfetto_trace_per_iteration": true,
+    "requires_runtime_health_and_nonempty_completion": true,
+    "requires_zero_perfetto_unknown_or_overlapping_self_other_jank_tags": true,
+    "ui_screenshot_and_semantics_per_language_and_profile": true
+  },
+  "evidence": {
+    "file_count": 44,
+    "files": [
+      {
+        "bytes": 2706,
+        "path": "models/minicpm5-1b-fable5-q4-k-m.json",
+        "sha256": "b73efc3540093582159f1fdbc2147f66110722edd991e9600c756083fadbbef0"
+      },
+      {
+        "bytes": 2544,
+        "path": "models/minicpm5-1b-web-litert-lm.json",
+        "sha256": "37fb06f8e86975f4e194d3460a154b79ec4b741ae19eaf935d063352671b7d88"
+      },
+      {
+        "bytes": 2594,
+        "path": "models/qwen3.5-0.8b-q4-k-m.json",
+        "sha256": "1548b04043569c9967dc85c07063023462be648caced3df96ea1378d194f4de5"
+      },
+      {
+        "bytes": 2545,
+        "path": "models/vibethinker-3b-litert-lm.json",
+        "sha256": "486504bd0c4d0cc87127ffa9a6fd42d88973e4415a0956e55f5ca48150e43047"
+      },
+      {
+        "bytes": 609565,
+        "path": "performance/phone-compact.host.raw.json",
+        "sha256": "ab6055004fff5f839aa583c6cc277cd45278f3355378c8c56765dac6fd997d79"
+      },
+      {
+        "bytes": 11402,
+        "path": "performance/phone-compact.json",
+        "sha256": "3d52fe405b42e416bddbcd99f65ebda33eabc64f053798730be16b86f375f232"
+      },
+      {
+        "bytes": 420301,
+        "path": "performance/phone-compact.macrobenchmark.raw.json",
+        "sha256": "e5042b254f869cf492c72827fa9a64d14d1663c007bc03e5192042d4a51ebfe1"
+      },
+      {
+        "bytes": 45010965,
+        "path": "performance/phone-compact.traces/iteration-001.perfetto-trace",
+        "sha256": "670a6566b281828eac3d649ef685c8e6e15b96f27a78006169543ca715ba2383"
+      },
+      {
+        "bytes": 53517408,
+        "path": "performance/phone-compact.traces/iteration-002.perfetto-trace",
+        "sha256": "4f61ba92d31036155619ada72ff04b288aa7db0b23cc0c29a843001973bb4873"
+      },
+      {
+        "bytes": 43139819,
+        "path": "performance/phone-compact.traces/iteration-003.perfetto-trace",
+        "sha256": "2eef77e0969aef2800cd815d74034ef540fbed19985ffd85886c982d64233cc4"
+      },
+      {
+        "bytes": 46238338,
+        "path": "performance/phone-compact.traces/iteration-004.perfetto-trace",
+        "sha256": "5061b42347fc41b9dd8507e30734a63bf67386b19bd4098c45544fc3ba8b4a76"
+      },
+      {
+        "bytes": 47214089,
+        "path": "performance/phone-compact.traces/iteration-005.perfetto-trace",
+        "sha256": "e9013e8e0633e54f36c20109f3723a5029542e170e75ea46082ad5877d401e7a"
+      },
+      {
+        "bytes": 622638,
+        "path": "performance/tablet.host.raw.json",
+        "sha256": "3edbdf50aa702e9d94ca6827b88e1f56cf60c782285340562d30061e47074472"
+      },
+      {
+        "bytes": 11354,
+        "path": "performance/tablet.json",
+        "sha256": "71e5cbaa0a667d63906f09992c09c1e37fe4eb57ec321d2a751beb97cd1b2a4e"
+      },
+      {
+        "bytes": 223885,
+        "path": "performance/tablet.macrobenchmark.raw.json",
+        "sha256": "25196ff5cbd2f7cf18307ed8c63ff0e830c46e05fa609ae75faea109dcfbe22b"
+      },
+      {
+        "bytes": 35427753,
+        "path": "performance/tablet.traces/iteration-001.perfetto-trace",
+        "sha256": "0b4349d7ebf25cdfa835a6393c56f56950c89b4d3dd39895f6e291bd3745c8dd"
+      },
+      {
+        "bytes": 36651025,
+        "path": "performance/tablet.traces/iteration-002.perfetto-trace",
+        "sha256": "4af2e03a8815b692909b0df73b6d18e981d1d84408b82363e2e45f09d48e3c77"
+      },
+      {
+        "bytes": 32978774,
+        "path": "performance/tablet.traces/iteration-003.perfetto-trace",
+        "sha256": "0069acf5f986560ccbbf03adfd3094ad822bca067d65033fc80e7de71d421d2e"
+      },
+      {
+        "bytes": 44419286,
+        "path": "performance/tablet.traces/iteration-004.perfetto-trace",
+        "sha256": "544639622ed889bbcd960f3faea7f4256ca1504945864d0a32e765c3c918ec10"
+      },
+      {
+        "bytes": 34001940,
+        "path": "performance/tablet.traces/iteration-005.perfetto-trace",
+        "sha256": "d6c12704e60218832bb82d543f4f7cd39916f2b214b626ea27b55f483d471fa2"
+      },
+      {
+        "bytes": 428698,
+        "path": "ui/phone-compact/de/screen.png",
+        "sha256": "15a0ece9c6224edf99cab1f77b93f17981dc47a8fde33d1f0e86ad3541c5fd66"
+      },
+      {
+        "bytes": 11507,
+        "path": "ui/phone-compact/de/semantics.txt",
+        "sha256": "930056b9f4b4289298ff61049c7b8bf412d4bd4de4978da2fee4994d5f7780f5"
+      },
+      {
+        "bytes": 416840,
+        "path": "ui/phone-compact/en/screen.png",
+        "sha256": "0d45d95e72ac9021435e51a9f949a67036348eed6176c3580208e69e1b906c2f"
+      },
+      {
+        "bytes": 11276,
+        "path": "ui/phone-compact/en/semantics.txt",
+        "sha256": "2279ad5af52b2379ff0e04393d633077d29be448f81cb1f9b63076b68370ec19"
+      },
+      {
+        "bytes": 424596,
+        "path": "ui/phone-compact/es/screen.png",
+        "sha256": "f861c43023486ec009b29fae162a4984ff9e5f0d10103e541999bcae1187140f"
+      },
+      {
+        "bytes": 11506,
+        "path": "ui/phone-compact/es/semantics.txt",
+        "sha256": "1327b1f43b45b7f8f0949a20f08122df5fcc6ffe51ac49d3d800307c9829f7c0"
+      },
+      {
+        "bytes": 417529,
+        "path": "ui/phone-compact/fr/screen.png",
+        "sha256": "470a15627ae9d5316c95b887375360708707cfb9e86a59a8b4f32d04d9c6b39b"
+      },
+      {
+        "bytes": 11561,
+        "path": "ui/phone-compact/fr/semantics.txt",
+        "sha256": "a6b809855c632a636e1782834ad6e714e52e5d1a0186f95e54fa0caaa89230c5"
+      },
+      {
+        "bytes": 428266,
+        "path": "ui/phone-compact/pt/screen.png",
+        "sha256": "557e42ec45ad66ba0c897981b6e1816cae750e17b44cba6aea88efc29090d28e"
+      },
+      {
+        "bytes": 11491,
+        "path": "ui/phone-compact/pt/semantics.txt",
+        "sha256": "dd3f48dd47fb3188d9f05a5a11809a47641325a1117bdbdc0004b138c279e154"
+      },
+      {
+        "bytes": 500457,
+        "path": "ui/phone-compact/zh/screen.png",
+        "sha256": "d327176fe48e45103dededcef3f102ff640d502dc5582172b10c6c74814e6254"
+      },
+      {
+        "bytes": 11291,
+        "path": "ui/phone-compact/zh/semantics.txt",
+        "sha256": "b417984bd40f2e386b62ad6c4354ab2e4d08b38944cf4b08bfcab0bc383d1a05"
+      },
+      {
+        "bytes": 505139,
+        "path": "ui/tablet/de/screen.png",
+        "sha256": "bd15792f772077692a9d5ebb72352a63feb8b8f22eeba9e557117dce623077f4"
+      },
+      {
+        "bytes": 21899,
+        "path": "ui/tablet/de/semantics.txt",
+        "sha256": "794286b687ec20d510a2fe3f634e182178e7c39a48ea557d94f0f4ee9bb63b11"
+      },
+      {
+        "bytes": 509365,
+        "path": "ui/tablet/en/screen.png",
+        "sha256": "1035055b784efa2020eeb1c51c181216856ef6e6134fc12e998ad1a02a14e6e7"
+      },
+      {
+        "bytes": 21569,
+        "path": "ui/tablet/en/semantics.txt",
+        "sha256": "7312855d591dcca7f3b0b13c37a045eedd3a3d393fe69468e20e411b6e66322b"
+      },
+      {
+        "bytes": 527582,
+        "path": "ui/tablet/es/screen.png",
+        "sha256": "3db4ad7e69287865c1e1a2d8fcffccc666752bee4b02149c8f33c59fecc6b2ea"
+      },
+      {
+        "bytes": 21877,
+        "path": "ui/tablet/es/semantics.txt",
+        "sha256": "debc9d4a58860ec7f26502996b45b715ab623465b3e597ad01fece891a0c64c1"
+      },
+      {
+        "bytes": 534046,
+        "path": "ui/tablet/fr/screen.png",
+        "sha256": "b1d92fa94ff0051a032f26252055d84f50b7f6e8880991f52e90ac9182d44a6b"
+      },
+      {
+        "bytes": 21982,
+        "path": "ui/tablet/fr/semantics.txt",
+        "sha256": "f9f969c26584c2e74507eb2d07e87bc9ab268ed049881f65fa73f7b840338796"
+      },
+      {
+        "bytes": 546666,
+        "path": "ui/tablet/pt/screen.png",
+        "sha256": "4780da28ce67e138ada47c449d21fa7bbd2cd0062e314cf7a343161783275eeb"
+      },
+      {
+        "bytes": 21862,
+        "path": "ui/tablet/pt/semantics.txt",
+        "sha256": "7426ba47e4667fa8a212e16f51b15074a089b56296bcd1b6ecd509388ca3cce7"
+      },
+      {
+        "bytes": 629527,
+        "path": "ui/tablet/zh/screen.png",
+        "sha256": "3ddee2e2dc6e7847cedf03bbded7bf0a68126d83a94ef8a12175d661dd42ef61"
+      },
+      {
+        "bytes": 21577,
+        "path": "ui/tablet/zh/semantics.txt",
+        "sha256": "c5dbb9fb1b32ee883825cca9a3b19b63f355ec80dec25beed2c4b7581366b20a"
+      }
+    ]
+  },
+  "registered_model_matrix": [
+    {
+      "expected_bytes": 688066496,
+      "file_name": "MiniCPM5-1B-Claude-Opus-Fable5-Thinking-Q4_K_M.gguf",
+      "model_id": "minicpm5-1b-fable5-q4-k-m",
+      "repository": "GnLOLot/MiniCPM5-1B-Claude-Opus-Fable5-Thinking-GGUF",
+      "revision": "5a4ed2c3605634e7b043e8b98fa01e504b0dfbed",
+      "runtime": "llama.cpp",
+      "sha256": "b1c3bf2995e96cb792a0031e4e1497a500e9244c68ba17c24a7e6edf1fc59019"
+    },
+    {
+      "expected_bytes": 1103486896,
+      "file_name": "MiniCPM5-1B-web.litertlm",
+      "model_id": "minicpm5-1b-web-litert-lm",
+      "repository": "Tdamre/MiniCPM5-1B-litert-lm",
+      "revision": "06e61f79c625f864391fbb33049b5b46d1bfd7a6",
+      "runtime": "litert-lm",
+      "sha256": "a6d6d61fdfa0e04458fea344791d15ca304b54a40573e1b44ebab30c54d7bf1d"
+    },
+    {
+      "expected_bytes": 532517120,
+      "file_name": "Qwen3.5-0.8B-Q4_K_M.gguf",
+      "model_id": "qwen3.5-0.8b-q4-k-m",
+      "repository": "unsloth/Qwen3.5-0.8B-GGUF",
+      "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+      "runtime": "llama.cpp",
+      "sha256": "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
+    },
+    {
+      "expected_bytes": 3446780848,
+      "file_name": "VibeThinker-3B.litertlm",
+      "model_id": "vibethinker-3b-litert-lm",
+      "repository": "Tdamre/VibeThinker-3B-litert-lm",
+      "revision": "9378fddbdce35a6ff818e0f08aa05dce6f1032aa",
+      "runtime": "litert-lm",
+      "sha256": "4cd4a856ab9fb890223d927efd4ed37268ecd1fa78559a9d27bf21daa6b8c22f"
+    }
+  ],
+  "schema": "hermes-android-release-evidence-manifest-v2",
+  "source_tree": {
+    "algorithm": "sha256-git-tree-contents-v1",
+    "digest": "53ee26c27a02715fa5a349fbba1e9e9714ef5939203a7b4f9c7868d6dbf70440",
+    "excluded_prefix": "android/release-evidence/",
+    "file_count": 4172,
+    "git_object_format": "sha1"
+  },
+  "summary": {
+    "device_models": [
+      "sdk_gphone64_x86_64"
+    ],
+    "model_count": 4,
+    "performance_record_count": 2,
+    "ui_capture_count": 12
+  },
+  "tag": "v0.13.147",
+  "tested_binaries": {
+    "benchmark_target_apk_sha256": "377a079c231e99da14d446c35722307af4edc5da33355271365ba6d5da04c5b9",
+    "benchmark_test_apk_sha256": "d03dc96a355eea614e2877d90cccba562c5c9d26b8f13056cb49ee341c670873",
+    "evidence_run_id": "v0.13.147-53ee26c27a02715f-20260814-163527bst",
+    "ui_candidate_apk_sha256": "17e8639a043092f6eb47c686ccdd84fe0122fac5e5a2d498c810e888e090c57d",
+    "ui_instrumentation_apk_sha256": "8be7dece41b4e39e61e55434f6b884d593bd2b1da8b7c97dbbd55bdc5d68ac1b"
+  }
+}

@@ -1,0 +1,120 @@
+name: ODYN vNext Bootstrap
+
+on:
+  push:
+    branches:
+      - integration/odyn-vnext
+    paths:
+      - ".github/workflows/odyn-vnext-bootstrap.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: odyn-vnext-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  reconstruct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest pytest-xdist
+
+      - name: Verify reconstruction policy tests
+        run: python -m pytest -q -c /dev/null --confcutdir=tests/convergence tests/convergence/test_reconstruct_policy.py
+
+      - name: Reconstruct on pinned current upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ODYN_BASE_SHA: df56169a5f472ca4156e8f8a77a75b89baa93733
+          COMMON_BASE_SHA: 6fa1701bd3d9dd41923adc30fe55ec3f02c693ce
+          PREVIOUS_UPSTREAM_SHA: 5e1005e46d3b919daa1336b4398d0b5430a4fd03
+          UPSTREAM_BASE_SHA: 93c9360a8da592cee43e8895403e91c7a920b0ce
+          REVIEW_HEAD_SHA: 3ccf3f620650520afb04cfd0a6bca90994ad74d2
+          TRUST_HEAD_SHA: 46daebd906bd90027e3581c91d886acb0d548e41
+        run: |
+          set -euo pipefail
+          git config user.name "odyn-vnext-bot"
+          git config user.email "odyn-vnext-bot@users.noreply.github.com"
+
+          rm -rf /tmp/odyn-vnext-overlay /tmp/odyn-convergence
+          mkdir -p /tmp/odyn-vnext-overlay /tmp/odyn-convergence
+          cp -a docs/convergence/BASELINES.md /tmp/odyn-vnext-overlay/BASELINES.md
+          cp -a scripts/convergence /tmp/odyn-vnext-overlay/scripts-convergence
+          cp -a tests/convergence /tmp/odyn-vnext-overlay/tests-convergence
+          cp -a .github/workflows /tmp/odyn-vnext-overlay/workflows
+
+          git remote add upstream https://github.com/NousResearch/hermes-agent.git || true
+          git fetch --no-tags upstream main
+          git cat-file -e "$UPSTREAM_BASE_SHA^{commit}"
+
+          git fetch --no-tags origin             baseline/odyn-pre-vnext             work/hermes-review-cycle             work/odyn-trust-boundary-max
+
+          git cat-file -e "$ODYN_BASE_SHA^{commit}"
+          git cat-file -e "$COMMON_BASE_SHA^{commit}"
+          git cat-file -e "$PREVIOUS_UPSTREAM_SHA^{commit}"
+          git cat-file -e "$REVIEW_HEAD_SHA^{commit}"
+          git cat-file -e "$TRUST_HEAD_SHA^{commit}"
+
+          PYTHONPATH=. python scripts/convergence/generate_baseline.py             --odyn "$ODYN_BASE_SHA"             --upstream "$UPSTREAM_BASE_SHA"             --previous-upstream "$PREVIOUS_UPSTREAM_SHA"             --out /tmp/odyn-convergence
+
+          gh api repos/NousResearch/hermes-agent > /tmp/hermes-repo.json
+          gh api 'repos/NousResearch/hermes-agent/forks?sort=stargazers&per_page=100' > /tmp/hermes-top-forks.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          repo = json.loads(Path("/tmp/hermes-repo.json").read_text())
+          forks = json.loads(Path("/tmp/hermes-top-forks.json").read_text())
+          payload = {
+              "schema_version": 1,
+              "observed_forks_count": repo.get("forks_count"),
+              "sample_strategy": "top 100 forks by stargazers; exhaustive miner is a separate paginated job",
+              "sample_count": len(forks),
+              "sample": [
+                  {
+                      "full_name": f.get("full_name"),
+                      "stars": f.get("stargazers_count"),
+                      "updated_at": f.get("updated_at"),
+                      "default_branch": f.get("default_branch"),
+                  }
+                  for f in forks
+              ],
+          }
+          Path("/tmp/odyn-convergence/FORK_CENSUS.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+
+          git reset --hard "$UPSTREAM_BASE_SHA"
+
+          mkdir -p docs/convergence scripts tests/convergence .github
+          cp -a /tmp/odyn-vnext-overlay/BASELINES.md docs/convergence/BASELINES.md
+          rm -rf scripts/convergence tests/convergence .github/workflows
+          cp -a /tmp/odyn-vnext-overlay/scripts-convergence scripts/convergence
+          cp -a /tmp/odyn-vnext-overlay/tests-convergence tests/convergence
+          cp -a /tmp/odyn-vnext-overlay/workflows .github/workflows
+          cp -a /tmp/odyn-convergence/. docs/convergence/
+
+          PYTHONPATH=. python scripts/convergence/reconstruct_vnext.py             --odyn-base "$ODYN_BASE_SHA"             --common-base "$COMMON_BASE_SHA"             --review-base "$PREVIOUS_UPSTREAM_SHA"             --review-head "$REVIEW_HEAD_SHA"             --trust-head "$TRUST_HEAD_SHA"             --report docs/convergence/PORT_RESULTS.json
+
+          python -m pytest -q -c /dev/null --confcutdir=tests/convergence tests/convergence/test_reconstruct_policy.py
+
+          git add -A
+          git commit -m "convergence: reconstruct ODYN vNext on Hermes 93c9360"
+          git push --force-with-lease origin HEAD:integration/odyn-vnext
+
+
+# bootstrap-trigger: force-stage-port
+
+# bootstrap-trigger: preserve-workflows-for-token-scope

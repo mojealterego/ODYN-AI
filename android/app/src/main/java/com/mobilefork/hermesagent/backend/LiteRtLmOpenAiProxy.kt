@@ -1,0 +1,2549 @@
+package com.mobilefork.hermesagent.backend
+
+import android.app.ActivityManager
+import android.content.Context
+import android.os.Build
+import android.util.Base64
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Capabilities
+import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Conversation
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.OpenApiTool
+import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolCall
+import com.google.ai.edge.litertlm.tool
+import com.mobilefork.hermesagent.device.HermesAndroidHardwareProfile
+import com.mobilefork.hermesagent.device.LocalModelRuntimeDiagnostics
+import fi.iki.elonen.NanoHTTPD
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+
+object LiteRtLmOpenAiProxy {
+    @Volatile private var server: LiteRtLmServer? = null
+    @Volatile private var activeModelPath: String = ""
+    @Volatile private var activeRuntimeConfigKey: String = ""
+
+    /** LiteRT-LM inference configuration from catalog entry or defaults */
+    data class InferenceConfig(
+        val topK: Int = 40,              // Edge Gallery default
+        val topP: Float = 0.95f,         // Edge Gallery default
+        val temperature: Float = 1.0f,   // Edge Gallery default
+        val maxTokens: Int = -1,         // -1 = backend default
+        val maxContextLength: Int = -1,  // -1 = backend default
+        val supportImage: Boolean = false,
+        val supportAudio: Boolean = false,
+        val preferredAccelerator: String = "auto",
+        val speculativeDecodingMode: SpeculativeDecodingMode = SpeculativeDecodingMode.AUTO,
+    )
+
+    enum class SpeculativeDecodingMode {
+        AUTO,
+        ENABLED,
+        DISABLED,
+    }
+
+    internal data class ModalityDecision(
+        val supportImage: Boolean,
+        val supportAudio: Boolean,
+        val policy: String,
+    )
+
+    internal data class SpeculativeDecodingDecision(
+        val supported: Boolean,
+        val enabled: Boolean,
+        val policy: String,
+    )
+
+    internal data class EngineTokenBudget(
+        val value: Int?,
+        val policy: String,
+    )
+
+    internal data class GpuBackendPolicy(
+        val enabled: Boolean,
+        val openClAvailable: Boolean,
+        val deviceIdentity: String,
+        val socFamily: String,
+        val gpuFamily: String,
+        val backendOrder: List<String>,
+        val nativeAbiStrategy: String,
+        val description: String,
+    )
+
+    internal data class StartupCompletionCanary(
+        val content: String,
+        val elapsedMs: Long,
+    )
+
+    /**
+     * Testable boundary around LiteRT-LM's final Engine class. Engine
+     * initialization alone is not readiness: every candidate must also produce
+     * nonblank model text before it can be selected or exposed over HTTP.
+     */
+    internal interface StartupEngineCandidate {
+        fun initialize()
+        fun completionCanary(timeoutMs: Long): StartupCompletionCanary
+        fun cancelCompletion()
+        fun close()
+    }
+
+    internal data class StartupEngineAttempt(
+        val label: String,
+        val create: () -> StartupEngineCandidate,
+    )
+
+    internal data class StartupEngineSelection(
+        val candidate: StartupEngineCandidate?,
+        val selectedLabel: String,
+        val completionLatencyMs: Long,
+        val attempts: List<String>,
+        val failure: Throwable?,
+    ) {
+        val verified: Boolean
+            get() = candidate != null && selectedLabel.isNotBlank() && completionLatencyMs > 0L
+    }
+
+    internal data class StartupProbeDecision(
+        val openClAvailable: Boolean,
+        val speculativeDecodingSupported: Boolean,
+        val attempts: List<String>,
+    )
+
+    private class StartupNativeOperationAbandonedException(message: String, cause: Throwable) :
+        TimeoutException(message) {
+        init {
+            initCause(cause)
+        }
+    }
+
+    private const val DEFAULT_GENERATION_TIMEOUT_MS = 300_000L
+    private const val MIN_GENERATION_TIMEOUT_MS = 5_000L
+    private const val MAX_GENERATION_TIMEOUT_MS = 300_000L
+    private const val STARTUP_INITIALIZATION_TIMEOUT_MS = 150_000L
+    private const val STARTUP_CANARY_TIMEOUT_MS = 150_000L
+    private const val STARTUP_TOTAL_TIMEOUT_MS = 300_000L
+    private const val STARTUP_CLEANUP_TIMEOUT_MS = 10_000L
+    private const val STARTUP_SHUTDOWN_TIMEOUT_MS = 30_000L
+
+    private data class NativeStartupUnwind(
+        val token: String,
+        val detail: String,
+    )
+
+    private val nativeStartupUnwind = AtomicReference<NativeStartupUnwind?>(null)
+
+    internal fun selectCompletionVerifiedEngine(
+        candidateAttempts: List<StartupEngineAttempt>,
+        timeoutMs: Long = STARTUP_CANARY_TIMEOUT_MS,
+        initializationTimeoutMs: Long = STARTUP_INITIALIZATION_TIMEOUT_MS,
+        totalTimeoutMs: Long = STARTUP_TOTAL_TIMEOUT_MS,
+        cleanupTimeoutMs: Long = STARTUP_CLEANUP_TIMEOUT_MS,
+        startupStartedAtNanos: Long = System.nanoTime(),
+        onInitializationWorkerAdmittedForTests: () -> Unit = {},
+    ): StartupEngineSelection {
+        require(timeoutMs > 0L) { "Startup completion timeout must be positive" }
+        require(initializationTimeoutMs > 0L) { "Engine initialization timeout must be positive" }
+        require(totalTimeoutMs > 0L) { "Total engine startup timeout must be positive" }
+        require(cleanupTimeoutMs > 0L) { "Candidate cleanup timeout must be positive" }
+        val attemptLog = mutableListOf<String>()
+        var lastFailure: Throwable? = null
+        nativeStartupUnwind.get()?.let { unwind ->
+            val failure = IllegalStateException(
+                "A prior native LiteRT-LM startup is still unwinding (${unwind.detail}); " +
+                    "Hermes will not construct another engine yet."
+            )
+            return StartupEngineSelection(null, "", 0L, listOf("startup blocked: ${failure.message}"), failure)
+        }
+        fun remainingStartupMs(): Long {
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startupStartedAtNanos)
+            return (totalTimeoutMs - elapsedMs).coerceAtLeast(0L)
+        }
+        for (attempt in candidateAttempts) {
+            var candidate: StartupEngineCandidate? = null
+            try {
+                if (remainingStartupMs() <= 0L) {
+                    lastFailure = TimeoutException("total startup budget exhausted after ${totalTimeoutMs / 1000.0} seconds")
+                    attemptLog += "${attempt.label}: not started (${startupFailureSummary(lastFailure)})"
+                    break
+                }
+                attemptLog += "${attempt.label}: starting"
+                candidate = attempt.create()
+                val initializationBudgetMs = minOf(initializationTimeoutMs, remainingStartupMs())
+                if (initializationBudgetMs <= 0L) {
+                    throw TimeoutException("total startup budget exhausted before ${attempt.label} initialization")
+                }
+                runBoundedNativeStartupOperation(
+                    label = attempt.label,
+                    phase = "initialization",
+                    timeoutMs = initializationBudgetMs,
+                    onAbandonedWorkerExit = { cleanupStartupCandidate(candidate) },
+                    onWorkerAdmitted = onInitializationWorkerAdmittedForTests,
+                ) {
+                    candidate.initialize()
+                }
+                val canaryBudgetMs = minOf(timeoutMs, remainingStartupMs())
+                if (canaryBudgetMs <= 0L) {
+                    throw TimeoutException("total startup budget exhausted before ${attempt.label} completion canary")
+                }
+                val canary = runBoundedNativeStartupOperation(
+                    label = attempt.label,
+                    phase = "completion canary",
+                    timeoutMs = canaryBudgetMs,
+                    onAbandonedWorkerExit = { cleanupStartupCandidate(candidate) },
+                ) {
+                    candidate.completionCanary(canaryBudgetMs)
+                }
+                require(canary.content.isNotBlank()) {
+                    "completion canary returned blank model content"
+                }
+                val elapsedMs = canary.elapsedMs.coerceAtLeast(1L)
+                attemptLog += "${attempt.label}: completion canary passed ($elapsedMs ms)"
+                return StartupEngineSelection(
+                    candidate = candidate,
+                    selectedLabel = attempt.label,
+                    completionLatencyMs = elapsedMs,
+                    attempts = attemptLog.toList(),
+                    failure = null,
+                )
+            } catch (error: Throwable) {
+                var failure = error
+                var nativeOperationAbandoned = error is StartupNativeOperationAbandonedException
+                if (!nativeOperationAbandoned && candidate != null) {
+                    try {
+                        closeCandidateBeforeFallback(
+                            candidate = candidate,
+                            label = attempt.label,
+                            timeoutMs = minOf(
+                                cleanupTimeoutMs,
+                                remainingStartupMs().coerceAtLeast(1L),
+                            ),
+                        )
+                    } catch (cleanupError: StartupNativeOperationAbandonedException) {
+                        failure = cleanupError
+                        nativeOperationAbandoned = true
+                    }
+                }
+                lastFailure = failure
+                attemptLog += "${attempt.label}: failed (${startupFailureSummary(failure)})"
+                if (nativeOperationAbandoned) {
+                    break
+                }
+            }
+        }
+        return StartupEngineSelection(
+            candidate = null,
+            selectedLabel = "",
+            completionLatencyMs = 0L,
+            attempts = attemptLog.toList(),
+            failure = lastFailure ?: IllegalStateException("No LiteRT-LM engine candidates were available"),
+        )
+    }
+
+    private fun <T> runBoundedNativeStartupOperation(
+        label: String,
+        phase: String,
+        timeoutMs: Long,
+        onAbandonedWorkerExit: () -> Unit = {},
+        onAbandonedBeforeStart: (() -> Unit)? = null,
+        poisonOnAbandonedOperationFailure: Boolean = false,
+        onWorkerBeforeAdmission: () -> Unit = {},
+        onWorkerAdmitted: () -> Unit = {},
+        operation: () -> T,
+    ): T {
+        nativeStartupUnwind.get()?.let { unwind ->
+            throw IllegalStateException("A prior native startup is still unwinding (${unwind.detail})")
+        }
+        val safeLabel = label.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val executor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "Hermes-LiteRT-$safeLabel-${phase.replace(' ', '-')}").apply { isDaemon = true }
+        }
+        val notStarted = 0
+        val running = 1
+        val finished = 2
+        val abandonedBeforeStart = 3
+        val abandonedRunning = 4
+        // Admission is linearizable: either the worker owns the native invocation, or the
+        // timeout owns cleanup before the worker is allowed to enter it. This avoids a
+        // boolean started-check race which could close an Engine beside live JNI.
+        val executionState = AtomicInteger(notStarted)
+        val workerFailure = AtomicReference<Throwable?>(null)
+        val unwindState = AtomicReference<NativeStartupUnwind?>(null)
+        val future = executor.submit<T> {
+            onWorkerBeforeAdmission()
+            if (!executionState.compareAndSet(notStarted, running)) {
+                throw java.util.concurrent.CancellationException("Native operation was abandoned before worker admission")
+            }
+            try {
+                onWorkerAdmitted()
+                operation()
+            } catch (error: Throwable) {
+                workerFailure.set(error)
+                throw error
+            } finally {
+                if (!executionState.compareAndSet(running, finished) &&
+                    executionState.compareAndSet(abandonedRunning, finished)
+                ) {
+                    unwindState.get()?.let {
+                        finishAbandonedNativeCleanup(
+                            cleanup = onAbandonedWorkerExit,
+                            unwind = it,
+                            abandonedOperationFailure = workerFailure.get(),
+                            poisonOnOperationFailure = poisonOnAbandonedOperationFailure,
+                        )
+                    }
+                }
+            }
+        }
+
+        fun abandon(cause: Throwable, reason: String): Nothing {
+            val unwind = NativeStartupUnwind(
+                token = UUID.randomUUID().toString(),
+                detail = "$label $phase $reason",
+            )
+            val registered = if (nativeStartupUnwind.compareAndSet(null, unwind)) {
+                unwind
+            } else {
+                checkNotNull(nativeStartupUnwind.get())
+            }
+            unwindState.set(registered)
+            var callerCleanup: (() -> Unit)? = null
+            while (true) {
+                when (executionState.get()) {
+                    notStarted -> if (executionState.compareAndSet(notStarted, abandonedBeforeStart)) {
+                        callerCleanup = onAbandonedBeforeStart ?: onAbandonedWorkerExit
+                        break
+                    }
+                    running -> if (executionState.compareAndSet(running, abandonedRunning)) {
+                        break
+                    }
+                    finished -> {
+                        callerCleanup = onAbandonedWorkerExit
+                        break
+                    }
+                    abandonedBeforeStart, abandonedRunning -> break
+                }
+            }
+            future.cancel(true)
+            callerCleanup?.let { cleanup ->
+                // Cleanup may itself block, so the deadline caller only transfers ownership
+                // to a daemon while the global retry guard remains held.
+                Thread(
+                    {
+                        finishAbandonedNativeCleanup(
+                            cleanup = cleanup,
+                            unwind = registered,
+                            abandonedOperationFailure = workerFailure.get(),
+                            poisonOnOperationFailure = poisonOnAbandonedOperationFailure,
+                        )
+                    },
+                    "Hermes-LiteRT-$safeLabel-abandoned-cleanup",
+                ).apply { isDaemon = true }.start()
+            }
+            throw StartupNativeOperationAbandonedException(
+                "$phase $reason after ${timeoutMs / 1000.0} seconds; " +
+                    "Hermes will not start another native engine until this attempt exits",
+                cause,
+            )
+        }
+
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (timeout: TimeoutException) {
+            abandon(timeout, "timed out")
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            abandon(interrupted, "was interrupted")
+        } catch (execution: ExecutionException) {
+            throw execution.cause ?: execution
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun closeCandidateBeforeFallback(
+        candidate: StartupEngineCandidate,
+        label: String,
+        timeoutMs: Long,
+    ) {
+        require(timeoutMs > 0L) { "Candidate cleanup timeout must be positive" }
+        val safeLabel = label.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val executor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "Hermes-LiteRT-$safeLabel-cleanup").apply { isDaemon = true }
+        }
+        val notStarted = 0
+        val running = 1
+        val finished = 2
+        val abandonedBeforeStart = 3
+        val abandonedRunning = 4
+        val executionState = AtomicInteger(notStarted)
+        val unwindState = AtomicReference<NativeStartupUnwind?>(null)
+        val closeFailure = AtomicReference<Throwable?>(null)
+        val future = executor.submit<Unit> {
+            if (!executionState.compareAndSet(notStarted, running)) {
+                return@submit
+            }
+            try {
+                cleanupStartupCandidate(candidate)
+            } catch (error: Throwable) {
+                closeFailure.set(error)
+                throw error
+            } finally {
+                if (!executionState.compareAndSet(running, finished) &&
+                    executionState.compareAndSet(abandonedRunning, finished)
+                ) {
+                    val unwind = unwindState.get()
+                    if (unwind != null) {
+                        val failure = closeFailure.get()
+                        if (failure == null) {
+                            nativeStartupUnwind.compareAndSet(unwind, null)
+                        } else {
+                            markUnwindCleanupFailure(unwind, failure)
+                        }
+                    }
+                }
+            }
+        }
+
+        fun abandonCleanup(cause: Throwable, reason: String): Nothing {
+            val unwind = registerNativeStartupUnwind("$label candidate cleanup $reason")
+            unwindState.set(unwind)
+            var cleanupBeforeStart = false
+            var cleanupFinished = false
+            while (true) {
+                when (executionState.get()) {
+                    notStarted -> if (executionState.compareAndSet(notStarted, abandonedBeforeStart)) {
+                        cleanupBeforeStart = true
+                        break
+                    }
+                    running -> if (executionState.compareAndSet(running, abandonedRunning)) {
+                        break
+                    }
+                    finished -> {
+                        cleanupFinished = true
+                        break
+                    }
+                    abandonedBeforeStart, abandonedRunning -> break
+                }
+            }
+            if (cleanupFinished) {
+                val failure = closeFailure.get()
+                if (failure == null) {
+                    nativeStartupUnwind.compareAndSet(unwind, null)
+                } else {
+                    markUnwindCleanupFailure(unwind, failure)
+                }
+            }
+            future.cancel(true)
+            if (cleanupBeforeStart) {
+                Thread(
+                    { finishAbandonedNativeCleanup({ cleanupStartupCandidate(candidate) }, unwind) },
+                    "Hermes-LiteRT-$safeLabel-cancelled-before-start-cleanup",
+                ).apply { isDaemon = true }.start()
+            }
+            throw StartupNativeOperationAbandonedException(
+                "candidate cleanup $reason after ${timeoutMs / 1000.0} seconds; " +
+                    "Hermes will not start another native engine until cleanup succeeds",
+                cause,
+            )
+        }
+
+        try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (timeout: TimeoutException) {
+            abandonCleanup(timeout, "timed out")
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            abandonCleanup(interrupted, "was interrupted")
+        } catch (execution: ExecutionException) {
+            val cause = execution.cause ?: execution
+            val unwind = registerNativeStartupUnwind("$label candidate cleanup failed")
+            markUnwindCleanupFailure(unwind, cause)
+            throw StartupNativeOperationAbandonedException(
+                "candidate cleanup failed; restart Hermes before another native engine attempt",
+                cause,
+            )
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun registerNativeStartupUnwind(detail: String): NativeStartupUnwind {
+        val unwind = NativeStartupUnwind(UUID.randomUUID().toString(), detail)
+        return if (nativeStartupUnwind.compareAndSet(null, unwind)) {
+            unwind
+        } else {
+            checkNotNull(nativeStartupUnwind.get())
+        }
+    }
+
+    private fun cleanupStartupCandidate(candidate: StartupEngineCandidate) {
+        var failure: Throwable? = null
+        fun capture(block: () -> Unit) {
+            try {
+                block()
+            } catch (error: Throwable) {
+                if (failure == null) {
+                    failure = error
+                } else {
+                    failure?.addSuppressed(error)
+                }
+            }
+        }
+        capture { candidate.cancelCompletion() }
+        capture { candidate.close() }
+        failure?.let { throw it }
+    }
+
+    private fun finishAbandonedNativeCleanup(
+        cleanup: () -> Unit,
+        unwind: NativeStartupUnwind,
+        abandonedOperationFailure: Throwable? = null,
+        poisonOnOperationFailure: Boolean = false,
+    ) {
+        runCatching { cleanup() }
+            .onSuccess {
+                if (poisonOnOperationFailure && abandonedOperationFailure != null) {
+                    markUnwindCleanupFailure(unwind, abandonedOperationFailure)
+                } else {
+                    nativeStartupUnwind.compareAndSet(unwind, null)
+                }
+            }
+            .onFailure { markUnwindCleanupFailure(unwind, it) }
+    }
+
+    internal fun resolveStartupProbes(
+        preferredAccelerator: String,
+        speculativeDecodingMode: SpeculativeDecodingMode,
+        startupStartedAtNanos: Long = System.nanoTime(),
+        totalTimeoutMs: Long = STARTUP_TOTAL_TIMEOUT_MS,
+        probeTimeoutMs: Long = STARTUP_INITIALIZATION_TIMEOUT_MS,
+        openClProbe: () -> Boolean,
+        capabilitiesProbe: () -> Boolean,
+    ): StartupProbeDecision {
+        require(totalTimeoutMs > 0L) { "Total engine startup timeout must be positive" }
+        require(probeTimeoutMs > 0L) { "Native startup probe timeout must be positive" }
+        nativeStartupUnwind.get()?.let { unwind ->
+            throw IllegalStateException("A prior native startup is still unwinding (${unwind.detail})")
+        }
+        val attempts = mutableListOf<String>()
+        fun remainingStartupMs(): Long {
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startupStartedAtNanos)
+            return (totalTimeoutMs - elapsedMs).coerceAtLeast(0L)
+        }
+        fun runProbe(
+            label: String,
+            poisonOnLateFailure: Boolean,
+            operation: () -> Boolean,
+        ): Boolean {
+            val remainingMs = remainingStartupMs()
+            if (remainingMs <= 0L) {
+                throw TimeoutException("total startup budget exhausted before $label")
+            }
+            return try {
+                val result = runBoundedNativeStartupOperation(
+                    label = "startup-probe",
+                    phase = label,
+                    timeoutMs = minOf(probeTimeoutMs, remainingMs),
+                    poisonOnAbandonedOperationFailure = poisonOnLateFailure,
+                    operation = operation,
+                )
+                attempts += "$label: ${if (result) "available" else "unavailable"}"
+                result
+            } catch (abandoned: StartupNativeOperationAbandonedException) {
+                attempts += "$label: abandoned (${startupFailureSummary(abandoned)})"
+                throw abandoned
+            } catch (cleanup: NativeProbeCleanupException) {
+                val unwind = registerNativeStartupUnwind("$label cleanup failed")
+                markUnwindCleanupFailure(unwind, cleanup)
+                attempts += "$label: cleanup failed (${startupFailureSummary(cleanup)})"
+                throw StartupNativeOperationAbandonedException(
+                    "$label cleanup failed; restart Hermes before another native engine attempt",
+                    cleanup,
+                )
+            } catch (error: Throwable) {
+                attempts += "$label: unavailable (${startupFailureSummary(error)})"
+                false
+            }
+        }
+
+        val normalizedAccelerator = preferredAccelerator.trim().lowercase(Locale.US)
+        val openClAvailable = if (normalizedAccelerator == "cpu" || normalizedAccelerator == "npu") {
+            attempts += "OpenCL probe: skipped for $normalizedAccelerator accelerator"
+            false
+        } else {
+            runProbe("OpenCL probe", poisonOnLateFailure = false, operation = openClProbe)
+        }
+        val speculativeDecodingSupported = if (speculativeDecodingMode == SpeculativeDecodingMode.DISABLED) {
+            attempts += "LiteRT-LM capabilities probe: skipped because speculative decoding is disabled"
+            false
+        } else {
+            runProbe(
+                "LiteRT-LM capabilities probe",
+                poisonOnLateFailure = true,
+                operation = capabilitiesProbe,
+            )
+        }
+        return StartupProbeDecision(openClAvailable, speculativeDecodingSupported, attempts)
+    }
+
+    private fun markUnwindCleanupFailure(unwind: NativeStartupUnwind, error: Throwable) {
+        nativeStartupUnwind.compareAndSet(
+            unwind,
+            unwind.copy(
+                detail = unwind.detail +
+                    "; cleanup failed (${startupFailureSummary(error)}); restart Hermes before retrying",
+            ),
+        )
+    }
+
+    internal fun resetNativeStartupUnwindForTests() {
+        nativeStartupUnwind.set(null)
+    }
+
+    internal fun nativeStartupUnwindActiveForTests(): Boolean {
+        return nativeStartupUnwind.get() != null
+    }
+
+    internal class NativeGenerationCleanupException(message: String, cause: Throwable) :
+        IllegalStateException(message, cause)
+
+    internal class NativeProbeCleanupException(message: String, cause: Throwable) :
+        IllegalStateException(message, cause)
+
+    internal fun <T> useOwnedNativeProbeResource(
+        create: () -> T,
+        query: (T) -> Boolean,
+        close: (T) -> Unit,
+    ): Boolean {
+        val resource = create()
+        var queryFailure: Throwable? = null
+        return try {
+            query(resource)
+        } catch (error: Throwable) {
+            queryFailure = error
+            throw error
+        } finally {
+            try {
+                close(resource)
+            } catch (cleanup: Throwable) {
+                queryFailure?.let(cleanup::addSuppressed)
+                throw NativeProbeCleanupException(
+                    "Native capabilities cleanup failed (${cleanup.message ?: cleanup.javaClass.simpleName})",
+                    cleanup,
+                )
+            }
+        }
+    }
+
+    internal class NativeGenerationCoordinator {
+        internal data class Snapshot(
+            val state: String,
+            val detail: String,
+        ) {
+            val completionAvailable: Boolean
+                get() = state == "idle"
+        }
+
+        private data class Lease(
+            val token: String = UUID.randomUUID().toString(),
+            val finished: CountDownLatch = CountDownLatch(1),
+            @Volatile var restartRequiredDetail: String = "",
+        )
+
+        private val lock = Any()
+        private var activeLease: Lease? = null
+        private var shuttingDown = false
+
+        internal fun <T> runBounded(
+            timeoutMs: Long,
+            onWorkerAdmittedForTests: () -> Unit = {},
+            operation: () -> T,
+        ): T {
+            require(timeoutMs > 0L) { "Generation timeout must be positive" }
+            val lease = synchronized(lock) {
+                check(!shuttingDown) { "LiteRT-LM is shutting down and cannot accept another completion" }
+                val active = activeLease
+                check(active == null) {
+                    val detail = active?.restartRequiredDetail.orEmpty()
+                    if (detail.isBlank()) {
+                        "A prior LiteRT-LM completion is still running; Hermes will not overlap native generation"
+                    } else {
+                        "A prior LiteRT-LM completion requires an app restart ($detail)"
+                    }
+                }
+                Lease().also { activeLease = it }
+            }
+            val notStarted = 0
+            val running = 1
+            val finishing = 2
+            val finished = 3
+            val abandonedBeforeStart = 4
+            val abandonedRunning = 5
+            val executionState = AtomicInteger(notStarted)
+            val workerFailure = AtomicReference<Throwable?>(null)
+            val executor = Executors.newSingleThreadExecutor { runnable ->
+                Thread(runnable, "Hermes-LiteRT-generation-${lease.token.take(8)}").apply { isDaemon = true }
+            }
+
+            fun finishLease(abandoned: Boolean) {
+                val failure = workerFailure.get()
+                val restartRequired = failure is NativeGenerationCleanupException || (abandoned && failure != null)
+                synchronized(lock) {
+                    if (restartRequired) {
+                        lease.restartRequiredDetail = startupFailureSummary(checkNotNull(failure))
+                    } else if (activeLease === lease) {
+                        activeLease = null
+                    }
+                }
+                lease.finished.countDown()
+            }
+
+            val future = executor.submit<T> {
+                if (!executionState.compareAndSet(notStarted, running)) {
+                    throw java.util.concurrent.CancellationException("Generation was abandoned before worker admission")
+                }
+                try {
+                    onWorkerAdmittedForTests()
+                    operation()
+                } catch (error: Throwable) {
+                    workerFailure.set(error)
+                    throw error
+                } finally {
+                    when {
+                        executionState.compareAndSet(running, finishing) -> {
+                            finishLease(abandoned = false)
+                            executionState.set(finished)
+                        }
+                        executionState.compareAndSet(abandonedRunning, finishing) -> {
+                            finishLease(abandoned = true)
+                            executionState.set(finished)
+                        }
+                    }
+                }
+            }
+
+            fun abandon(cause: Throwable, reason: String): Nothing {
+                var callerFinishesLease = false
+                while (true) {
+                    when (executionState.get()) {
+                        notStarted -> if (executionState.compareAndSet(notStarted, abandonedBeforeStart)) {
+                            callerFinishesLease = true
+                            break
+                        }
+                        running -> if (executionState.compareAndSet(running, abandonedRunning)) break
+                        finishing, finished, abandonedBeforeStart, abandonedRunning -> break
+                    }
+                }
+                future.cancel(true)
+                if (callerFinishesLease) {
+                    finishLease(abandoned = true)
+                }
+                throw IllegalStateException(
+                    "LiteRT-LM generation $reason after ${timeoutMs / 1000.0} seconds; " +
+                        "Hermes will not accept another completion or close the engine until this native call exits",
+                    cause,
+                )
+            }
+
+            try {
+                return future.get(timeoutMs, TimeUnit.MILLISECONDS)
+            } catch (timeout: TimeoutException) {
+                abandon(timeout, "timed out")
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+                abandon(interrupted, "was interrupted")
+            } catch (execution: ExecutionException) {
+                throw execution.cause ?: execution
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+
+        internal fun beginShutdownAndAwaitIdle() {
+            val lease = synchronized(lock) {
+                shuttingDown = true
+                activeLease
+            } ?: return
+            var complete = false
+            while (!complete) {
+                try {
+                    lease.finished.await()
+                    complete = true
+                } catch (_: InterruptedException) {
+                    // Shutdown ownership must not race Engine.close beside live JNI merely
+                    // because the bounded caller stopped waiting.
+                }
+            }
+            if (lease.restartRequiredDetail.isNotBlank()) {
+                throw IllegalStateException(
+                    "Native generation cleanup failed (${lease.restartRequiredDetail}); " +
+                        "force stop and reopen Hermes before replacing this engine"
+                )
+            }
+        }
+
+        internal fun snapshot(): Snapshot = synchronized(lock) {
+            val active = activeLease
+            when {
+                active?.restartRequiredDetail?.isNotBlank() == true -> Snapshot(
+                    state = "restart_required",
+                    detail = active.restartRequiredDetail,
+                )
+                shuttingDown -> Snapshot(
+                    state = "shutting_down",
+                    detail = "LiteRT-LM is shutting down and cannot accept another completion",
+                )
+                active != null -> Snapshot(
+                    state = "running_or_unwinding",
+                    detail = "A native LiteRT-LM completion is still running or unwinding",
+                )
+                else -> Snapshot(state = "idle", detail = "")
+            }
+        }
+    }
+
+    internal data class GenerationHealthState(
+        val status: String,
+        val completionAvailable: Boolean,
+        val generationState: String,
+        val generationDetail: String,
+    )
+
+    internal fun generationHealthState(
+        startupCompletionVerified: Boolean,
+        snapshot: NativeGenerationCoordinator.Snapshot,
+    ): GenerationHealthState = GenerationHealthState(
+        status = when (snapshot.state) {
+            "idle" -> "ok"
+            "running_or_unwinding" -> "busy"
+            else -> snapshot.state
+        },
+        completionAvailable = startupCompletionVerified && snapshot.completionAvailable,
+        generationState = snapshot.state,
+        generationDetail = snapshot.detail,
+    )
+
+    internal fun <T> constructOwnedNativeResource(
+        create: () -> T,
+        assignOwner: (T) -> Unit,
+        initialize: (T) -> Unit,
+    ): T {
+        val resource = create()
+        // Ownership must be published before JNI initialization. Vendor initialize()
+        // can allocate native state and then throw; assigning only after it returns
+        // would make the resource unreachable to the bounded cleanup path.
+        assignOwner(resource)
+        initialize(resource)
+        return resource
+    }
+
+    private fun startupFailureSummary(error: Throwable): String {
+        return error.message
+            ?.lineSequence()
+            ?.firstOrNull { it.isNotBlank() }
+            ?.trim()
+            ?.take(180)
+            ?: error.javaClass.simpleName
+    }
+
+    @Synchronized
+    fun ensureRunning(
+        context: Context,
+        modelPath: String,
+        requestedModelName: String,
+        port: Int,
+        inferenceConfig: InferenceConfig = InferenceConfig(),
+    ): LocalBackendStatus {
+        val artifactError = validateModelArtifact(modelPath)
+        if (artifactError != null) {
+            return LocalBackendStatus(
+                backendKind = BackendKind.LITERT_LM,
+                started = false,
+                sourceModelPath = modelPath,
+                statusMessage = artifactError,
+            )
+        }
+        val modelFile = File(modelPath)
+        val requestedRuntimeConfigKey = inferenceConfig.runtimeConfigKey()
+        val current = server
+        if (
+            current != null &&
+            current.isAlive() &&
+            activeModelPath == modelPath &&
+            activeRuntimeConfigKey == requestedRuntimeConfigKey
+        ) {
+            return statusFromHealth(
+                server = current,
+                modelPath = modelPath,
+                port = port,
+                preflightDetail = "Existing initialized runtime reused; no new native model allocation was requested.",
+            )
+        }
+        val memory = LocalModelRuntimeDiagnostics.captureMemory(context)
+        val requestedContext = inferenceConfig.maxContextLength
+        val preflight = LocalModelRuntimeDiagnostics.evaluatePreflight(
+            backend = "litert-lm",
+            modelBytes = modelFile.length(),
+            requestedContextTokens = requestedContext,
+            memory = memory,
+        )
+        val effectiveInferenceConfig = inferenceConfig.copy(
+            maxTokens = inferenceConfig.maxTokens
+                .takeIf { it > 0 }
+                ?.coerceAtMost(preflight.effectiveContextTokens)
+                ?: inferenceConfig.maxTokens,
+            maxContextLength = preflight.effectiveContextTokens,
+        )
+        val attemptId = LocalModelRuntimeDiagnostics.beginAttempt(
+            context = context,
+            backend = "litert-lm",
+            modelFile = modelFile,
+            requestedAccelerator = inferenceConfig.preferredAccelerator,
+            requestedContextTokens = requestedContext,
+            effectiveContextTokens = preflight.effectiveContextTokens,
+            memory = memory,
+            preflight = preflight,
+        )
+        if (!preflight.allowed) {
+            LocalModelRuntimeDiagnostics.finishAttempt(
+                context = context,
+                attemptId = attemptId,
+                status = "blocked",
+                stage = "memory_preflight",
+                detail = preflight.detail,
+            )
+            return LocalBackendStatus(
+                backendKind = BackendKind.LITERT_LM,
+                started = false,
+                sourceModelPath = modelPath,
+                artifactSummary = "${modelFile.name} (${modelFile.length()} bytes, LiteRT-LM header verified)",
+                statusMessage = "LiteRT-LM memory preflight blocked this model: ${preflight.detail}",
+            )
+        }
+        val shutdownFailure = stopCurrentServerBounded()
+        if (shutdownFailure != null) {
+            val detail =
+                "The existing LiteRT-LM runtime did not shut down safely (${startupFailureSummary(shutdownFailure)}). " +
+                    "Hermes did not construct a replacement engine. Force stop and reopen Hermes before retrying."
+            LocalModelRuntimeDiagnostics.finishAttempt(
+                context = context,
+                attemptId = attemptId,
+                status = "failed",
+                stage = "existing_engine_shutdown",
+                detail = detail,
+            )
+            return LocalBackendStatus(
+                backendKind = BackendKind.LITERT_LM,
+                started = false,
+                sourceModelPath = modelPath,
+                artifactSummary = "${modelFile.name} (${modelFile.length()} bytes, LiteRT-LM header verified)",
+                statusMessage = detail,
+                requiresAppRestart = true,
+            )
+        }
+        var candidateServer: LiteRtLmServer? = null
+        return try {
+            val newServer = LiteRtLmServer(
+                context = context.applicationContext,
+                modelPath = modelPath,
+                requestedModelName = requestedModelName,
+                port = port,
+                inferenceConfig = effectiveInferenceConfig,
+            )
+            candidateServer = newServer
+            newServer.start(SOCKET_READ_TIMEOUT, false)
+            val status = statusFromHealth(
+                server = newServer,
+                modelPath = modelPath,
+                port = port,
+                preflightDetail = preflight.detail,
+            )
+            check(status.started && status.completionVerified) {
+                "LiteRT-LM startup did not retain a verified nonblank completion proof"
+            }
+            server = newServer
+            activeModelPath = modelPath
+            activeRuntimeConfigKey = requestedRuntimeConfigKey
+            LocalModelRuntimeDiagnostics.finishAttempt(
+                context = context,
+                attemptId = attemptId,
+                status = "ready",
+                stage = "completion_verified",
+                detail = status.statusMessage,
+                accelerator = status.accelerator,
+                acceleratorFallback = status.acceleratorFallback,
+                completionVerified = status.completionVerified,
+                completionLatencyMs = status.completionLatencyMs,
+            )
+            status
+        } catch (error: Throwable) {
+            val candidateCleanupFailure = candidateServer?.let { candidate ->
+                shutdownNativeResourceBounded(
+                    label = "failed candidate server",
+                    timeoutMs = STARTUP_SHUTDOWN_TIMEOUT_MS,
+                    shutdown = { candidate.shutdown() },
+                )
+            }
+            val failure = buildString {
+                append(actionableRuntimeFailure(error, "LiteRT-LM"))
+                if (candidateCleanupFailure != null) {
+                    append(" Candidate cleanup did not finish safely (")
+                    append(startupFailureSummary(candidateCleanupFailure))
+                    append("); force stop and reopen Hermes before retrying.")
+                }
+            }
+            LocalModelRuntimeDiagnostics.finishAttempt(
+                context = context,
+                attemptId = attemptId,
+                status = "failed",
+                stage = "engine_initialization",
+                detail = failure,
+            )
+            LocalBackendStatus(
+                backendKind = BackendKind.LITERT_LM,
+                started = false,
+                sourceModelPath = modelPath,
+                artifactSummary = "${modelFile.name} (${modelFile.length()} bytes, LiteRT-LM header verified)",
+                statusMessage = failure,
+                requiresAppRestart = candidateCleanupFailure != null || nativeStartupUnwind.get() != null,
+            )
+        }
+    }
+
+    @Synchronized
+    fun stop(): Throwable? = stopCurrentServerBounded()
+
+    private fun stopCurrentServerBounded(): Throwable? {
+        nativeStartupUnwind.get()?.let { unwind ->
+            return IllegalStateException(
+                "A prior native LiteRT-LM operation is still unwinding (${unwind.detail}); " +
+                    "Hermes cannot report the runtime as stopped yet"
+            )
+        }
+        val current = server
+        server = null
+        activeModelPath = ""
+        activeRuntimeConfigKey = ""
+        if (current == null) return null
+        return shutdownNativeResourceBounded(
+            label = "existing server",
+            timeoutMs = STARTUP_SHUTDOWN_TIMEOUT_MS,
+            shutdown = { current.shutdown() },
+        )
+    }
+
+    private fun shutdownNativeResourceBounded(
+        label: String,
+        timeoutMs: Long,
+        onWorkerBeforeAdmission: () -> Unit = {},
+        shutdown: () -> Unit,
+    ): Throwable? {
+        nativeStartupUnwind.get()?.let { unwind ->
+            return IllegalStateException("A prior native startup is still unwinding (${unwind.detail})")
+        }
+        return try {
+            runBoundedNativeStartupOperation(
+                label = label,
+                phase = "shutdown",
+                timeoutMs = timeoutMs,
+                onAbandonedBeforeStart = shutdown,
+                poisonOnAbandonedOperationFailure = true,
+                onWorkerBeforeAdmission = onWorkerBeforeAdmission,
+                operation = shutdown,
+            )
+            null
+        } catch (abandoned: StartupNativeOperationAbandonedException) {
+            abandoned
+        } catch (error: Throwable) {
+            val unwind = registerNativeStartupUnwind("$label shutdown failed")
+            markUnwindCleanupFailure(unwind, error)
+            error
+        }
+    }
+
+    internal fun runBoundedNativeShutdownForTests(
+        timeoutMs: Long,
+        onWorkerBeforeAdmission: () -> Unit = {},
+        shutdown: () -> Unit,
+    ): Throwable? {
+        return shutdownNativeResourceBounded(
+            label = "test native resource",
+            timeoutMs = timeoutMs,
+            onWorkerBeforeAdmission = onWorkerBeforeAdmission,
+            shutdown = shutdown,
+        )
+    }
+
+    @Synchronized
+    internal fun currentHealthJson(): JSONObject? {
+        val current = server ?: return null
+        return if (current.isAlive()) current.healthJson() else null
+    }
+
+    private fun InferenceConfig.runtimeConfigKey(): String {
+        return listOf(
+            topK,
+            topP,
+            temperature,
+            maxTokens,
+            maxContextLength,
+            supportImage,
+            supportAudio,
+            preferredAccelerator,
+            speculativeDecodingMode,
+        ).joinToString("|")
+    }
+
+    private fun statusFromHealth(
+        server: LiteRtLmServer,
+        modelPath: String,
+        port: Int,
+        preflightDetail: String,
+    ): LocalBackendStatus {
+        val health = server.healthJson()
+        val accelerator = health.optString("accelerator")
+        val fallback = health.optString("accelerator_fallback_reason")
+        val completionVerified = health.optBoolean("completion_available", false)
+        val generationState = health.optString("generation_state", "idle")
+        val generationDetail = health.optString("generation_detail")
+        val fallbackLabel = fallback.takeIf { it.isNotBlank() }?.let { " CPU fallback: $it" }.orEmpty()
+        val statusMessage = if (completionVerified) {
+            "LiteRT-LM engine initialized and completion-verified with " +
+                "${accelerator.ifBlank { "unknown" }} acceleration. $preflightDetail$fallbackLabel"
+        } else {
+            val recovery = if (generationState == "restart_required") {
+                " Force stop and reopen Hermes before retrying."
+            } else {
+                " Wait for the owning native completion to exit before retrying."
+            }
+            "LiteRT-LM completion is unavailable ($generationState). ${generationDetail.ifBlank { "Native generation is not idle." }}$recovery"
+        }
+        return LocalBackendStatus(
+            backendKind = BackendKind.LITERT_LM,
+            started = completionVerified,
+            baseUrl = "http://127.0.0.1:$port/v1",
+            modelName = server.modelName,
+            sourceModelPath = modelPath,
+            statusMessage = statusMessage,
+            accelerator = accelerator,
+            acceleratorFallback = fallback,
+            artifactSummary = "${File(modelPath).name} (${File(modelPath).length()} bytes, LiteRT-LM header verified)",
+            completionVerified = completionVerified,
+            completionLatencyMs = health.optLong("completion_latency_ms", 0L),
+            requiresAppRestart = generationState == "restart_required",
+        )
+    }
+
+    internal fun actionableRuntimeFailure(error: Throwable, runtimeLabel: String): String {
+        val chain = generateSequence(error as Throwable?) { it.cause }.take(12).toList()
+        val outOfMemory = chain.any { item ->
+            item is OutOfMemoryError || item.message.orEmpty().contains("out of memory", ignoreCase = true) ||
+                item.message.orEmpty().contains("allocate memory", ignoreCase = true)
+        }
+        val nativeFailure = chain.any { item ->
+            item.message.orEmpty().contains("native", ignoreCase = true) ||
+                item.message.orEmpty().contains("delegate", ignoreCase = true) ||
+                item.message.orEmpty().contains("context creation", ignoreCase = true)
+        }
+        val detail = chain.firstNotNullOfOrNull { item -> item.message?.lineSequence()?.firstOrNull { it.isNotBlank() } }
+            ?.trim()
+            ?.take(400)
+            ?: error.javaClass.simpleName
+        return when {
+            outOfMemory -> "$runtimeLabel could not start because native model allocation exhausted available memory: $detail. Close memory-heavy apps, reduce the context window, or choose a smaller model artifact. Android may record the process exit as low memory on the next launch."
+            nativeFailure -> "$runtimeLabel native runtime initialization failed: $detail. The requested accelerator may be unsupported for this artifact/device; review accelerator fallback diagnostics or choose CPU."
+            else -> "$runtimeLabel failed to start: $detail"
+        }
+    }
+
+    private fun validateModelArtifact(modelPath: String): String? {
+        val modelFile = File(modelPath)
+        if (!modelFile.exists()) {
+            return "Preferred local model is missing on disk: $modelPath"
+        }
+        val header = ByteArray(8)
+        val bytesRead = runCatching {
+            modelFile.inputStream().use { it.read(header) }
+        }.getOrElse { error ->
+            return "Unable to inspect local LiteRT-LM model file: ${error.message ?: error.javaClass.simpleName}"
+        }
+        if (bytesRead <= 0) {
+            return "Local LiteRT-LM model file is empty: ${modelFile.name}"
+        }
+
+        val lowerName = modelFile.name.lowercase(Locale.US)
+        val startsWithLiteRtLm = bytesRead >= 8 &&
+            header[0] == 'L'.code.toByte() &&
+            header[1] == 'I'.code.toByte() &&
+            header[2] == 'T'.code.toByte() &&
+            header[3] == 'E'.code.toByte() &&
+            header[4] == 'R'.code.toByte() &&
+            header[5] == 'T'.code.toByte() &&
+            header[6] == 'L'.code.toByte() &&
+            header[7] == 'M'.code.toByte()
+        val startsWithZip = bytesRead >= 4 &&
+            header[0] == 'P'.code.toByte() &&
+            header[1] == 'K'.code.toByte()
+        val containsTfl3Magic = bytesRead >= 8 &&
+            header[4] == 'T'.code.toByte() &&
+            header[5] == 'F'.code.toByte() &&
+            header[6] == 'L'.code.toByte() &&
+            header[7] == '3'.code.toByte()
+
+        return when {
+            lowerName.endsWith(".litertlm") && !startsWithLiteRtLm ->
+                "${modelFile.name} is not a valid LiteRT-LM bundle. Download the .litertlm artifact from the LiteRT-LM repo."
+            lowerName.endsWith(".task") && containsTfl3Magic ->
+                "${modelFile.name} is a web/browser .task FlatBuffer, not an Android LiteRT-LM zip bundle. Remove it and download the .litertlm artifact instead."
+            lowerName.endsWith(".task") && !startsWithZip ->
+                "${modelFile.name} is not an Android LiteRT-LM .task zip bundle. Download the .litertlm artifact instead."
+            else -> null
+        }
+    }
+
+    internal fun responseText(message: Message): String = message.contents.contents
+        .filterIsInstance<Content.Text>()
+        .joinToString(separator = "") { it.text }
+        .trim()
+
+    private class LiteRtLmServer(
+        context: Context,
+        modelPath: String,
+        requestedModelName: String,
+        port: Int,
+        inferenceConfig: InferenceConfig = InferenceConfig(),
+    ) : NanoHTTPD("127.0.0.1", port) {
+        private val generationCoordinator = NativeGenerationCoordinator()
+
+        /** Engine initialization result with accelerator labels for each modality */
+        data class EngineInitResult(
+            val engine: Engine,
+            val backend: String,
+            val visionBackend: String,
+            val audioBackend: String,
+            val supportsImageInput: Boolean,
+            val supportsAudioInput: Boolean,
+            val modalityPolicy: String,
+            val speculativeDecoding: Boolean,
+            val speculativeDecodingSupported: Boolean,
+            val speculativeDecodingPolicy: String,
+            val gpuPolicy: GpuBackendPolicy,
+            val maxNumTokens: Int?,
+            val contextWindowPolicy: String,
+            val backendAttempts: List<String>,
+            val acceleratorFallbackReason: String,
+            val completionVerified: Boolean,
+            val completionLatencyMs: Long,
+        )
+
+        private val engineMaxNumTokens = resolveEngineMaxNumTokens(
+            context = context,
+            modelPath = modelPath,
+            requestedMaxTokens = inferenceConfig.maxTokens,
+            requestedMaxContextLength = inferenceConfig.maxContextLength,
+        )
+
+        private val engineInitResult = initializeEngine(
+            context = context,
+            modelPath = modelPath,
+            supportImage = inferenceConfig.supportImage,
+            supportAudio = inferenceConfig.supportAudio,
+            preferredAccelerator = inferenceConfig.preferredAccelerator,
+            speculativeDecodingMode = inferenceConfig.speculativeDecodingMode,
+            maxNumTokens = engineMaxNumTokens.value,
+            contextWindowPolicy = engineMaxNumTokens.policy,
+        )
+        private val engine = engineInitResult.engine
+        private val runtimeBackendLabel = engineInitResult.backend
+        private val visionBackendLabel = engineInitResult.visionBackend
+        private val audioBackendLabel = engineInitResult.audioBackend
+        private val supportsImageInput = engineInitResult.supportsImageInput
+
+        val modelName: String = requestedModelName.ifBlank { File(modelPath).name }
+        private val samplerConfig = SamplerConfig(
+            topK = inferenceConfig.topK,
+            topP = inferenceConfig.topP.toDouble(),
+            temperature = inferenceConfig.temperature.toDouble(),
+        )
+
+        override fun serve(session: IHTTPSession): Response {
+            return try {
+                when {
+                    session.method == Method.GET && session.uri == "/health" -> jsonResponse(healthJson())
+                    session.method == Method.GET && session.uri == "/v1/models" -> jsonResponse(modelsPayload())
+                    session.method == Method.POST && session.uri == "/v1/chat/completions" -> handleChatCompletions(session)
+                    else -> jsonResponse(
+                        JSONObject().put("error", "Not found"),
+                        status = Response.Status.NOT_FOUND,
+                    )
+                }
+            } catch (error: Throwable) {
+                jsonResponse(
+                    JSONObject().apply {
+                        put("error", error.message ?: error.javaClass.simpleName)
+                    },
+                    status = Response.Status.INTERNAL_ERROR,
+                )
+            }
+        }
+
+        fun healthJson(): JSONObject {
+            val generation = generationHealthState(
+                startupCompletionVerified = engineInitResult.completionVerified,
+                snapshot = generationCoordinator.snapshot(),
+            )
+            return JSONObject().apply {
+                put("status", generation.status)
+                put("backend", "litert-lm")
+                put("accelerator", runtimeBackendLabel)
+                put("vision_accelerator", visionBackendLabel)
+                put("audio_accelerator", audioBackendLabel)
+                put("image_input_supported", engineInitResult.supportsImageInput)
+                put("audio_input_supported", engineInitResult.supportsAudioInput)
+                put("modality_policy", engineInitResult.modalityPolicy)
+                put(
+                    "multimodal_fallback",
+                    engineInitResult.modalityPolicy.startsWith("text-only fallback") ||
+                        engineInitResult.modalityPolicy.startsWith("text-only memory guard"),
+                )
+                put("speculative_decoding", engineInitResult.speculativeDecoding)
+                put("speculative_decoding_supported", engineInitResult.speculativeDecodingSupported)
+                put("mtp_policy", engineInitResult.speculativeDecodingPolicy)
+                put("gpu_policy", engineInitResult.gpuPolicy.description)
+                put("gpu_attempted", engineInitResult.gpuPolicy.enabled)
+                put("gpu_fallback_to_cpu", engineInitResult.gpuPolicy.enabled && engineInitResult.backend != "gpu")
+                put("opencl_available", engineInitResult.gpuPolicy.openClAvailable)
+                put("hardware_identity", engineInitResult.gpuPolicy.deviceIdentity)
+                put("soc_family", engineInitResult.gpuPolicy.socFamily)
+                put("gpu_family", engineInitResult.gpuPolicy.gpuFamily)
+                put("litert_backend_order", JSONArray(engineInitResult.gpuPolicy.backendOrder))
+                put("accelerator_attempts", JSONArray(engineInitResult.backendAttempts))
+                put("accelerator_fallback_reason", engineInitResult.acceleratorFallbackReason)
+                put("completion_verified", engineInitResult.completionVerified)
+                put("completion_available", generation.completionAvailable)
+                put("completion_latency_ms", engineInitResult.completionLatencyMs)
+                put("generation_state", generation.generationState)
+                put("generation_detail", generation.generationDetail)
+                put("native_abi_strategy", engineInitResult.gpuPolicy.nativeAbiStrategy)
+                put("max_num_tokens", engineInitResult.maxNumTokens ?: JSONObject.NULL)
+                put("context_window_policy", engineInitResult.contextWindowPolicy)
+                put("model", modelName)
+            }
+        }
+
+        fun shutdown() {
+            generationCoordinator.beginShutdownAndAwaitIdle()
+            var failure: Throwable? = null
+            fun captureShutdown(block: () -> Unit) {
+                try {
+                    block()
+                } catch (error: Throwable) {
+                    if (failure == null) {
+                        failure = error
+                    } else {
+                        failure?.addSuppressed(error)
+                    }
+                }
+            }
+            captureShutdown { stop() }
+            captureShutdown { engine.close() }
+            failure?.let { throw it }
+        }
+
+        /**
+         * Initialize LiteRT-LM engine with GPU-first strategy and multimodal backends.
+         * Follows Edge Gallery pattern: GPU primary, CPU fallback.
+         * For multimodal models: vision uses GPU, audio uses CPU.
+         */
+        @OptIn(ExperimentalApi::class)
+        private fun initializeEngine(
+            context: Context,
+            modelPath: String,
+            supportImage: Boolean,
+            supportAudio: Boolean,
+            preferredAccelerator: String,
+            speculativeDecodingMode: SpeculativeDecodingMode,
+            maxNumTokens: Int?,
+            contextWindowPolicy: String,
+        ): EngineInitResult {
+            var lastError: Throwable? = null
+            val backendAttempts = mutableListOf<String>()
+            // Multimodal and text-only fallback attempts share one monotonic wall-clock
+            // budget. A safely-returned adapter/backend failure may fall back, but the
+            // fallback matrix never gets a fresh 300-second allowance.
+            val startupStartedAtNanos = System.nanoTime()
+            val startupProbes = resolveStartupProbes(
+                preferredAccelerator = preferredAccelerator,
+                speculativeDecodingMode = speculativeDecodingMode,
+                startupStartedAtNanos = startupStartedAtNanos,
+                openClProbe = { hasLoadableOpenClLibrary() },
+                capabilitiesProbe = {
+                    useOwnedNativeProbeResource(
+                        create = { Capabilities(modelPath) },
+                        query = { it.hasSpeculativeDecodingSupport() },
+                        close = { it.close() },
+                    )
+                },
+            )
+            val gpuPolicy = gpuBackendPolicy(context, startupProbes.openClAvailable, preferredAccelerator)
+            val speculativeDecoding = speculativeDecodingDecision(
+                context = context,
+                modelPath = modelPath,
+                mode = speculativeDecodingMode,
+                capabilitiesSupported = startupProbes.speculativeDecodingSupported,
+            )
+            backendAttempts += startupProbes.attempts
+            val modalityDecision = memorySafeModalityDecision(
+                totalRamBytes = totalDeviceRamBytes(context),
+                modelBytes = runCatching { File(modelPath).length() }.getOrDefault(0L),
+                requestedImage = supportImage,
+                requestedAudio = supportAudio,
+            )
+            val backends = if (gpuPolicy.enabled) {
+                listOf(
+                    Backend.GPU() to "gpu",
+                    Backend.CPU() to "cpu",
+                )
+            } else {
+                listOf(Backend.CPU() to "cpu")
+            }
+
+            data class CandidateMetadata(
+                val backendLabel: String,
+                val visionBackendLabel: String,
+                val mtpEnabled: Boolean,
+                val mtpPolicy: String,
+            )
+
+            class GoogleEngineCandidate(
+                private val mtpEnabled: Boolean,
+                private val engineConfig: EngineConfig,
+            ) : StartupEngineCandidate {
+                private var candidate: Engine? = null
+                private var activeConversation: Conversation? = null
+
+                override fun initialize() {
+                    ExperimentalFlags.enableSpeculativeDecoding = mtpEnabled
+                    try {
+                        constructOwnedNativeResource(
+                            create = { Engine(engineConfig) },
+                            assignOwner = { candidate = it },
+                            initialize = { it.initialize() },
+                        )
+                    } finally {
+                        ExperimentalFlags.enableSpeculativeDecoding = false
+                    }
+                }
+
+                override fun completionCanary(timeoutMs: Long): StartupCompletionCanary {
+                    require(timeoutMs > 0L) { "Completion canary timeout must be positive" }
+                    val engine = checkNotNull(candidate) { "LiteRT-LM engine was not initialized" }
+                    val conversation = engine.createConversation(
+                        ConversationConfig(
+                            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
+                            maxOutputToken = 16,
+                        )
+                    )
+                    activeConversation = conversation
+                    val startedAt = System.nanoTime()
+                    var completionFailure: Throwable? = null
+                    return try {
+                        // The outer runBoundedNativeStartupOperation call owns this JNI work and
+                        // its timeout. Keeping sendMessage on that one worker is deliberate: an
+                        // inner future could be cancelled while native code kept running, making
+                        // the outer worker appear finished and permitting a second Engine to race
+                        // the first. If JNI outlives the deadline, the outer worker retains
+                        // ownership and closes this candidate only after sendMessage really exits.
+                        val response = conversation.sendMessage(Message.user("Reply with exactly one word: OK"))
+                        StartupCompletionCanary(
+                            content = responseText(response),
+                            elapsedMs = TimeUnit.NANOSECONDS
+                                .toMillis(System.nanoTime() - startedAt)
+                                .coerceAtLeast(1L),
+                        )
+                    } catch (error: Throwable) {
+                        completionFailure = error
+                        throw error
+                    } finally {
+                        var cleanupFailure: Throwable? = null
+                        fun captureCleanup(block: () -> Unit) {
+                            try {
+                                block()
+                            } catch (error: Throwable) {
+                                if (cleanupFailure == null) {
+                                    cleanupFailure = error
+                                } else {
+                                    cleanupFailure?.addSuppressed(error)
+                                }
+                            }
+                        }
+                        captureCleanup { conversation.cancelProcess() }
+                        var conversationClosed = false
+                        captureCleanup {
+                            conversation.close()
+                            conversationClosed = true
+                        }
+                        if (conversationClosed) {
+                            activeConversation = null
+                        }
+                        cleanupFailure?.let { failure ->
+                            completionFailure?.let(failure::addSuppressed)
+                            throw NativeGenerationCleanupException(
+                                "LiteRT-LM startup canary conversation cleanup failed",
+                                failure,
+                            )
+                        }
+                    }
+                }
+
+                override fun cancelCompletion() {
+                    runCatching { activeConversation?.cancelProcess() }
+                }
+
+                override fun close() {
+                    var closeFailure: Throwable? = null
+                    fun captureClose(block: () -> Unit) {
+                        try {
+                            block()
+                        } catch (error: Throwable) {
+                            if (closeFailure == null) {
+                                closeFailure = error
+                            } else {
+                                closeFailure?.addSuppressed(error)
+                            }
+                        }
+                    }
+                    try {
+                        captureClose { activeConversation?.cancelProcess() }
+                        captureClose { activeConversation?.close() }
+                        activeConversation = null
+                        val engineToClose = candidate
+                        candidate = null
+                        captureClose { engineToClose?.close() }
+                    } finally {
+                        ExperimentalFlags.enableSpeculativeDecoding = false
+                    }
+                    closeFailure?.let { throw it }
+                }
+
+                fun takeEngine(): Engine {
+                    val verifiedEngine = checkNotNull(candidate) {
+                        "Completion-verified LiteRT-LM engine was unexpectedly absent"
+                    }
+                    candidate = null
+                    return verifiedEngine
+                }
+            }
+
+            fun tryInitialize(
+                requestedSupportImage: Boolean,
+                requestedSupportAudio: Boolean,
+                modalityPolicy: String,
+            ): EngineInitResult? {
+                val candidateMetadata = linkedMapOf<String, CandidateMetadata>()
+                val candidateAttempts = mutableListOf<StartupEngineAttempt>()
+                for ((backend, label) in backends) {
+                    val visionBackend = when {
+                        !requestedSupportImage -> null
+                        label == "gpu" -> Backend.GPU()
+                        else -> Backend.CPU()
+                    }
+                    val visionBackendLabel = when {
+                        !requestedSupportImage -> "none"
+                        label == "gpu" -> "gpu"
+                        else -> "cpu"
+                    }
+                    val attempts = if (speculativeDecoding.enabled) {
+                        listOf(
+                            true to speculativeDecoding.policy,
+                            false to "disabled: Gemma 4 MTP failed during $label startup completion proof; retried without MTP",
+                        )
+                    } else {
+                        listOf(false to speculativeDecoding.policy)
+                    }
+                    for ((enableMtp, mtpPolicy) in attempts) {
+                        val attemptLabel = "$label/${if (enableMtp) "mtp" else "standard"}"
+                        candidateMetadata[attemptLabel] = CandidateMetadata(
+                            backendLabel = label,
+                            visionBackendLabel = visionBackendLabel,
+                            mtpEnabled = enableMtp,
+                            mtpPolicy = mtpPolicy,
+                        )
+                        candidateAttempts += StartupEngineAttempt(attemptLabel) {
+                            GoogleEngineCandidate(
+                                mtpEnabled = enableMtp,
+                                engineConfig = EngineConfig(
+                                    modelPath = modelPath,
+                                    backend = backend,
+                                    visionBackend = visionBackend,
+                                    audioBackend = if (requestedSupportAudio) Backend.CPU() else null,
+                                    maxNumImages = if (requestedSupportImage) 1 else null,
+                                    maxNumTokens = maxNumTokens,
+                                    cacheDir = context.cacheDir.absolutePath,
+                                ),
+                            )
+                        }
+                    }
+                }
+                val selection = selectCompletionVerifiedEngine(
+                    candidateAttempts = candidateAttempts,
+                    startupStartedAtNanos = startupStartedAtNanos,
+                )
+                backendAttempts += selection.attempts
+                lastError = selection.failure
+                if (!selection.verified) return null
+
+                val metadata = checkNotNull(candidateMetadata[selection.selectedLabel])
+                val selected = selection.candidate as GoogleEngineCandidate
+                val fallbackReason = if (metadata.backendLabel == "cpu") {
+                    backendAttempts
+                        .filter { it.startsWith("gpu/") && it.contains(": failed") }
+                        .joinToString("; ")
+                } else {
+                    ""
+                }
+                return EngineInitResult(
+                    engine = selected.takeEngine(),
+                    backend = metadata.backendLabel,
+                    visionBackend = metadata.visionBackendLabel,
+                    audioBackend = if (requestedSupportAudio) "cpu" else "none",
+                    supportsImageInput = requestedSupportImage,
+                    supportsAudioInput = requestedSupportAudio,
+                    modalityPolicy = modalityPolicy,
+                    speculativeDecoding = metadata.mtpEnabled,
+                    speculativeDecodingSupported = speculativeDecoding.supported,
+                    speculativeDecodingPolicy = metadata.mtpPolicy,
+                    gpuPolicy = gpuPolicy,
+                    maxNumTokens = maxNumTokens,
+                    contextWindowPolicy = contextWindowPolicy,
+                    backendAttempts = backendAttempts.toList(),
+                    acceleratorFallbackReason = fallbackReason,
+                    completionVerified = true,
+                    completionLatencyMs = selection.completionLatencyMs,
+                )
+            }
+
+            tryInitialize(
+                modalityDecision.supportImage,
+                modalityDecision.supportAudio,
+                modalityDecision.policy,
+            )?.let { return it }
+
+            val multimodalError = lastError
+            if (multimodalError is StartupNativeOperationAbandonedException) {
+                throw IllegalStateException(
+                    "LiteRT-LM native startup exceeded its safety deadline. Hermes did not start a second engine " +
+                        "while the original native call might still be exiting; restart Hermes before retrying.",
+                    multimodalError,
+                )
+            }
+            if (modalityDecision.supportImage || modalityDecision.supportAudio) {
+                val fallbackPolicy =
+                    "text-only fallback: multimodal adapter initialization failed on this device (${shortError(multimodalError)})"
+                tryInitialize(
+                    requestedSupportImage = false,
+                    requestedSupportAudio = false,
+                    modalityPolicy = fallbackPolicy,
+                )?.let { return it }
+                throw IllegalStateException(
+                    "LiteRT-LM text-only fallback also failed after multimodal adapter initialization failed. " +
+                        "Multimodal: ${shortError(multimodalError)}; text-only: ${shortError(lastError)}",
+                    lastError ?: multimodalError,
+                )
+            }
+            throw lastError ?: IllegalStateException("LiteRT-LM engine initialization failed")
+        }
+
+        private fun shortError(error: Throwable?): String {
+            return error?.message
+                ?.lineSequence()
+                ?.firstOrNull { it.isNotBlank() }
+                ?.trim()
+                ?.take(180)
+                ?: error?.javaClass?.simpleName
+                ?: "unknown error"
+        }
+
+        private fun resolveEngineMaxNumTokens(
+            context: Context,
+            modelPath: String,
+            requestedMaxTokens: Int,
+            requestedMaxContextLength: Int,
+        ): EngineTokenBudget {
+            val memory = LocalModelRuntimeDiagnostics.captureMemory(context)
+            return decideEngineTokenBudget(
+                requestedMaxTokens = requestedMaxTokens,
+                requestedMaxContextLength = requestedMaxContextLength,
+                totalRamBytes = memory.totalBytes,
+                modelBytes = runCatching { File(modelPath).length() }.getOrDefault(0L),
+                isX86Device = Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
+                availableRamBytes = memory.availableBytes,
+                memoryThresholdBytes = memory.thresholdBytes,
+                lowMemory = memory.lowMemory,
+            )
+        }
+
+        private fun totalDeviceRamBytes(context: Context): Long {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                ?: return 0L
+            val memoryInfo = ActivityManager.MemoryInfo()
+            activityManager.getMemoryInfo(memoryInfo)
+            return memoryInfo.totalMem
+        }
+
+        private fun gpuBackendPolicy(
+            context: Context,
+            openClAvailable: Boolean,
+            preferredAccelerator: String,
+        ): GpuBackendPolicy {
+            return decideGpuBackendPolicy(
+                isTranslatedArm64OnX86 = isTranslatedArm64OnX86(context),
+                supportedAbis = Build.SUPPORTED_ABIS.toList(),
+                openClAvailable = openClAvailable,
+                hardwareIdentity = androidHardwareIdentity(),
+                preferredAccelerator = preferredAccelerator,
+            )
+        }
+
+        private fun androidHardwareIdentity(): String {
+            val socManufacturer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER else ""
+            val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else ""
+            return listOf(
+                Build.MANUFACTURER,
+                Build.BRAND,
+                Build.DEVICE,
+                Build.HARDWARE,
+                Build.BOARD,
+                socManufacturer,
+                socModel,
+            ).joinToString(" ").lowercase(Locale.US)
+        }
+
+        private fun speculativeDecodingDecision(
+            context: Context,
+            modelPath: String,
+            mode: SpeculativeDecodingMode,
+            capabilitiesSupported: Boolean,
+        ): SpeculativeDecodingDecision {
+            val modelFile = File(modelPath)
+            return decideSpeculativeDecoding(
+                capabilitiesSupported = capabilitiesSupported,
+                modelName = modelFile.name,
+                modelBytes = runCatching { modelFile.length() }.getOrDefault(0L),
+                totalRamBytes = totalDeviceRamBytes(context),
+                isX86Device = Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
+                mode = mode,
+            )
+        }
+
+        private fun isTranslatedArm64OnX86(context: Context): Boolean {
+            val nativeLibraryDir = context.applicationInfo.nativeLibraryDir.orEmpty()
+            val packageUsesArm64 = nativeLibraryDir.contains("/arm64") ||
+                nativeLibraryDir.contains("\\arm64")
+            val deviceSupportsX86 = Build.SUPPORTED_ABIS.any { it.startsWith("x86") }
+            return packageUsesArm64 && deviceSupportsX86
+        }
+
+        private fun hasLoadableOpenClLibrary(): Boolean {
+            if (runCatching { System.loadLibrary("OpenCL") }.isSuccess) {
+                return true
+            }
+            return listOf(
+                "/vendor/lib64/libOpenCL.so",
+                "/system/vendor/lib64/libOpenCL.so",
+                "/system/lib64/libOpenCL.so",
+                "/odm/lib64/libOpenCL.so",
+                "/vendor/lib/libOpenCL.so",
+                "/system/vendor/lib/libOpenCL.so",
+                "/system/lib/libOpenCL.so",
+                "/odm/lib/libOpenCL.so",
+            ).any { path ->
+                val file = File(path)
+                file.isFile && runCatching { System.load(file.absolutePath) }.isSuccess
+            }
+        }
+
+        private fun handleChatCompletions(session: IHTTPSession): Response {
+            val requestJson = readRequestJson(session)
+            val requestMessages = requestJson.optJSONArray("messages") ?: JSONArray()
+            if (requestMessages.length() == 0) {
+                return jsonResponse(
+                    JSONObject().put("error", "messages are required"),
+                    status = Response.Status.BAD_REQUEST,
+                )
+            }
+            if (requestContainsImage(requestMessages) && !supportsImageInput) {
+                val errorMessage = if (engineInitResult.modalityPolicy.startsWith("text-only fallback")) {
+                    "image input is unavailable because LiteRT-LM fell back to text-only after multimodal adapter initialization failed on this device. Check /health modality_policy for details."
+                } else if (engineInitResult.modalityPolicy.startsWith("text-only memory guard")) {
+                    "image input is unavailable because Hermes started this large local LiteRT-LM model in text-only mode to avoid an out-of-memory crash on this device. Check /health modality_policy for details."
+                } else {
+                    "image input requires a LiteRT-LM model started with image support, such as Gemma 4, Gemma 3n, or Gemma 3 vision models"
+                }
+                return jsonResponse(
+                    JSONObject().put("error", errorMessage),
+                    status = Response.Status.BAD_REQUEST,
+                )
+            }
+
+            val systemInstruction = buildSystemInstruction(requestMessages)
+            val mappedMessages = mapMessages(requestMessages)
+            val promptMessage = mappedMessages.lastOrNull()
+                ?: return jsonResponse(
+                    JSONObject().put("error", "no prompt message could be constructed"),
+                    status = Response.Status.BAD_REQUEST,
+                )
+            val initialMessages = if (mappedMessages.size > 1) mappedMessages.dropLast(1) else emptyList()
+            val toolProviders = buildToolProviders(requestJson.optJSONArray("tools"))
+            val extraContext = chatTemplateExtraContext(requestJson)
+            val payload = runInferenceWithTimeout(
+                conversationConfig = ConversationConfig(
+                    systemInstruction = systemInstruction,
+                    initialMessages = initialMessages,
+                    tools = toolProviders,
+                    samplerConfig = samplerConfig,
+                    automaticToolCalling = false,
+                ),
+                promptMessage = promptMessage,
+                timeoutMs = generationTimeoutMs(requestJson),
+                extraContext = extraContext,
+            )
+            return if (requestJson.optBoolean("stream", false)) {
+                sseResponse(payload)
+            } else {
+                jsonResponse(payload)
+            }
+        }
+
+        private fun runInferenceWithTimeout(
+            conversationConfig: ConversationConfig,
+            promptMessage: Message,
+            timeoutMs: Long,
+            extraContext: Map<String, Any>,
+        ): JSONObject {
+            return generationCoordinator.runBounded(timeoutMs) {
+                val conversation = engine.createConversation(conversationConfig)
+                var sendFailure: Throwable? = null
+                try {
+                    completionPayload(conversation.sendMessage(promptMessage, extraContext))
+                } catch (error: Throwable) {
+                    sendFailure = error
+                    throw error
+                } finally {
+                    var cleanupFailure: Throwable? = null
+                    fun captureCleanup(block: () -> Unit) {
+                        try {
+                            block()
+                        } catch (error: Throwable) {
+                            if (cleanupFailure == null) {
+                                cleanupFailure = error
+                            } else {
+                                cleanupFailure?.addSuppressed(error)
+                            }
+                        }
+                    }
+                    captureCleanup { conversation.cancelProcess() }
+                    captureCleanup { conversation.close() }
+                    cleanupFailure?.let { failure ->
+                        sendFailure?.let(failure::addSuppressed)
+                        throw NativeGenerationCleanupException(
+                            "LiteRT-LM conversation cleanup failed",
+                            failure,
+                        )
+                    }
+                }
+            }
+        }
+
+        private fun chatTemplateExtraContext(requestJson: JSONObject): Map<String, Any> {
+            val contextJson = requestJson.optJSONObject("chat_template_kwargs")
+                ?: requestJson.optJSONObject("extra_context")
+                ?: return emptyMap()
+            return buildMap {
+                jsonObjectToMap(contextJson).forEach { (key, value) ->
+                    if (value != null) {
+                        put(key, value)
+                    }
+                }
+            }
+        }
+
+        private fun generationTimeoutMs(requestJson: JSONObject): Long {
+            val requested = requestJson.optLong("timeout_ms", DEFAULT_GENERATION_TIMEOUT_MS)
+            return requested.coerceIn(MIN_GENERATION_TIMEOUT_MS, MAX_GENERATION_TIMEOUT_MS)
+        }
+
+        private fun buildSystemInstruction(messages: JSONArray): com.google.ai.edge.litertlm.Contents? {
+            val systemText = buildString {
+                for (index in 0 until messages.length()) {
+                    val message = messages.optJSONObject(index) ?: continue
+                    if (message.optString("role") == "system") {
+                        val text = extractTextContent(message)
+                        if (text.isNotBlank()) {
+                            if (isNotBlank()) {
+                                append("\n\n")
+                            }
+                            append(text)
+                        }
+                    }
+                }
+            }
+            return systemText.ifBlank { null }?.let { com.google.ai.edge.litertlm.Contents.of(it) }
+        }
+
+        private fun mapMessages(messages: JSONArray): List<Message> {
+            val toolIdToName = mutableMapOf<String, String>()
+            val mapped = mutableListOf<Message>()
+            for (index in 0 until messages.length()) {
+                val message = messages.optJSONObject(index) ?: continue
+                when (message.optString("role")) {
+                    "system" -> Unit
+                    "user" -> mapped += Message.user(extractMessageContents(message))
+                    "assistant" -> {
+                        val content = extractTextContent(message)
+                        val toolCalls = mutableListOf<ToolCall>()
+                        val rawToolCalls = message.optJSONArray("tool_calls") ?: JSONArray()
+                        for (toolIndex in 0 until rawToolCalls.length()) {
+                            val toolCallJson = rawToolCalls.optJSONObject(toolIndex) ?: continue
+                            val toolId = toolCallJson.optString("id")
+                            val function = toolCallJson.optJSONObject("function") ?: JSONObject()
+                            val name = function.optString("name").ifBlank { "tool" }
+                            val arguments = jsonObjectToMap(parseJsonObject(function.optString("arguments", "{}")))
+                            if (toolId.isNotBlank()) {
+                                toolIdToName[toolId] = name
+                            }
+                            toolCalls += ToolCall(name, arguments)
+                        }
+                        mapped += Message.model(
+                            contents = com.google.ai.edge.litertlm.Contents.of(
+                                if (content.isBlank()) emptyList() else listOf(Content.Text(content))
+                            ),
+                            toolCalls = toolCalls,
+                        )
+                    }
+                    "tool" -> {
+                        val toolName = message.optString("name").ifBlank {
+                            toolIdToName[message.optString("tool_call_id")] ?: "tool"
+                        }
+                        mapped += Message.tool(
+                            com.google.ai.edge.litertlm.Contents.of(
+                                Content.ToolResponse(toolName, parseJsonValue(message.optString("content")))
+                            )
+                        )
+                    }
+                }
+            }
+            return mapped
+        }
+
+        private fun buildToolProviders(rawTools: JSONArray?): List<com.google.ai.edge.litertlm.ToolProvider> {
+            if (rawTools == null) {
+                return emptyList()
+            }
+            val providers = mutableListOf<com.google.ai.edge.litertlm.ToolProvider>()
+            for (index in 0 until rawTools.length()) {
+                val toolJson = rawTools.optJSONObject(index) ?: continue
+                val function = toolJson.optJSONObject("function") ?: continue
+                val spec = JSONObject().apply {
+                    put("name", function.optString("name"))
+                    put("description", function.optString("description"))
+                    put("parameters", function.optJSONObject("parameters") ?: JSONObject().put("type", "object"))
+                }
+                providers += tool(JsonSchemaTool(spec.toString()))
+            }
+            return providers
+        }
+
+        private fun completionPayload(responseMessage: Message, finishReasonOverride: String? = null): JSONObject {
+            val toolCallsJson = JSONArray()
+            responseMessage.toolCalls.forEachIndexed { index, toolCall ->
+                toolCallsJson.put(
+                    JSONObject().apply {
+                        put("id", "call_${UUID.randomUUID()}_$index")
+                        put("type", "function")
+                        put(
+                            "function",
+                            JSONObject().apply {
+                                put("name", toolCall.name)
+                                put("arguments", mapToJsonObject(toolCall.arguments).toString())
+                            }
+                        )
+                    }
+                )
+            }
+            val content = responseText(responseMessage)
+            val finishReason = finishReasonOverride ?: if (responseMessage.toolCalls.isNotEmpty()) "tool_calls" else "stop"
+            return JSONObject().apply {
+                put("id", "chatcmpl-${UUID.randomUUID()}")
+                put("object", "chat.completion")
+                put("created", System.currentTimeMillis() / 1000)
+                put("model", modelName)
+                put(
+                    "choices",
+                    JSONArray().put(
+                        JSONObject().apply {
+                            put("index", 0)
+                            put(
+                                "message",
+                                JSONObject().apply {
+                                    put("role", "assistant")
+                                    put("content", if (content.isBlank()) JSONObject.NULL else content)
+                                    if (toolCallsJson.length() > 0) {
+                                        put("tool_calls", toolCallsJson)
+                                    }
+                                }
+                            )
+                            put("finish_reason", finishReason)
+                        }
+                    )
+                )
+                put(
+                    "usage",
+                    JSONObject().apply {
+                        put("prompt_tokens", 0)
+                        put("completion_tokens", 0)
+                        put("total_tokens", 0)
+                    }
+                )
+            }
+        }
+
+        private fun modelsPayload(): JSONObject {
+            return JSONObject().apply {
+                put(
+                    "data",
+                    JSONArray().put(
+                        JSONObject().apply {
+                            put("id", modelName)
+                            put("object", "model")
+                            put("owned_by", "litert-lm")
+                        }
+                    )
+                )
+                put("object", "list")
+            }
+        }
+
+        private fun readRequestJson(session: IHTTPSession): JSONObject {
+            val files = HashMap<String, String>()
+            session.parseBody(files)
+            val body = files["postData"].orEmpty()
+            return JSONObject(body)
+        }
+
+        private fun jsonResponse(payload: JSONObject, status: Response.Status = Response.Status.OK): Response {
+            return newFixedLengthResponse(status, "application/json", payload.toString())
+        }
+
+        private fun sseResponse(payload: JSONObject): Response {
+            val delta = JSONObject().apply {
+                put("id", "chatcmpl-${UUID.randomUUID()}")
+                put("object", "chat.completion.chunk")
+                put("created", System.currentTimeMillis() / 1000)
+                put("model", modelName)
+                put(
+                    "choices",
+                    JSONArray().put(
+                        JSONObject().apply {
+                            put("index", 0)
+                            put(
+                                "delta",
+                                JSONObject().apply {
+                                    put("role", "assistant")
+                                    val message = payload.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+                                    if (!message.isNull("content")) {
+                                        put("content", message.optString("content"))
+                                    }
+                                    if (message.has("tool_calls")) {
+                                        put("tool_calls", message.getJSONArray("tool_calls"))
+                                    }
+                                }
+                            )
+                            put("finish_reason", payload.getJSONArray("choices").getJSONObject(0).optString("finish_reason"))
+                        }
+                    )
+                )
+            }
+            val body = buildString {
+                append("data: ")
+                append(delta.toString())
+                append("\n\n")
+                append("data: [DONE]\n\n")
+            }
+            return newFixedLengthResponse(Response.Status.OK, "text/event-stream", body)
+        }
+
+        private fun extractTextContent(message: JSONObject): String {
+            val content = message.opt("content")
+            return when (content) {
+                is JSONArray -> buildString {
+                    for (index in 0 until content.length()) {
+                        val part = content.optJSONObject(index) ?: continue
+                        if (part.optString("type") == "text") {
+                            append(part.optString("text"))
+                        }
+                    }
+                }
+                is JSONObject -> content.optString("text")
+                JSONObject.NULL, null -> ""
+                else -> content.toString()
+            }
+        }
+
+        private fun extractMessageContents(message: JSONObject): com.google.ai.edge.litertlm.Contents {
+            val content = message.opt("content")
+            val parts = when (content) {
+                is JSONArray -> extractContentParts(content)
+                is JSONObject -> listOfNotNull(content.optString("text").takeIf { it.isNotBlank() }?.let { Content.Text(it) })
+                JSONObject.NULL, null -> emptyList()
+                else -> listOf(Content.Text(content.toString()))
+            }
+            return com.google.ai.edge.litertlm.Contents.of(parts)
+        }
+
+        private fun extractContentParts(content: JSONArray): List<Content> {
+            val parts = mutableListOf<Content>()
+            for (index in 0 until content.length()) {
+                val part = content.optJSONObject(index) ?: continue
+                when (part.optString("type")) {
+                    "text" -> {
+                        val text = part.optString("text")
+                        if (text.isNotBlank()) {
+                            parts += Content.Text(text)
+                        }
+                    }
+                    "image_url", "input_image" -> {
+                        val imageUrl = part.optJSONObject("image_url")?.optString("url").orEmpty()
+                            .ifBlank { part.optString("image_url") }
+                            .ifBlank { part.optString("url") }
+                        contentFromImageUrl(imageUrl)?.let { parts += it }
+                    }
+                }
+            }
+            return parts
+        }
+
+        private fun contentFromImageUrl(imageUrl: String): Content? {
+            val url = imageUrl.trim()
+            if (url.isBlank()) {
+                return null
+            }
+            if (url.startsWith("data:", ignoreCase = true)) {
+                val base64Payload = url.substringAfter("base64,", missingDelimiterValue = "")
+                require(base64Payload.isNotBlank()) { "image_url data URI must include base64 data" }
+                return Content.ImageBytes(Base64.decode(base64Payload, Base64.DEFAULT))
+            }
+            if (url.startsWith("file://", ignoreCase = true)) {
+                return Content.ImageFile(url.removePrefix("file://"))
+            }
+            if (url.startsWith("/")) {
+                return Content.ImageFile(url)
+            }
+            throw IllegalArgumentException("LiteRT-LM local vision only supports data: image URLs or app-local file paths")
+        }
+
+        private fun requestContainsImage(messages: JSONArray): Boolean {
+            for (index in 0 until messages.length()) {
+                val content = messages.optJSONObject(index)?.opt("content")
+                if (content is JSONArray) {
+                    for (partIndex in 0 until content.length()) {
+                        val part = content.optJSONObject(partIndex) ?: continue
+                        val type = part.optString("type")
+                        if (type == "image_url" || type == "input_image") {
+                            return true
+                        }
+                    }
+                }
+            }
+            return false
+        }
+
+        private fun parseJsonValue(raw: String): Any? {
+            val trimmed = raw.trim()
+            if (trimmed.isBlank()) {
+                return ""
+            }
+            return kotlin.runCatching {
+                when {
+                    trimmed.startsWith("{") -> jsonObjectToMap(JSONObject(trimmed))
+                    trimmed.startsWith("[") -> jsonArrayToList(JSONArray(trimmed))
+                    else -> raw
+                }
+            }.getOrDefault(raw)
+        }
+
+        private fun parseJsonObject(raw: String): JSONObject {
+            return kotlin.runCatching { JSONObject(raw) }.getOrDefault(JSONObject())
+        }
+
+        private fun jsonObjectToMap(jsonObject: JSONObject): Map<String, Any?> {
+            val result = linkedMapOf<String, Any?>()
+            val keys = jsonObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                result[key] = jsonValueToAny(jsonObject.opt(key))
+            }
+            return result
+        }
+
+        private fun jsonArrayToList(jsonArray: JSONArray): List<Any?> {
+            return buildList {
+                for (index in 0 until jsonArray.length()) {
+                    add(jsonValueToAny(jsonArray.opt(index)))
+                }
+            }
+        }
+
+        private fun jsonValueToAny(value: Any?): Any? {
+            return when (value) {
+                is JSONObject -> jsonObjectToMap(value)
+                is JSONArray -> jsonArrayToList(value)
+                JSONObject.NULL -> null
+                else -> value
+            }
+        }
+
+        private fun mapToJsonObject(value: Map<String, Any?>): JSONObject {
+            val jsonObject = JSONObject()
+            value.forEach { (key, item) ->
+                jsonObject.put(key, anyToJson(item))
+            }
+            return jsonObject
+        }
+
+        private fun anyToJson(value: Any?): Any? {
+            return when (value) {
+                null -> JSONObject.NULL
+                is Map<*, *> -> {
+                    val jsonObject = JSONObject()
+                    value.forEach { (key, item) ->
+                        if (key != null) {
+                            jsonObject.put(key.toString(), anyToJson(item))
+                        }
+                    }
+                    jsonObject
+                }
+                is Iterable<*> -> JSONArray().apply { value.forEach { put(anyToJson(it)) } }
+                else -> value
+            }
+        }
+
+        private class JsonSchemaTool(private val spec: String) : OpenApiTool {
+            override fun getToolDescriptionJsonString(): String = spec
+
+            override fun execute(paramsJsonString: String): String {
+                throw IllegalStateException("LiteRT-LM proxy uses manual tool-calling mode")
+            }
+        }
+    }
+
+    private const val SOCKET_READ_TIMEOUT = 0
+    internal fun memorySafeModalityDecision(
+        totalRamBytes: Long,
+        modelBytes: Long,
+        requestedImage: Boolean,
+        requestedAudio: Boolean,
+    ): ModalityDecision {
+        if (!requestedImage && !requestedAudio) {
+            return ModalityDecision(
+                supportImage = false,
+                supportAudio = false,
+                policy = "text-only",
+            )
+        }
+
+        val requestedLabel = buildString {
+            append("requested")
+            if (requestedImage) append(" image")
+            if (requestedImage && requestedAudio) append(" and")
+            if (requestedAudio) append(" audio")
+            append(" adapter support")
+        }
+        val minimumRamBytes = minimumRamForLargeModelExtras(modelBytes)
+        if (minimumRamBytes > 0L) {
+            val shouldGuard = if (totalRamBytes > 0L) {
+                totalRamBytes < minimumRamBytes
+            } else {
+                true
+            }
+            if (shouldGuard) {
+                val currentRam = if (totalRamBytes > 0L) {
+                    "${formatRamGb(totalRamBytes)}GB RAM"
+                } else {
+                    "unknown RAM"
+                }
+                return ModalityDecision(
+                    supportImage = false,
+                    supportAudio = false,
+                    policy = "text-only memory guard: skipped $requestedLabel for a ${formatRamGb(modelBytes)}GB model on $currentRam; ${formatRamGb(minimumRamBytes)}GB RAM recommended",
+                )
+            }
+        }
+        return ModalityDecision(
+            supportImage = requestedImage,
+            supportAudio = requestedAudio,
+            policy = requestedLabel,
+        )
+    }
+
+    internal fun decideGpuBackendPolicy(
+        isTranslatedArm64OnX86: Boolean,
+        supportedAbis: List<String>,
+        openClAvailable: Boolean,
+        hardwareIdentity: String,
+        preferredAccelerator: String = "auto",
+    ): GpuBackendPolicy {
+        val normalizedIdentity = hardwareIdentity.lowercase(Locale.US)
+        val normalizedAccelerator = preferredAccelerator.trim().lowercase(Locale.US)
+        val hardwareProfile = HermesAndroidHardwareProfile.classify(listOf(normalizedIdentity))
+        val nativeAbiStrategy = HermesAndroidHardwareProfile.nativeAbiStrategy(supportedAbis)
+        val armDeviceLabel = HermesAndroidHardwareProfile.accelerationLabel(hardwareProfile)
+
+        fun policy(
+            enabled: Boolean,
+            description: String,
+            backendOrder: List<String> = if (enabled) listOf("gpu", "cpu") else listOf("cpu"),
+        ): GpuBackendPolicy {
+            return GpuBackendPolicy(
+                enabled = enabled,
+                openClAvailable = openClAvailable,
+                deviceIdentity = normalizedIdentity,
+                socFamily = hardwareProfile.socFamily,
+                gpuFamily = hardwareProfile.gpuFamily,
+                backendOrder = backendOrder,
+                nativeAbiStrategy = nativeAbiStrategy,
+                description = description,
+            )
+        }
+
+        return when {
+            normalizedAccelerator == "cpu" -> policy(
+                enabled = false,
+                description = "disabled: user selected CPU accelerator in local model configuration",
+            )
+            normalizedAccelerator == "npu" -> policy(
+                enabled = false,
+                description = "disabled: Hermes does not implement a separate NPU delegate; choose auto, CPU, or GPU",
+            )
+            isTranslatedArm64OnX86 -> policy(
+                enabled = false,
+                description = "disabled: translated arm64 package on x86 emulator/device",
+            )
+            supportedAbis.any { HermesAndroidHardwareProfile.isX86Abi(it) } -> policy(
+                enabled = false,
+                description = "disabled: x86 emulator/device build",
+            )
+            openClAvailable -> policy(
+                enabled = true,
+                description = "enabled: OpenCL library was loadable for $armDeviceLabel; attempting LiteRT-LM GPU with CPU fallback",
+            )
+            supportedAbis.any { HermesAndroidHardwareProfile.isArmAbi(it) } -> policy(
+                enabled = true,
+                description = "enabled: $armDeviceLabel device; attempting LiteRT-LM GPU with CPU fallback even though OpenCL probe was not loadable",
+            )
+            else -> policy(
+                enabled = false,
+                description = "disabled: no ARM ABI or loadable OpenCL GPU path detected",
+            )
+        }
+    }
+
+    internal fun decideSpeculativeDecoding(
+        capabilitiesSupported: Boolean,
+        modelName: String,
+        modelBytes: Long,
+        totalRamBytes: Long,
+        isX86Device: Boolean,
+        mode: SpeculativeDecodingMode,
+    ): SpeculativeDecodingDecision {
+        val capabilitySupported = capabilitiesSupported
+        if (mode == SpeculativeDecodingMode.DISABLED) {
+            return SpeculativeDecodingDecision(
+                supported = capabilitySupported,
+                enabled = false,
+                policy = if (capabilitySupported) {
+                    "disabled: runtime setting disabled Gemma 4 MTP"
+                } else {
+                    "disabled: runtime setting disabled speculative decoding"
+                },
+            )
+        }
+        if (!capabilitySupported) {
+            return SpeculativeDecodingDecision(
+                supported = false,
+                enabled = false,
+                policy = if (mode == SpeculativeDecodingMode.ENABLED) {
+                    "disabled: runtime setting requested Gemma 4 MTP but ${File(modelName).name} does not advertise support"
+                } else {
+                    "disabled: ${File(modelName).name} does not advertise Gemma 4 MTP support"
+                },
+            )
+        }
+        if (isX86Device) {
+            return SpeculativeDecodingDecision(
+                supported = true,
+                enabled = false,
+                policy = "disabled: x86 emulator/device build",
+            )
+        }
+        val minimumRamBytes = minimumRamForLargeModelExtras(modelBytes)
+        if (minimumRamBytes > 0L && totalRamBytes > 0L && totalRamBytes < minimumRamBytes) {
+            return SpeculativeDecodingDecision(
+                supported = true,
+                enabled = false,
+                policy = "disabled: memory guard for Gemma 4 MTP on ${formatRamGb(totalRamBytes)}GB RAM device; ${formatRamGb(minimumRamBytes)}GB RAM recommended",
+            )
+        }
+        return SpeculativeDecodingDecision(
+            supported = true,
+            enabled = true,
+            policy = when (mode) {
+                SpeculativeDecodingMode.ENABLED ->
+                    "enabled: runtime setting requested Gemma 4 MTP and LiteRT-LM capabilities advertise support"
+                else ->
+                    "enabled: LiteRT-LM capabilities advertise Gemma 4 MTP support"
+            },
+        )
+    }
+
+    internal fun decideEngineTokenBudget(
+        requestedMaxTokens: Int,
+        requestedMaxContextLength: Int,
+        totalRamBytes: Long,
+        modelBytes: Long,
+        isX86Device: Boolean,
+        availableRamBytes: Long = 0L,
+        memoryThresholdBytes: Long = 0L,
+        lowMemory: Boolean = false,
+    ): EngineTokenBudget {
+        val x86Limit = if (isX86Device) {
+            x86LiteRtLmTokenBudget(totalRamBytes = totalRamBytes, modelBytes = modelBytes)
+        } else {
+            Int.MAX_VALUE
+        }
+        val requested = when {
+            requestedMaxContextLength > 0 -> requestedMaxContextLength
+            requestedMaxTokens > 0 -> requestedMaxTokens
+            isX86Device -> return EngineTokenBudget(
+                value = x86Limit,
+                policy = "using RAM-aware x86 emulator/device LiteRT-LM token budget $x86Limit",
+            )
+            else -> return EngineTokenBudget(null, "backend default")
+        }
+
+        if (requestedMaxContextLength <= 0) {
+            val selected = requested.coerceAtMost(x86Limit)
+            return EngineTokenBudget(
+                value = selected,
+                policy = if (selected == requested) {
+                    "using requested max token budget"
+                } else {
+                    "clamped requested max token budget $requested to $selected on x86 emulator/device"
+                },
+            )
+        }
+
+        val safeLimit = memorySafeContextWindowLimit(
+            totalRamBytes = totalRamBytes,
+            modelBytes = modelBytes,
+            availableRamBytes = availableRamBytes,
+            memoryThresholdBytes = memoryThresholdBytes,
+            lowMemory = lowMemory,
+        ).coerceAtMost(x86Limit)
+        val selected = requested.coerceAtMost(safeLimit)
+        val totalRamGb = if (totalRamBytes > 0L) "${formatRamGb(totalRamBytes)}GB RAM" else "unknown RAM"
+        return EngineTokenBudget(
+            value = selected,
+            policy = when {
+                selected == requested ->
+                    "using requested context window $requested tokens on $totalRamGb device"
+                isX86Device ->
+                    "clamped requested context window $requested to $selected on x86 emulator/device"
+                else ->
+                    "clamped requested context window $requested to $selected on $totalRamGb device"
+            },
+        )
+    }
+
+    private fun memorySafeContextWindowLimit(
+        totalRamBytes: Long,
+        modelBytes: Long,
+        availableRamBytes: Long,
+        memoryThresholdBytes: Long,
+        lowMemory: Boolean,
+    ): Int {
+        if (lowMemory) return 512
+        val usableAvailableBytes = (availableRamBytes - memoryThresholdBytes).coerceAtLeast(0L)
+        if (availableRamBytes > 0L) {
+            return when {
+                modelBytes >= 6_000_000_000L && usableAvailableBytes < 14_000_000_000L -> 2_048
+                modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES && usableAvailableBytes < 4_000_000_000L -> 2_048
+                modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES && usableAvailableBytes < 8_000_000_000L -> 4_096
+                modelBytes >= LARGE_MULTIMODAL_MODEL_SIZE_FLOOR_BYTES && usableAvailableBytes < 5_000_000_000L -> 4_096
+                usableAvailableBytes < 2_000_000_000L -> 2_048
+                usableAvailableBytes < 5_000_000_000L -> 4_096
+                usableAvailableBytes < 10_000_000_000L -> 8_192
+                else -> 16_384
+            }
+        }
+        if (totalRamBytes <= 0L) {
+            return if (modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES) 2_048 else 4_096
+        }
+        return when {
+            modelBytes >= 6_000_000_000L -> 2_048
+            modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES && totalRamBytes < 12_000_000_000L -> 2_048
+            modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES && totalRamBytes < 16_000_000_000L -> 4_096
+            totalRamBytes < 6_000_000_000L -> 2_048
+            totalRamBytes < 10_000_000_000L -> 4_096
+            totalRamBytes < 14_000_000_000L -> 8_192
+            else -> 16_384
+        }
+    }
+
+    private fun x86LiteRtLmTokenBudget(totalRamBytes: Long, modelBytes: Long): Int {
+        if (totalRamBytes <= 0L) return X86_LITERT_LM_DEFAULT_TOKEN_BUDGET
+        return when {
+            totalRamBytes < 4_000_000_000L -> X86_LITERT_LM_LOW_RAM_TOKEN_BUDGET
+            totalRamBytes < 7_000_000_000L -> X86_LITERT_LM_DEFAULT_TOKEN_BUDGET
+            modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES && totalRamBytes < 12_000_000_000L ->
+                X86_LITERT_LM_DEFAULT_TOKEN_BUDGET
+            else -> X86_LITERT_LM_HIGH_RAM_TOKEN_BUDGET
+        }
+    }
+
+    private fun minimumRamForLargeModelExtras(modelBytes: Long): Long {
+        return when {
+            modelBytes >= GEMMA4_E4B_SIZE_FLOOR_BYTES -> 12_000_000_000L
+            modelBytes >= LARGE_MULTIMODAL_MODEL_SIZE_FLOOR_BYTES -> 8_000_000_000L
+            modelBytes >= MEDIUM_MULTIMODAL_MODEL_SIZE_FLOOR_BYTES -> 6_000_000_000L
+            else -> 0L
+        }
+    }
+
+    private fun formatRamGb(bytes: Long): String {
+        return "%.1f".format(Locale.US, bytes / 1_000_000_000.0)
+    }
+
+    private const val GEMMA4_E4B_SIZE_FLOOR_BYTES = 3_000_000_000L
+    private const val LARGE_MULTIMODAL_MODEL_SIZE_FLOOR_BYTES = 2_000_000_000L
+    private const val MEDIUM_MULTIMODAL_MODEL_SIZE_FLOOR_BYTES = 1_500_000_000L
+    private const val X86_LITERT_LM_LOW_RAM_TOKEN_BUDGET = 512
+    private const val X86_LITERT_LM_DEFAULT_TOKEN_BUDGET = 1_024
+    private const val X86_LITERT_LM_HIGH_RAM_TOKEN_BUDGET = 2_048
+}

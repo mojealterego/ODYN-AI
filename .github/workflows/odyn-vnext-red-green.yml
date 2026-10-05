@@ -1,0 +1,32 @@
+name: ODYN vNext RED-GREEN
+
+on:
+  pull_request:
+    branches:
+      - codex/termux-five-goals
+    paths:
+      - "scripts/convergence/**"
+      - "tests/convergence/**"
+      - ".github/workflows/odyn-vnext-red-green.yml"
+  push:
+    branches:
+      - integration/odyn-vnext
+    paths:
+      - "scripts/convergence/**"
+      - "tests/convergence/**"
+      - ".github/workflows/odyn-vnext-red-green.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruction-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: RED/GREEN reconstruction policy
+        run: python -m pytest -q tests/convergence/test_reconstruct_policy.py

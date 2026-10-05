@@ -1,0 +1,370 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - 'v0.*'
+
+# A tag push is the single release authority. The job creates/updates the
+# matching GitHub release itself; listening for `release.published` as well
+# starts a duplicate run which can cancel the tag build under this workflow's
+# concurrency policy before its signed artifacts are uploaded.
+
+concurrency:
+  group: android-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Python 3.13 for Chaquopy
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+
+      - name: Require the tagged commit to be the published default-branch head
+        id: authority
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$DEFAULT_BRANCH"
+          git check-ref-format --branch "$DEFAULT_BRANCH"
+          git fetch --no-tags --force --depth=1 origin \
+            "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/hermes-release-authority/default"
+          git fetch --no-tags --force --depth=1 origin \
+            "+refs/tags/${HERMES_RELEASE_TAG}:refs/hermes-release-authority/tag"
+          tagged_commit="$(git rev-parse 'HEAD^{commit}')"
+          default_commit="$(git rev-parse 'refs/remotes/hermes-release-authority/default^{commit}')"
+          local_tag_type="$(git cat-file -t "refs/tags/${HERMES_RELEASE_TAG}")"
+          local_tag_object_sha="$(git rev-parse --verify "refs/tags/${HERMES_RELEASE_TAG}")"
+          remote_tag_type="$(git cat-file -t 'refs/hermes-release-authority/tag')"
+          remote_tag_object_sha="$(git rev-parse --verify 'refs/hermes-release-authority/tag')"
+          remote_tag_commit="$(git rev-parse --verify 'refs/hermes-release-authority/tag^{commit}')"
+          printf 'taggedCommit=%s\ndefaultBranch=%s\ndefaultCommit=%s\ntagType=%s\ntagObjectSha=%s\n' \
+            "$tagged_commit" "$DEFAULT_BRANCH" "$default_commit" \
+            "$remote_tag_type" "$remote_tag_object_sha"
+          test "$GITHUB_REF" = "refs/tags/${HERMES_RELEASE_TAG}"
+          test "$GITHUB_SHA" = "$tagged_commit"
+          test "$tagged_commit" = "$default_commit"
+          test "$local_tag_type" = 'tag'
+          test "$remote_tag_type" = 'tag'
+          test "$local_tag_object_sha" = "$remote_tag_object_sha"
+          test "$remote_tag_commit" = "$tagged_commit"
+          printf 'release_commit=%s\ntag_object_sha=%s\n' \
+            "$tagged_commit" "$remote_tag_object_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag and source release identity
+        id: release_identity
+        run: |
+          identity="$(python scripts/check_android_release_identity.py --tag "$GITHUB_REF_NAME")"
+          printf '%s\n' "$identity"
+          version_name="$(printf '%s\n' "$identity" | sed -n 's/^versionName=//p')"
+          version_code="$(printf '%s\n' "$identity" | sed -n 's/^versionCode=//p')"
+          test -n "$version_name"
+          test -n "$version_code"
+          source_identity="$(python scripts/android_release_evidence.py source-identity \
+            --repo-root . \
+            --require-clean)"
+          printf '%s\n' "$source_identity"
+          source_digest="$(printf '%s\n' "$source_identity" | sed -n 's/^sourceDigest=//p')"
+          printf '%s' "$source_digest" | grep -Eq '^[0-9a-f]{64}$'
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "source_digest=$source_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Verify committed headed-device release evidence
+        run: |
+          # This verifies evidence captured by the local hardware-accelerated
+          # AVD lane. It does not turn the compile-only CI runner into device
+          # certification and fails before signing or release publication.
+          python scripts/android_release_evidence.py verify \
+            --tag "$GITHUB_REF_NAME" \
+            --require-tag-ref
+
+      - name: Install Python test dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e '.[android,dev]' -c constraints-android.txt
+
+      - name: Run Android-related Python tests
+        run: |
+          bash scripts/run_tests.sh \
+            tests/hermes_android \
+            tests/gateway/test_api_server_toolset.py \
+            tests/gateway/test_api_server_android_toolset.py \
+            tests/tools/test_skills_sync.py \
+            tests/tools/test_web_tools_firecrawl_fallback.py \
+            tests/run_agent/test_run_agent_chatgpt_web.py \
+            -q
+
+      - name: Verify latest stable LiteRT-LM Android SDK
+        run: python scripts/check_android_litertlm_version.py
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          # Avoid the full "tools" meta-package (pulls emulator) — zip fetch of
+          # emulator has been flaky on GitHub runners and is not needed to
+          # assemble/sign release APK/AAB.
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;29.0.14206865 cmake;3.31.6
+
+      - name: Run Android regression gates
+        working-directory: android
+        run: |
+          export PYTHON_FOR_BUILD="$(command -v python3.13 || command -v python3 || command -v python)"
+          ./gradlew \
+            :app:testDebugUnitTest \
+            :app:compileDebugAndroidTestKotlin \
+            :app:compileBenchmarkKotlin \
+            :macrobenchmark:compileBenchmarkKotlin \
+            :app:lintDebug
+
+      - name: Reauthorize live default head and annotated tag before signing
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EXPECTED_RELEASE_COMMIT: ${{ steps.authority.outputs.release_commit }}
+          EXPECTED_TAG_OBJECT_SHA: ${{ steps.authority.outputs.tag_object_sha }}
+        run: bash scripts/verify_android_remote_release_authority.sh
+
+      - name: Restore signing material
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/release.keystore
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x android/gradlew
+
+      - name: Build and sign Android artifacts
+        working-directory: android
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+          HERMES_SOURCE_DIGEST: ${{ steps.release_identity.outputs.source_digest }}
+          SOURCE_DATE_EPOCH: "315532800"
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_VERSION_NAME: ${{ steps.release_identity.outputs.version_name }}
+          EXPECTED_VERSION_CODE: ${{ steps.release_identity.outputs.version_code }}
+          EXPECTED_SIGNER_SHA256: 2cbdb94d6081413055af1e903d4c1d6714300b4240402d1d4c8182fda777d14e
+        run: |
+          set -euo pipefail
+          cleanup_signing_material() {
+            rm -f release.keystore keystore.properties
+          }
+          trap cleanup_signing_material EXIT
+          rm -rf ../build
+          rm -f keystore.properties
+          export PYTHON_FOR_BUILD="$(command -v python3.13 || command -v python3 || command -v python)"
+          ./gradlew :app:assembleRelease
+          cat > keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+          ./gradlew :app:bundleRelease
+          sdk_root="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          build_tools_dir="$sdk_root/build-tools/35.0.0"
+          apksigner="$build_tools_dir/apksigner"
+          aapt2="$build_tools_dir/aapt2"
+          unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          signed_apk="app/build/outputs/apk/release/app-release.apk"
+          universal_apk="app/build/outputs/apk/release/app-universal-release.apk"
+          test -x "$apksigner"
+          test -x "$aapt2"
+          test -f "$unsigned_apk"
+          python ../scripts/verify_android_source_bound_artifact.py \
+            --artifact "$unsigned_apk" \
+            --source-digest "$HERMES_SOURCE_DIGEST"
+          "$apksigner" sign \
+            --alignment-preserved true \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --v4-signing-enabled false \
+            --ks release.keystore \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "$signed_apk" \
+            "$unsigned_apk"
+          "$apksigner" verify --verbose "$signed_apk"
+          cert_digest="$("$apksigner" verify --print-certs "$signed_apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')"
+          test "$cert_digest" = "$EXPECTED_SIGNER_SHA256"
+          badging="$("$aapt2" dump badging "$signed_apk" | head -n 1)"
+          printf '%s\n' "$badging"
+          printf '%s\n' "$badging" | grep -F "package: name='com.mobilefork.hermesagent'"
+          printf '%s\n' "$badging" | grep -F "versionCode='$EXPECTED_VERSION_CODE'"
+          printf '%s\n' "$badging" | grep -F "versionName='$EXPECTED_VERSION_NAME'"
+          aab="app/build/outputs/bundle/release/app-release.aab"
+          test -f "$aab"
+          python ../scripts/verify_android_source_bound_artifact.py \
+            --artifact "$aab" \
+            --source-digest "$HERMES_SOURCE_DIGEST"
+          jarsigner -verify "$aab"
+          aab_digest="$(keytool -printcert -jarfile "$aab" -rfc | openssl x509 -inform PEM -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$aab_digest" = "$EXPECTED_SIGNER_SHA256"
+          cp -f "$signed_apk" "$universal_apk"
+          rm -f "$unsigned_apk"
+
+      - name: Remove signing material
+        if: ${{ always() }}
+        run: rm -f android/release.keystore android/keystore.properties
+
+      - name: Require final release APK to match the certified physical-device candidate
+        working-directory: android
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          evidence_record="release-evidence/${HERMES_RELEASE_TAG}/physical-device/nanbeige4.2-3b-q4-k-m-repair.json"
+          signed_apk="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$evidence_record" ]; then
+            # The preceding evidence verifier requires this record from v0.13.151
+            # onward. Preserve historical tag reruns whose older policy predates it.
+            printf 'No physical candidate record is required for historical tag %s\n' \
+              "$HERMES_RELEASE_TAG"
+            exit 0
+          fi
+          test -f "$signed_apk"
+          candidate_sha256="$(python -c \
+            'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["release_identity"]["candidate_apk_sha256"])' \
+            "$evidence_record")"
+          candidate_bytes="$(python -c \
+            'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["release_identity"]["candidate_apk_bytes"])' \
+            "$evidence_record")"
+          printf '%s' "$candidate_sha256" | grep -Eq '^[0-9a-f]{64}$'
+          printf '%s' "$candidate_bytes" | grep -Eq '^[1-9][0-9]*$'
+          release_sha256="$(sha256sum "$signed_apk" | awk '{print $1}')"
+          release_bytes="$(stat -c '%s' "$signed_apk")"
+          printf 'candidateSha256=%s\nreleaseSha256=%s\ncandidateBytes=%s\nreleaseBytes=%s\n' \
+            "$candidate_sha256" "$release_sha256" "$candidate_bytes" "$release_bytes"
+          test "$release_sha256" = "$candidate_sha256"
+          test "$release_bytes" = "$candidate_bytes"
+          python ../scripts/android_release_evidence.py verify-physical-candidate-apk \
+            --repo-root .. \
+            --tag "$HERMES_RELEASE_TAG" \
+            --apk "$(pwd)/$signed_apk"
+
+      - name: Rename artifacts and write checksums
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python scripts/android_release_manifest.py --tag "$HERMES_RELEASE_TAG"
+
+      - name: Verify GitHub CLI is available
+        run: |
+          command -v gh
+          gh --version
+
+      - name: Reauthorize live default head and annotated tag before draft creation
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EXPECTED_RELEASE_COMMIT: ${{ steps.authority.outputs.release_commit }}
+          EXPECTED_TAG_OBJECT_SHA: ${{ steps.authority.outputs.tag_object_sha }}
+        run: bash scripts/verify_android_remote_release_authority.sh
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          title="Hermes Agent Fork ${HERMES_RELEASE_TAG}"
+          notes_file="RELEASE_${HERMES_RELEASE_TAG}.md"
+          if gh release view "$HERMES_RELEASE_TAG" >/dev/null 2>&1; then
+            edit_args=(--draft --target "$GITHUB_SHA" --title "$title")
+            if [ -f "$notes_file" ]; then
+              edit_args+=(--notes-file "$notes_file")
+            fi
+            gh release edit "$HERMES_RELEASE_TAG" "${edit_args[@]}"
+          else
+            create_args=(--generate-notes)
+            if [ -f "$notes_file" ]; then
+              create_args=(--notes-file "$notes_file")
+            fi
+            gh release create "$HERMES_RELEASE_TAG" \
+              --draft \
+              --verify-tag \
+              --target "$GITHUB_SHA" \
+              --title "$title" \
+              "${create_args[@]}"
+          fi
+
+      - name: Reauthorize live default head and annotated tag before asset upload
+        env:
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EXPECTED_RELEASE_COMMIT: ${{ steps.authority.outputs.release_commit }}
+          EXPECTED_TAG_OBJECT_SHA: ${{ steps.authority.outputs.tag_object_sha }}
+        run: bash scripts/verify_android_remote_release_authority.sh
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release upload "$HERMES_RELEASE_TAG" \
+            dist/android-release/*.apk \
+            dist/android-release/*.aab \
+            dist/android-release/*.sha256 \
+            --clobber
+
+      - name: Verify complete release asset manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mapfile -t expected < <(find dist/android-release -maxdepth 1 -type f \
+            \( -name '*.apk' -o -name '*.aab' -o -name '*.sha256' \) \
+            -printf '%f\n' | sort)
+          mapfile -t published < <(gh release view "$HERMES_RELEASE_TAG" \
+            --json assets --jq '.assets[].name' | sort)
+          test "${#expected[@]}" -gt 0
+          test "${#expected[@]}" -eq "${#published[@]}"
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${published[@]}")
+          for checksum_file in dist/android-release/*.sha256; do
+            (cd dist/android-release && sha256sum --check "$(basename "$checksum_file")")
+          done
+          test "$(gh release view "$HERMES_RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HERMES_RELEASE_TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EXPECTED_RELEASE_COMMIT: ${{ steps.authority.outputs.release_commit }}
+          EXPECTED_TAG_OBJECT_SHA: ${{ steps.authority.outputs.tag_object_sha }}
+        run: |
+          bash scripts/verify_android_remote_release_authority.sh
+          gh release edit "$HERMES_RELEASE_TAG" --draft=false --latest
+          test "$(gh release view "$HERMES_RELEASE_TAG" --json isDraft --jq .isDraft)" = false

@@ -1,0 +1,412 @@
+package com.mobilefork.hermesagent.data
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
+
+data class StoredConversationMessage(
+    val id: String,
+    val role: String,
+    val content: String,
+    val createdAtEpochMs: Long,
+    val attachments: List<StoredConversationAttachment> = emptyList(),
+)
+
+data class StoredConversationAttachment(
+    val uri: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long = 0L,
+)
+
+data class StoredConversation(
+    val sessionId: String,
+    val title: String,
+    val updatedAtEpochMs: Long,
+    val messages: List<StoredConversationMessage>,
+)
+
+data class ConversationSummary(
+    val sessionId: String,
+    val title: String,
+    val preview: String,
+    val updatedAtEpochMs: Long,
+    val messageCount: Int,
+)
+
+class ConversationStore(context: Context) {
+    private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    @Volatile
+    private var cachedConversations: List<StoredConversation>? = null
+
+    @Synchronized
+    fun currentSessionId(): String = ensureCurrentConversation().sessionId
+
+    @Synchronized
+    fun currentConversation(): StoredConversation = ensureCurrentConversation()
+
+    @Synchronized
+    fun currentConversationMessages(): List<StoredConversationMessage> = ensureCurrentConversation().messages
+
+    @Synchronized
+    fun listConversationSummaries(): List<ConversationSummary> {
+        return readConversations()
+            .map { conversation ->
+                ConversationSummary(
+                    sessionId = conversation.sessionId,
+                    title = conversation.title,
+                    preview = conversation.messages.lastOrNull()?.content?.trim().orEmpty(),
+                    updatedAtEpochMs = conversation.updatedAtEpochMs,
+                    messageCount = conversation.messages.size,
+                )
+            }
+            .sortedByDescending { it.updatedAtEpochMs }
+    }
+
+    @Synchronized
+    fun loadConversation(sessionId: String): StoredConversation? {
+        return readConversations().firstOrNull { it.sessionId == sessionId }
+    }
+
+    @Synchronized
+    fun switchConversation(sessionId: String): StoredConversation? {
+        val conversation = loadConversation(sessionId) ?: return null
+        preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
+        return conversation
+    }
+
+    @Synchronized
+    fun createNewConversation(title: String = DEFAULT_TITLE): StoredConversation {
+        val now = System.currentTimeMillis()
+        val conversation = StoredConversation(
+            sessionId = UUID.randomUUID().toString(),
+            title = title,
+            updatedAtEpochMs = now,
+            messages = emptyList(),
+        )
+        val updated = (readConversations() + conversation).sortedByDescending { it.updatedAtEpochMs }
+        writeConversations(updated)
+        preferences.edit().putString(KEY_SESSION_ID, conversation.sessionId).apply()
+        return conversation
+    }
+
+    @Synchronized
+    fun upsertMessage(sessionId: String, message: StoredConversationMessage) {
+        upsertMessages(sessionId, listOf(message))
+    }
+
+    /** Persist one logical message batch with one read-modify-write and one serialization. */
+    @Synchronized
+    fun upsertMessages(sessionId: String, messages: List<StoredConversationMessage>) {
+        if (messages.isEmpty()) return
+        val conversations = readConversations().toMutableList()
+        val index = conversations.indexOfFirst { it.sessionId == sessionId }
+        val base = if (index >= 0) conversations[index] else createShellConversation(sessionId)
+        val updatedMessages = base.messages.toMutableList()
+        messages.forEach { message ->
+            val existingIndex = updatedMessages.indexOfFirst { it.id == message.id }
+            if (existingIndex >= 0) {
+                updatedMessages[existingIndex] = message
+            } else {
+                updatedMessages += message
+            }
+        }
+        val updatedConversation = base.copy(
+            title = deriveTitle(base.title, updatedMessages),
+            updatedAtEpochMs = maxOf(
+                base.updatedAtEpochMs,
+                messages.maxOf { message -> message.createdAtEpochMs },
+                System.currentTimeMillis(),
+            ),
+            messages = updatedMessages,
+        )
+        if (index >= 0) {
+            conversations[index] = updatedConversation
+        } else {
+            conversations += updatedConversation
+        }
+        writeConversations(conversations.sortedByDescending { it.updatedAtEpochMs })
+        preferences.edit().putString(KEY_SESSION_ID, sessionId).apply()
+    }
+
+    @Synchronized
+    fun insertMessageBefore(sessionId: String, beforeMessageId: String, message: StoredConversationMessage) {
+        val conversation = loadConversation(sessionId) ?: return upsertMessage(sessionId, message)
+        if (conversation.messages.any { it.id == message.id }) return
+        val beforeIndex = conversation.messages.indexOfFirst { it.id == beforeMessageId }
+        val updatedMessages = conversation.messages.toMutableList().apply {
+            if (beforeIndex >= 0) add(beforeIndex, message) else add(message)
+        }
+        replaceConversation(
+            conversation.copy(
+                title = deriveTitle(conversation.title, updatedMessages),
+                updatedAtEpochMs = System.currentTimeMillis(),
+                messages = updatedMessages,
+            ),
+        )
+    }
+
+    @Synchronized
+    fun updateMessageContent(sessionId: String, messageId: String, newContent: String) {
+        val conversation = loadConversation(sessionId) ?: return
+        val updatedMessages = conversation.messages.map { message ->
+            if (message.id == messageId) message.copy(content = newContent) else message
+        }
+        replaceConversation(
+            conversation.copy(
+                title = deriveTitle(conversation.title, updatedMessages),
+                updatedAtEpochMs = System.currentTimeMillis(),
+                messages = updatedMessages,
+            )
+        )
+    }
+
+    /**
+     * Finalize an in-flight assistant placeholder without overwriting a reply which won a race
+     * with Stop or failure handling.
+     */
+    @Synchronized
+    fun updateBlankMessageContent(
+        sessionId: String,
+        messageId: String,
+        newContent: String,
+    ): Boolean {
+        require(newContent.isNotBlank()) { "Terminal placeholder content must not be blank" }
+        val conversation = loadConversation(sessionId) ?: return false
+        val targetIndex = conversation.messages.indexOfFirst { it.id == messageId }
+        if (targetIndex < 0 || conversation.messages[targetIndex].content.isNotBlank()) return false
+        val updatedMessages = conversation.messages.toMutableList().apply {
+            this[targetIndex] = this[targetIndex].copy(content = newContent)
+        }
+        replaceConversation(
+            conversation.copy(
+                title = deriveTitle(conversation.title, updatedMessages),
+                updatedAtEpochMs = System.currentTimeMillis(),
+                messages = updatedMessages,
+            ),
+        )
+        return true
+    }
+
+    @Synchronized
+    fun clearCurrentConversation(): StoredConversation {
+        val currentId = preferences.getString(KEY_SESSION_ID, null)
+        if (currentId.isNullOrBlank()) {
+            return createNewConversation()
+        }
+        return clearConversation(currentId)
+    }
+
+    @Synchronized
+    fun clearConversation(sessionId: String): StoredConversation {
+        val remaining = readConversations().filterNot { it.sessionId == sessionId }
+        writeConversations(remaining)
+        val next = remaining.firstOrNull()?.let {
+            preferences.edit().putString(KEY_SESSION_ID, it.sessionId).apply()
+            it
+        } ?: createNewConversation()
+        return next
+    }
+
+    @Synchronized
+    fun clearAll() {
+        cachedConversations = null
+        preferences.edit().remove(KEY_CONVERSATIONS).remove(KEY_SESSION_ID).apply()
+    }
+
+    @Synchronized
+    fun clearSession() {
+        preferences.edit().remove(KEY_SESSION_ID).apply()
+    }
+
+    /** In-memory content update for streaming; disk flush is caller's responsibility (throttled). */
+    @Synchronized
+    fun updateMessageContentInMemory(sessionId: String, messageId: String, newContent: String) {
+        val conversations = readConversations().toMutableList()
+        val index = conversations.indexOfFirst { it.sessionId == sessionId }
+        if (index < 0) return
+        val conversation = conversations[index]
+        val updatedMessages = conversation.messages.map { message ->
+            if (message.id == messageId) message.copy(content = newContent) else message
+        }
+        conversations[index] = conversation.copy(
+            title = deriveTitle(conversation.title, updatedMessages),
+            updatedAtEpochMs = System.currentTimeMillis(),
+            messages = updatedMessages,
+        )
+        cachedConversations = conversations.sortedByDescending { it.updatedAtEpochMs }
+    }
+
+    @Synchronized
+    fun flushCacheToDisk() {
+        val snapshot = cachedConversations ?: return
+        writeConversations(snapshot)
+    }
+
+    private fun ensureCurrentConversation(): StoredConversation {
+        val conversations = readConversations()
+        val currentId = preferences.getString(KEY_SESSION_ID, null)
+        val current = conversations.firstOrNull { it.sessionId == currentId }
+        if (current != null) {
+            return current
+        }
+        if (conversations.isNotEmpty()) {
+            val latest = conversations.maxByOrNull { it.updatedAtEpochMs } ?: conversations.first()
+            preferences.edit().putString(KEY_SESSION_ID, latest.sessionId).apply()
+            return latest
+        }
+        return createNewConversation()
+    }
+
+    private fun replaceConversation(updatedConversation: StoredConversation) {
+        val conversations = readConversations().toMutableList()
+        val index = conversations.indexOfFirst { it.sessionId == updatedConversation.sessionId }
+        if (index >= 0) {
+            conversations[index] = updatedConversation
+        } else {
+            conversations += updatedConversation
+        }
+        writeConversations(conversations.sortedByDescending { it.updatedAtEpochMs })
+        preferences.edit().putString(KEY_SESSION_ID, updatedConversation.sessionId).apply()
+    }
+
+    private fun createShellConversation(sessionId: String): StoredConversation {
+        return StoredConversation(
+            sessionId = sessionId,
+            title = DEFAULT_TITLE,
+            updatedAtEpochMs = System.currentTimeMillis(),
+            messages = emptyList(),
+        )
+    }
+
+    private fun readConversations(): List<StoredConversation> {
+        cachedConversations?.let { return it }
+        val raw = preferences.getString(KEY_CONVERSATIONS, null).orEmpty()
+        if (raw.isBlank()) {
+            cachedConversations = emptyList()
+            return emptyList()
+        }
+        val parsed = runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(item.toConversation())
+                }
+            }
+        }.getOrDefault(emptyList())
+        cachedConversations = parsed
+        return parsed
+    }
+
+    private fun writeConversations(conversations: List<StoredConversation>) {
+        cachedConversations = conversations
+        val array = JSONArray()
+        conversations.forEach { array.put(it.toJson()) }
+        preferences.edit().putString(KEY_CONVERSATIONS, array.toString()).apply()
+    }
+
+    private fun deriveTitle(existingTitle: String, messages: List<StoredConversationMessage>): String {
+        val firstUserText = messages.firstOrNull { it.role == "user" }
+            ?.content
+            ?.trim()
+            .orEmpty()
+            .removePrefix("/")
+            .ifBlank { existingTitle }
+        if (firstUserText.isBlank()) {
+            return existingTitle.ifBlank { DEFAULT_TITLE }
+        }
+        val collapsed = firstUserText.replace(Regex("\\s+"), " ")
+        return if (collapsed.length > 48) collapsed.take(45) + "..." else collapsed
+    }
+
+    private fun StoredConversation.toJson(): JSONObject {
+        return JSONObject().apply {
+            put("sessionId", sessionId)
+            put("title", title)
+            put("updatedAtEpochMs", updatedAtEpochMs)
+            put(
+                "messages",
+                JSONArray().apply {
+                    messages.forEach { message -> put(message.toJson()) }
+                },
+            )
+        }
+    }
+
+    private fun JSONObject.toConversation(): StoredConversation {
+        val messages = optJSONArray("messages")?.let { array ->
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(item.toMessage())
+                }
+            }
+        }.orEmpty()
+        return StoredConversation(
+            sessionId = optString("sessionId", UUID.randomUUID().toString()),
+            title = optString("title", DEFAULT_TITLE),
+            updatedAtEpochMs = optLong("updatedAtEpochMs", System.currentTimeMillis()),
+            messages = messages,
+        )
+    }
+
+    private fun StoredConversationMessage.toJson(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("role", role)
+            put("content", content)
+            put("createdAtEpochMs", createdAtEpochMs)
+            put(
+                "attachments",
+                JSONArray().apply {
+                    attachments.forEach { attachment ->
+                        put(
+                            JSONObject().apply {
+                                put("uri", attachment.uri)
+                                put("displayName", attachment.displayName)
+                                put("mimeType", attachment.mimeType)
+                                put("sizeBytes", attachment.sizeBytes)
+                            }
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    private fun JSONObject.toMessage(): StoredConversationMessage {
+        val attachments = optJSONArray("attachments")?.let { array ->
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val uri = item.optString("uri")
+                    if (uri.isBlank()) continue
+                    add(
+                        StoredConversationAttachment(
+                            uri = uri,
+                            displayName = item.optString("displayName", "attachment"),
+                            mimeType = item.optString("mimeType", "application/octet-stream"),
+                            sizeBytes = item.optLong("sizeBytes", 0L).coerceAtLeast(0L),
+                        )
+                    )
+                }
+            }
+        }.orEmpty()
+        return StoredConversationMessage(
+            id = optString("id", UUID.randomUUID().toString()),
+            role = optString("role", "assistant"),
+            content = optString("content", ""),
+            createdAtEpochMs = optLong("createdAtEpochMs", System.currentTimeMillis()),
+            attachments = attachments,
+        )
+    }
+
+    companion object {
+        private const val PREFS_NAME = "hermes_android_conversation"
+        private const val KEY_CONVERSATIONS = "conversations_json"
+        private const val KEY_SESSION_ID = "session_id"
+        private const val DEFAULT_TITLE = "New chat"
+    }
+}

@@ -1,0 +1,605 @@
+package com.mobilefork.hermesagent.ui.settings
+
+import android.app.Application
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mobilefork.hermesagent.data.McpConfigurationMode
+import com.mobilefork.hermesagent.data.McpRuntimeBridge
+import com.mobilefork.hermesagent.data.McpPromptCacheResendPolicy
+import com.mobilefork.hermesagent.data.McpSettings
+import com.mobilefork.hermesagent.data.McpSettingsMessages
+import com.mobilefork.hermesagent.data.McpSettingsStore
+import com.mobilefork.hermesagent.ui.i18n.LocalHermesStrings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+data class McpSettingsUiState(
+    val mode: McpConfigurationMode = McpConfigurationMode.SIMPLE,
+    val configText: String = "",
+    val providerPromptCacheResendEnabled: Boolean = false,
+    val statusMessage: String = McpSettingsMessages.SIMPLE_READY,
+    val configFilePath: String = "",
+    val lastReloadEpochMs: Long = 0L,
+)
+
+class McpSettingsViewModel(application: Application) : AndroidViewModel(application) {
+    private val store = McpSettingsStore(application)
+    private val _uiState = MutableStateFlow(store.load().toUiState(store.configFilePath()))
+    val uiState: StateFlow<McpSettingsUiState> = _uiState.asStateFlow()
+
+    fun reloadFromDisk() {
+        _uiState.value = store.load().toUiState(store.configFilePath())
+    }
+
+    fun selectMode(mode: McpConfigurationMode) {
+        _uiState.value = store.saveMode(mode).toUiState(store.configFilePath())
+    }
+
+    fun detectExistingConfiguration() {
+        val result = store.detectExistingConfiguration()
+        _uiState.update {
+            it.copy(
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun autoFillSimpleConfiguration() {
+        val result = store.autoFillSimpleConfiguration()
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+            )
+        }
+    }
+
+    fun autoSetupSimpleConfiguration() {
+        val result = store.autoSetupSimpleConfiguration()
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun addDraftServer(serverNameOrCommand: String, note: String) {
+        val result = store.addDraftServer(serverNameOrCommand, note)
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun updateAdvancedConfigText(value: String) {
+        _uiState.update { it.copy(configText = value) }
+    }
+
+    fun saveAdvancedConfigAndReload() {
+        val result = store.saveAdvancedConfigTextAndReload(_uiState.value.configText)
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.ADVANCED,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun reloadServers() {
+        val result = store.reloadServers()
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun quickAddNativeTools() {
+        val result = store.quickAddNativeToolsPreset()
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun quickAddStdioServer(command: String) {
+        val result = store.quickAddStdioPreset(command)
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun quickAddSseServer(url: String) {
+        val result = store.quickAddSsePreset(url)
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun quickAddStreamableHttpServer(url: String, authorizationHeader: String = "") {
+        val result = store.quickAddStreamableHttpPreset(url, authorizationHeader)
+        McpRuntimeBridge.reloadIntoRuntime(getApplication())
+        _uiState.update {
+            it.copy(
+                mode = McpConfigurationMode.SIMPLE,
+                configText = result.configText,
+                statusMessage = result.statusMessage,
+                lastReloadEpochMs = result.lastReloadEpochMs.takeIf { value -> value > 0L } ?: it.lastReloadEpochMs,
+            )
+        }
+    }
+
+    fun updateProviderPromptCacheResend(enabled: Boolean, providerId: String = "") {
+        val updated = store.saveProviderPromptCacheResendEnabled(enabled)
+        _uiState.value = updated.toUiState(
+            configFilePath = store.configFilePath(),
+            statusOverride = McpPromptCacheResendPolicy.statusFor(providerId, updated),
+        )
+    }
+}
+
+@Composable
+fun McpSettingsSection(
+    modifier: Modifier = Modifier,
+    selectedProviderId: String = "",
+    viewModel: McpSettingsViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    McpSettingsCard(
+        modifier = modifier,
+        uiState = uiState,
+        selectedProviderId = selectedProviderId,
+        onProviderPromptCacheResendChange = viewModel::updateProviderPromptCacheResend,
+    )
+}
+
+@Composable
+fun McpSettingsCard(
+    uiState: McpSettingsUiState,
+    selectedProviderId: String,
+    onProviderPromptCacheResendChange: (Boolean, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalHermesStrings.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 2.dp,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(strings.mcpConfigurationTitle(), style = MaterialTheme.typography.titleMedium)
+            Text(
+                strings.mcpConfigurationDescription(),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("McpExternalRuntimeUnavailable"),
+            )
+            Text(
+                strings.mcpConfigFile(uiState.configFilePath),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("McpConfigFilePath"),
+            )
+            Text(
+                strings.mcpStoredConfigNotExecuted(),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("McpStoredConfigNotExecuted"),
+            )
+            ProviderPromptCacheControls(
+                enabled = uiState.providerPromptCacheResendEnabled,
+                selectedProviderId = selectedProviderId,
+                onChange = onProviderPromptCacheResendChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SimpleMcpOnboardingControls(
+    configText: String,
+    onDetect: () -> Unit,
+    onAutoFill: () -> Unit,
+    onAutoSetup: () -> Unit,
+    onAddDraftServer: (String, String) -> Unit,
+    onReloadServers: () -> Unit,
+    onQuickAddNativeTools: () -> Unit,
+    onQuickAddStdioServer: (String) -> Unit,
+    onQuickAddSseServer: (String) -> Unit,
+    onQuickAddStreamableHttpServer: (String, String) -> Unit = { _, _ -> },
+) {
+    val strings = LocalHermesStrings.current
+    var addDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var sseDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var streamableDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var serverName by rememberSaveable { mutableStateOf("") }
+    var serverNote by rememberSaveable { mutableStateOf("") }
+    var sseUrl by rememberSaveable { mutableStateOf("") }
+    var streamableUrl by rememberSaveable { mutableStateOf("") }
+    var streamableAuth by rememberSaveable { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpQuickAddNativeToolsButton"),
+                onClick = onQuickAddNativeTools,
+            ) {
+                McpButtonLabel(strings.mcpQuickAddNativeTools())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpQuickAddStdioButton"),
+                onClick = { addDialogVisible = true },
+            ) {
+                McpButtonLabel(strings.mcpQuickAddStdioServer())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpQuickAddSseButton"),
+                onClick = { sseDialogVisible = true },
+            ) {
+                McpButtonLabel(strings.mcpQuickAddSseServer())
+            }
+        }
+        Button(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("McpQuickAddStreamableHttpButton"),
+            onClick = { streamableDialogVisible = true },
+        ) {
+            McpButtonLabel("Add Streamable HTTP (Gallery-style)")
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpAutoDetectButton"),
+                onClick = onDetect,
+            ) {
+                McpButtonLabel(strings.mcpAutoDetect())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpAutoFillButton"),
+                onClick = onAutoFill,
+            ) {
+                McpButtonLabel(strings.mcpAutoFill())
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpAddDraftServerButton"),
+                onClick = { addDialogVisible = true },
+            ) {
+                McpButtonLabel(strings.mcpAddServer())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpAutoSetupButton"),
+                onClick = onAutoSetup,
+            ) {
+                McpButtonLabel(strings.mcpAutoSetup())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpTestRefreshButton"),
+                onClick = onReloadServers,
+            ) {
+                McpButtonLabel(strings.mcpTestRefresh())
+            }
+        }
+        OutlinedTextField(
+            value = strings.mcpConfigPreviewText(configText),
+            onValueChange = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("McpSimpleConfigPreview"),
+            label = { Text(strings.mcpPreview()) },
+            minLines = 4,
+            maxLines = 10,
+            readOnly = true,
+        )
+    }
+    if (addDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { addDialogVisible = false },
+            title = { Text(strings.mcpAddDialogTitle()) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(strings.mcpAddDialogDescription(), style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        label = { Text(strings.mcpServerNameLabel()) },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = serverNote,
+                        onValueChange = { serverNote = it },
+                        label = { Text(strings.mcpServerNoteLabel()) },
+                        minLines = 2,
+                        maxLines = 4,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = serverName.isNotBlank(),
+                    onClick = {
+                        onAddDraftServer(serverName, serverNote)
+                        serverName = ""
+                        serverNote = ""
+                        addDialogVisible = false
+                    },
+                ) {
+                    Text(strings.mcpAddAndTest())
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { addDialogVisible = false }) {
+                    Text(strings.mcpCancel())
+                }
+            },
+        )
+    }
+    if (sseDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { sseDialogVisible = false },
+            title = { Text(strings.mcpQuickAddSseServer()) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(strings.agentEndpointDescription(), style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = sseUrl,
+                        onValueChange = { sseUrl = it },
+                        label = { Text(strings.baseUrlLabel()) },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = sseUrl.isNotBlank(),
+                    onClick = {
+                        onQuickAddSseServer(sseUrl)
+                        sseUrl = ""
+                        sseDialogVisible = false
+                    },
+                ) {
+                    Text(strings.mcpAddAndTest())
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sseDialogVisible = false }) {
+                    Text(strings.mcpCancel())
+                }
+            },
+        )
+    }
+    if (streamableDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { streamableDialogVisible = false },
+            title = { Text(strings.streamableHttpMcpTitle()) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        strings.streamableHttpMcpDescription(),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = streamableUrl,
+                        onValueChange = { streamableUrl = it },
+                        label = { Text(strings.mcpServerUrlLabel()) },
+                        singleLine = true,
+                        modifier = Modifier.testTag("McpStreamableHttpUrlInput"),
+                    )
+                    OutlinedTextField(
+                        value = streamableAuth,
+                        onValueChange = { streamableAuth = it },
+                        label = { Text(strings.optionalApiTokenLabel()) },
+                        singleLine = true,
+                        modifier = Modifier.testTag("McpStreamableHttpAuthInput"),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = streamableUrl.isNotBlank(),
+                    onClick = {
+                        onQuickAddStreamableHttpServer(streamableUrl, streamableAuth)
+                        streamableUrl = ""
+                        streamableAuth = ""
+                        streamableDialogVisible = false
+                    },
+                    modifier = Modifier.testTag("McpStreamableHttpConfirmButton"),
+                ) {
+                    Text(strings.mcpAddAndTest())
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { streamableDialogVisible = false }) {
+                    Text(strings.mcpCancel())
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun AdvancedMcpConfigEditor(
+    configText: String,
+    onConfigTextChange: (String) -> Unit,
+    onSaveAdvanced: () -> Unit,
+    onReloadServers: () -> Unit,
+) {
+    val strings = LocalHermesStrings.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpSaveAdvancedButton"),
+                onClick = onSaveAdvanced,
+            ) {
+                McpButtonLabel(strings.mcpSaveAndReload())
+            }
+            Button(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("McpReloadServersButton"),
+                onClick = onReloadServers,
+            ) {
+                McpButtonLabel(strings.mcpReloadServers())
+            }
+        }
+        OutlinedTextField(
+            value = configText,
+            onValueChange = onConfigTextChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("McpAdvancedConfigText"),
+            label = { Text(strings.mcpConfigJsonLabel()) },
+            minLines = 8,
+            maxLines = 18,
+        )
+    }
+}
+
+@Composable
+private fun ProviderPromptCacheControls(
+    enabled: Boolean,
+    selectedProviderId: String,
+    onChange: (Boolean, String) -> Unit,
+) {
+    val strings = LocalHermesStrings.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(strings.mcpProviderCacheResendTitle(), style = MaterialTheme.typography.titleSmall)
+            Text(
+                strings.mcpProviderCacheResendDescription(),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Switch(
+            modifier = Modifier.testTag("McpProviderCacheResendSwitch"),
+            checked = enabled,
+            onCheckedChange = { onChange(it, selectedProviderId) },
+        )
+    }
+}
+
+@Composable
+private fun McpButtonLabel(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun McpSettings.toUiState(
+    configFilePath: String,
+    statusOverride: String? = null,
+): McpSettingsUiState {
+    return McpSettingsUiState(
+        mode = mode,
+        configText = configText,
+        providerPromptCacheResendEnabled = providerPromptCacheResendEnabled,
+        statusMessage = statusOverride ?: lastStatusMessage,
+        configFilePath = configFilePath,
+        lastReloadEpochMs = lastReloadEpochMs,
+    )
+}
