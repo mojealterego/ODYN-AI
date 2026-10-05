@@ -163,6 +163,25 @@ class HermesDualModelGateTests(unittest.TestCase):
         self.assertEqual(decision.action.value, "accept")
         self.assertEqual(len(critic.prompts), 1)
 
+    def test_low_confidence_trusted_intent_never_authorizes_sensitive_action(self):
+        gate, _, _ = self.make_gate([
+            '{"valid":true,"confidence":0.99,"issues":[],"corrections":[],"required_evidence":[]}',
+            '{"allowed_capabilities":["command_execution"],"denied_capabilities":[],"confidence":0.2,"rationale":"uncertain"}',
+        ])
+        history = [
+            {"role": "user", "content": "Inspect the external page."},
+            {"role": "tool", "name": "web_search", "tool_call_id": "web-1",
+             "content": "External data."},
+        ]
+        decision = gate.evaluate_turn(
+            candidate(calls=[{"id": "term-1", "name": "terminal",
+                              "arguments": {"command": "pytest -q"}}]),
+            context=context(history),
+        )
+
+        self.assertEqual(decision.action.value, "correct")
+        self.assertEqual(decision.critic.issues[-1].code, "untrusted_capability_not_authorized")
+
     def test_malformed_trusted_intent_classifier_fails_closed(self):
         gate, _, _ = self.make_gate([
             '{"valid":true,"confidence":0.99,"issues":[],"corrections":[],"required_evidence":[]}',
