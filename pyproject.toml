@@ -270,11 +270,6 @@ messaging = [
   "qrcode==7.4.2",
 ] # aiohttp 3.14.3: prior CVEs + GHSA-cq5v-8q36-5273/GHSA-mfx4-hv73-q22v/GHSA-mq44-7p77-q5h7
 cron = [] # croniter is now a core dependency; this extra kept for back-compat
-android = [
-  # ODYN Mobile Runtime / Chaquopy compatibility lane.
-  "aiohttp>=3.10.10,<4",
-  "croniter>=6.0.0,<7",
-]
 slack = ["slack-bolt==1.30.0", "slack-sdk==3.44.1", "aiohttp==3.14.3"]
 # Matrix gateway deps. `mautrix[encryption]` pulls `python-olm`, whose
 # vendored libolm (archived 2023) cannot build on Windows or modern macOS:
@@ -820,8 +815,6 @@ include = [
   "providers.*",
   "hermes_platform",
   "hermes_platform.*",
-  "hermes_android",
-  "hermes_android.*",
   "pm",
   "pm.*",
   "tools",

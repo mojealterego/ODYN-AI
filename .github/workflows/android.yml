@@ -35,10 +35,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Python 3.13 for Chaquopy
+      - name: Set up Python 3.14 test runtime
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
@@ -51,7 +51,12 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install -e '.[android,dev]' -c constraints-android.txt
+          .venv/bin/python -m pip install -e '.[all]' pytest pytest-asyncio pyyaml
+
+      - name: Set up Python 3.13 for Chaquopy
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
 
       - name: Run Android-related Python tests
         run: |
