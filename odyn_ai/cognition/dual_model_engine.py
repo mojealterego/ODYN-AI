@@ -156,6 +156,13 @@ class DualModelEngine:
                 raise ValueError("classifier denied an unrequested capability")
             if set(allowed_tuple) & set(denied_tuple):
                 raise ValueError("a capability cannot be both allowed and denied")
+            if confidence < self.critic_confidence_threshold:
+                allowed_tuple = ()
+                denied_tuple = requested
+                rationale = (
+                    "Capability authorization confidence was below the acceptance "
+                    "threshold; sensitive capabilities fail closed."
+                )
             return CapabilityAuthorization(
                 valid=True,
                 allowed_capabilities=allowed_tuple,
