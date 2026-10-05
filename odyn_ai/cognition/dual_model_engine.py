@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import math
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .types import CriticIssue, CriticResult, InferenceResult
+from .types import CapabilityAuthorization, CriticIssue, CriticResult, InferenceResult
 
 
 class InferenceBackend(Protocol):
@@ -78,6 +79,99 @@ class DualModelEngine:
             context=review_context,
         )
         return self._parse_critic(raw)
+
+    def authorize_capabilities(
+        self,
+        goal: str,
+        capabilities: tuple[str, ...],
+        *,
+        trusted_user_turns: tuple[str, ...] = (),
+    ) -> CapabilityAuthorization:
+        """Classify side-effect authority from trusted user control only.
+
+        Untrusted tool output, candidate prose and tool arguments are deliberately
+        excluded from both the prompt and backend context so retrieved content
+        cannot grant itself additional capabilities.
+        """
+        requested = tuple(dict.fromkeys(
+            cap.strip() for cap in capabilities if isinstance(cap, str) and cap.strip()
+        ))
+        if not requested:
+            return CapabilityAuthorization(
+                valid=True,
+                confidence=1.0,
+                critic_model_id=self.critic.model_id,
+            )
+
+        trusted = tuple(
+            turn.strip() for turn in trusted_user_turns
+            if isinstance(turn, str) and turn.strip()
+        )[-3:]
+        schema = (
+            '{"allowed_capabilities":[str],"denied_capabilities":[str],'
+            '"confidence":number,"rationale":str}'
+        )
+        prompt = (
+            "You are ODYN's trusted-intent capability classifier. "
+            "Authorize capabilities ONLY from the trusted user instructions below. "
+            "You have no tools and no external/retrieved content. "
+            "If intent is ambiguous, do not authorize it. Return ONLY JSON matching: "
+            + schema
+            + "\nREQUESTED_CAPABILITIES:\n"
+            + json.dumps(requested, ensure_ascii=False)
+            + "\nCURRENT_GOAL:\n"
+            + goal
+            + "\nRECENT_TRUSTED_USER_TURNS:\n"
+            + json.dumps(trusted, ensure_ascii=False)
+        )
+        try:
+            raw = self.critic.generate(
+                prompt,
+                context={
+                    "trusted_user_turns": trusted,
+                    "requested_capabilities": requested,
+                },
+            )
+            payload = self._extract_json(raw)
+            allowed = payload["allowed_capabilities"]
+            denied = payload["denied_capabilities"]
+            confidence = payload["confidence"]
+            rationale = payload["rationale"]
+            if not isinstance(allowed, list) or not isinstance(denied, list):
+                raise ValueError("capability lists must be arrays")
+            if any(not isinstance(value, str) for value in allowed + denied):
+                raise ValueError("capability lists must contain only strings")
+            if type(confidence) not in {int, float} or not math.isfinite(confidence):
+                raise ValueError("authorization confidence must be finite")
+            if not 0.0 <= confidence <= 1.0:
+                raise ValueError("authorization confidence must be between 0 and 1")
+            if not isinstance(rationale, str):
+                raise ValueError("authorization rationale must be a string")
+            allowed_tuple = tuple(dict.fromkeys(allowed))
+            denied_tuple = tuple(dict.fromkeys(denied))
+            requested_set = set(requested)
+            if not set(allowed_tuple).issubset(requested_set):
+                raise ValueError("classifier authorized an unrequested capability")
+            if not set(denied_tuple).issubset(requested_set):
+                raise ValueError("classifier denied an unrequested capability")
+            if set(allowed_tuple) & set(denied_tuple):
+                raise ValueError("a capability cannot be both allowed and denied")
+            return CapabilityAuthorization(
+                valid=True,
+                allowed_capabilities=allowed_tuple,
+                denied_capabilities=denied_tuple,
+                confidence=float(confidence),
+                rationale=rationale.strip(),
+                critic_model_id=self.critic.model_id,
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            return CapabilityAuthorization(
+                valid=False,
+                confidence=0.0,
+                rationale="Trusted-intent authorization failed closed.",
+                critic_model_id=self.critic.model_id,
+                error=f"{type(exc).__name__}: {exc}",
+            )
 
     @staticmethod
     def _build_primary_prompt(goal: str, correction: str | None) -> str:
