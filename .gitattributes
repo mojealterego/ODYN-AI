@@ -35,3 +35,4 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+hermes_android/patches/*.patch text eol=lf

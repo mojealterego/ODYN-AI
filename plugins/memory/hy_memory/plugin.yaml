@@ -1,0 +1,4 @@
+name: hy_memory
+description: HY Memory dual-system cognitive memory provider for Hermes agents.
+python_dependencies:
+  - "hy-memory==1.2.18"

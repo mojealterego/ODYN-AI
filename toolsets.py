@@ -206,6 +206,18 @@ TOOLSETS = {
         "interactive UI tools like clarify or send_message)",
         _core_without("text_to_speech", "clarify", "computer_use", kanban=False),
     ),
+    "hermes-android-app": _ts(
+        "ODYN Android embedded runtime — bounded local execution and device tools",
+        [
+            "terminal", "process_manage",
+            "android_device_status", "android_system_action",
+            "android_shared_folder_list", "android_shared_folder_read", "android_shared_folder_write",
+            "android_ui_snapshot", "android_ui_action",
+            "read_file", "search_files", "write_file", "patch",
+            "skills_list", "skill_view", "skill_manage",
+            "todo_list", "memory", "session_search",
+        ],
+    ),
     "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 
     # Mirrors hermes-cli; `hermes tools` platform config filters it down and
