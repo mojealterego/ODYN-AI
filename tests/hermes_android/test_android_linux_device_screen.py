@@ -1,0 +1,18 @@
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_device_screen_mentions_linux_command_suite_and_terminal_usage():
+    device_screen = (
+        REPO_ROOT / "android/app/src/main/java/com/mobilefork/hermesagent/ui/device/DeviceScreen.kt"
+    ).read_text(encoding="utf-8")
+    strings = (
+        REPO_ROOT / "android/app/src/main/java/com/mobilefork/hermesagent/ui/i18n/HermesStrings.kt"
+    ).read_text(encoding="utf-8")
+
+    assert 'Text(strings.deviceLinuxSuiteTitle()' in device_screen
+    assert 'strings.deviceLinuxTerminalGuidance()' in device_screen
+    assert 'Text(strings.deviceGuideStep(1))' in device_screen
+    assert 'strings.deviceRuntimeTitle()' in device_screen
