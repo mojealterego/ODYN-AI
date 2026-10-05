@@ -132,11 +132,8 @@ class HermesDualModelGate:
 
     def evaluate_turn(self, candidate: Any, *, context: Any) -> GateDecision:
         messages = list(getattr(context, "messages", ()) or ())
-        goal = next(
-            (str(m.get("content") or "") for m in reversed(messages)
-             if isinstance(m, dict) and m.get("role") == "user"),
-            "",
-        )
+        trusted_turns = _trusted_user_turns(messages)
+        goal = trusted_turns[-1] if trusted_turns else ""
         task_key = str(getattr(context, "task_id", None) or getattr(context, "session_id", None) or "default")
         calls = list(getattr(candidate, "tool_calls", ()) or ())
         candidate_payload = {
@@ -161,7 +158,6 @@ class HermesDualModelGate:
             capabilities = _required_capabilities(calls)
             untrusted_sources = _untrusted_tool_sources(messages)
             if capabilities and untrusted_sources:
-                trusted_turns = _trusted_user_turns(messages)
                 authorization = self.engine.authorize_capabilities(
                     goal,
                     capabilities,
