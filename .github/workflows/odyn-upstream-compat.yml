@@ -1,0 +1,32 @@
+name: ODYN Hermes upstream compatibility policy
+
+on:
+  pull_request:
+    paths:
+      - "scripts/odyn_upstream_compat_gate.py"
+      - "tests/test_odyn_upstream_compat_gate.py"
+      - "website/docs/getting-started/termux.md"
+      - ".github/workflows/odyn-upstream-compat.yml"
+  push:
+    branches: ["codex/termux-five-goals"]
+    paths:
+      - "scripts/odyn_upstream_compat_gate.py"
+      - "tests/test_odyn_upstream_compat_gate.py"
+      - "website/docs/getting-started/termux.md"
+      - ".github/workflows/odyn-upstream-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test read-only Termux compatibility gate
+        run: python -m unittest discover -s tests -p test_odyn_upstream_compat_gate.py -v

@@ -6,6 +6,8 @@ description: "Run Hermes Agent directly on an Android phone with Termux"
 
 # Hermes on Android with Termux
 
+> **Upstream compatibility notice (2026-10-09):** The current official Nous Research [Termux documentation](https://hermes-agent.nousresearch.com/docs/getting-started/termux) explicitly reports **"Termux is currently broken"** and warns that its APT package can fail to install or run. This ODYN MobileFork page describes a historically tested **separate source/Python-venv path**; it does **not** establish that upstream signed APT packages or every source dependency works today. Avoid suggesting unverified `curl | bash`, disabling signature checks, or forced upgrades as a fix. Independently verify a newer official release/status and make a backup before any change. See [read-only compatibility preflight](../../../scripts/odyn_upstream_compat_gate.py), which cannot install or attest packages.
+
 This is the tested path for running Hermes Agent directly on an Android phone through [Termux](https://termux.dev/).
 
 It gives you a working local CLI on the phone, plus the core extras that are currently known to install cleanly on Android.
