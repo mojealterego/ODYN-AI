@@ -1,5 +1,7 @@
 # Hermes Agent for Android
 
+> **Important distinction (reviewed 2026-10-09):** This Android **native APK/AAB** and the separately published official **Hermes Termux APT package** are different distribution paths, with different build/runtime support. [Upstream Nous Research Termux documentation](https://hermes-agent.nousresearch.com/docs/getting-started/termux) currently states "Termux is currently broken." That status does **not** prove this native Android APK has the same defect. Never use the desktop glibc installer to "repair" an Android Termux installation, nor disable APT signature checks. Our optional [release-plan preflight](../../scripts/odyn_upstream_compat_gate.py) checks only a supplied, independently verified APT release plan and never contacts the phone or installs anything. Source guide [here](../website/docs/getting-started/termux.md).
+
 Hermes Agent ships as a native Android app as well as the separate Termux CLI.
 The app embeds Hermes, can connect to remote OpenAI-compatible providers, and
 can run supported local models through either LiteRT-LM or llama.cpp.
