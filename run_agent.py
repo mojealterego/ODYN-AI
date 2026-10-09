@@ -214,6 +214,7 @@ from agent.tool_dispatch_helpers import (
     _extract_file_mutation_targets,
     _extract_error_preview,
     _trajectory_normalize_msg,
+    make_tool_result_message,
 )
 from utils import atomic_json_write, base_url_host_matches, base_url_hostname, env_var_enabled, normalize_proxy_url
 from hermes_cli.config import cfg_get
@@ -15513,12 +15514,7 @@ class AIAgent:
                 if _is_multimodal_tool_result(function_result)
                 else function_result
             )
-            tool_msg = {
-                "role": "tool",
-                "name": name,
-                "content": _tool_content,
-                "tool_call_id": tc.id,
-            }
+            tool_msg = make_tool_result_message(name, _tool_content, tc.id)
             messages.append(tool_msg)
 
             android_restart_detail = _android_command_execution_restart_detail()
@@ -16004,12 +16000,9 @@ class AIAgent:
                 if _is_multimodal_tool_result(function_result)
                 else function_result
             )
-            tool_msg = {
-                "role": "tool",
-                "name": function_name,
-                "content": _tool_content,
-                "tool_call_id": tool_call.id
-            }
+            tool_msg = make_tool_result_message(
+                function_name, _tool_content, tool_call.id,
+            )
             messages.append(tool_msg)
 
             android_restart_detail = _android_command_execution_restart_detail()
